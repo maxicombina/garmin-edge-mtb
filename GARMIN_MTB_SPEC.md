@@ -1,0 +1,237 @@
+# Especificación: Data Field MTB para Garmin Edge (Connect IQ)
+
+> **Propósito de este documento:** servir de contexto completo para que una IA (o un desarrollador) implemente el proyecto sin necesidad de la conversación previa. Redactado para revisión humana antes de arrancar.
+
+---
+
+## 1. Contexto y objetivo
+
+El usuario quiere desarrollar una aplicación para la **Connect IQ Store de Garmin**, orientada a su uso personal en **MTB (mountain bike)**, con posibilidad futura de publicarla en la tienda.
+
+Tras evaluar los tipos de app disponibles (watch face, widget, data field, device app), se decidió que el formato adecuado para un ciclocomputador Edge es un **Data Field**: un campo de datos que se muestra *dentro* de las pantallas de actividad mientras se pedalea. Los widgets solo se ven fuera de la actividad y aportan poco en este caso.
+
+**Objetivo v1:** un data field útil para MTB, funcionando primero en el simulador y luego en el dispositivo real.
+
+---
+
+## 2. Usuario y hardware
+
+| Aspecto | Detalle |
+|---|---|
+| Dispositivo actual | **Garmin Edge 830** |
+| Dispositivo futuro (próximamente) | **Garmin Edge 840** — el proyecto debe declarar ambos en el manifiesto desde el día 1 |
+| Pantalla (830 y 840) | Táctil, **246 × 322 px**, color |
+| Sensores internos relevantes | GPS, **altímetro barométrico**, acelerómetro, termómetro |
+| Sensores externos | Posibles (FC, cadencia, potencia vía ANT+/BLE) — **no asumir que existen**; la app debe degradar bien sin ellos. El usuario tiene sensor de FC, velocidad y cadencia |
+| Uso | MTB: Más bien XC. Senderos técnicos.  |
+| Experiencia del usuario | Desarrollador de software (backend); conoce C/Java/Python; primera vez con Monkey C |
+| Idioma de trabajo | Conversación en castellano; el código y sus comentarios DEBEN ir en inglés |
+
+---
+
+## 3. Plataforma y restricciones técnicas
+
+### 3.1 Stack
+
+- **Lenguaje:** Monkey C (OO, tipado dinámico/opcional, GC, corre en VM — similar a Java/JS, *no* a C).
+- **SDK:** Connect IQ SDK + Connect IQ SDK Manager.
+- **IDE:** VS Code + extensión oficial "Monkey C" de Garmin.
+- **Pruebas:** simulador del SDK (tiene perfil de Edge 830 y 840). El usuario ya tiene claro que trabajará primero en simulador.
+- **Firma:** requiere generar una developer key (gratuita, cuenta de desarrollador Garmin).
+
+### 3.2 Datos disponibles en un Data Field
+
+- ✅ Vía `Activity.Info` (en `compute()`): velocidad, distancia, **altitud barométrica**, pendiente aproximada, FC/cadencia/potencia/velocidad si hay sensores, temperatura, posición GPS, tiempos de actividad.
+- ✅ **Acelerómetro crudo** vía `Toybox.Sensor.registerSensorDataListener` (ráfagas a ~25 Hz típicamente). ⚠️ **Verificar en simulador/documentación que el Edge 830 lo soporta para data fields** — el hardware lo tiene, pero hay que confirmar el permiso/API level.
+- ✅ **Batería** vía `Toybox.System.getSystemStats()`: `battery` (% restante, `Float`, API 1.0 — disponible seguro en el 830) y `charging` (booleano, API 3.0). Existe también `batteryInDays` (API 3.3) pero con soporte de dispositivos limitado — no contar con él; calcular la proyección nosotros.
+- ✅ **Gasto energético en vivo** vía `Activity.Info.energyExpenditure` (kcal/min, `Float`, API 1.2): métrica de Firstbeat derivada de FC — insumo directo para un modelo de "depósito de energía" (Opción G) sin potenciómetro.
+- ✅ **Perfil de usuario** vía `Toybox.UserProfile.getProfile()`: `restingHeartRate`, `weight`, `birthYear` (API 1.0) y `vo2maxRunning` / `vo2maxCycling` (API 3.3 — el 830 llega justo). ⚠️ `vo2maxCycling` lo calcula el dispositivo solo con potenciómetro; sin él será probablemente `null` → el VO2max debe poder introducirse a mano o **estimarse desde FC/edad** (ver Opción G). Los settings manuales van en los App Settings del propio data field, no en el perfil de Garmin.
+- ❌ **Grit, Flow, conteo de saltos y Stamina nativos de Garmin NO están expuestos** al API de Connect IQ (verificado en `Activity.Info`: no existe ningún campo de stamina). Si se quieren métricas equivalentes, hay que calcularlas desde datos crudos (esto es parte del atractivo del proyecto).
+
+### 3.3 Restricciones
+
+- **Memoria muy limitada** para data fields (decenas de KB; el límite exacto por dispositivo está en el SDK — consultarlo y diseñar con frugalidad: evitar objetos innecesarios, buffers acotados).
+- `compute()` se llama **1 vez por segundo**; `onUpdate()` redibuja según el layout. Cálculos pesados deben ser incrementales, nunca re-procesar históricos completos.
+- El data field puede ocupar desde una celda pequeña hasta pantalla completa: el renderizado debe **adaptarse al tamaño del campo** (mostrar menos info en campos chicos).
+- API level: el Edge 830 soporta hasta **Connect IQ 3.3.6** (confirmado); el Edge 840 soporta 4.x/5.x. **Compilar contra 3.3** (mínimo común) para compatibilidad total.
+- Sin conexión a internet requerida para la v1 (todo on-device).
+
+---
+
+## 4. Opciones de producto evaluadas
+
+Ordenadas de menor a mayor complejidad. La visión es **incremental**: cada opción puede construirse sobre la anterior dentro del mismo proyecto.
+
+### Opción A — Pendiente + VAM
+- **Qué muestra:** pendiente actual (%) y velocidad de ascenso vertical (VAM, m/h), calculadas de altitud + distancia.
+- **Cálculo:** `pendiente = Δaltitud / Δdistancia` (ventana móvil corta, p. ej. 5–10 s, para suavizar ruido barométrico); `VAM = Δaltitud / Δtiempo × 3600`.
+- **Dificultad:** 🟢 baja. **Valor MTB:** ⭐⭐ (existe mucho parecido en la tienda).
+- **Rol:** ejercicio de calentamiento; no es el objetivo final.
+
+### Opción B — "Descenso actual" ⭐ candidata a MVP
+- **Qué muestra:** al detectar que empieza una bajada, resetea y trackea métricas *de esta bajada*: desnivel perdido (m), velocidad máxima, tiempo de descenso, pendiente media. Al terminar la bajada, congela el resumen unos segundos.
+- **Detección de estado:** máquina de estados (SUBIENDO / LLANO / BAJANDO) con **histéresis** sobre la pendiente suavizada (p. ej. entra en BAJANDO con pendiente < −3 % sostenida N segundos; sale con pendiente > −1 % sostenida M segundos) para no rebotar en terreno rompepiernas.
+- **Dificultad:** 🟢🟡 baja-media. **Valor MTB:** ⭐⭐⭐⭐.
+- **Rol:** **MVP recomendado.** Toca todas las piezas base (lectura de `Activity.Info`, estado, render adaptativo) sin acelerómetro.
+
+### Opción C — Cronómetro de tramos (enduro)
+- **Qué hace:** botón táctil grande para iniciar/parar el crono de cada tramo/stage; guarda la lista de tiempos de la salida.
+- **Nota técnica:** los data fields tienen interacción táctil limitada (`onTap` en CIQ 3.x según dispositivo); si resultara insuficiente, esta opción podría requerir convertirse en device app. **Investigar antes de comprometerse.**
+- **Dificultad:** 🟡 media. **Valor MTB:** ⭐⭐⭐⭐ (para uso enduro específico).
+
+### Opción D — "Chunk meter" / índice de rugosidad (Grit casero)
+- **Qué hace:** usa el **acelerómetro crudo** para puntuar en vivo qué tan técnico/roto es el terreno — una versión abierta de la métrica propietaria **Grit** de Garmin (que puntúa la dificultad del recorrido combinando desnivel, sinuosidad y acelerómetro, y que NO está expuesta a Connect IQ).
+- **Enfoque de cálculo (propuesta inicial, a refinar):** RMS de la aceleración vertical filtrada (paso alto para quitar gravedad y pedaleo lento) sobre ventana móvil, normalizada por velocidad; mapear a una escala 0–100 o niveles (verde/amarillo/rojo).
+- **Dificultad:** 🟡🔴 media-alta (procesamiento de señal + límites de memoria/CPU). **Valor MTB:** ⭐⭐⭐⭐⭐ (no hay buen equivalente gratuito en la tienda → candidata a publicación).
+
+### Opción E — Detector de saltos / air time
+- **Qué hace:** detecta fases de caída libre (norma de aceleración ≈ 0 g sostenida) para contar saltos y medir tiempo en el aire; muestra contador y último air time.
+- **Retos:** umbrales robustos (falsos positivos en baches/raíces), ventanas de confirmación, calibración.
+- **Dificultad:** 🔴 alta. **Valor MTB:** ⭐⭐⭐⭐⭐.
+- **Rol:** objetivo aspiracional tras la opción D (comparten la infraestructura de acelerómetro).
+
+### Opción F — Estimador de batería restante (tiempo de autonomía)
+- **Qué muestra:** tiempo estimado de batería restante en h:mm a ritmo de consumo actual, y opcionalmente la tasa de descarga (%/h). Complementa al % nativo del Edge, que no proyecta horas según el uso real de *esta* salida.
+- **Fuente de datos:** `System.getSystemStats().battery` (% restante, disponible desde API 1.0 → funciona en el 830 sin permisos especiales). `charging == true` (p. ej. conectado a un powerbank) invalida la estimación → pausar/resetear el estimador.
+- **Cálculo propuesto:**
+  - Muestrear el % en cada `compute()`; registrar el timestamp de cada caída de % (el valor baja en escalones — no hay precisión continua garantizada).
+  - Estimar la tasa de descarga con regresión lineal o media móvil exponencial sobre una **ventana móvil** de los últimos 30–60 min (adaptativa: si el usuario enciende retroiluminación/navegación, la tasa sube y la estimación se corrige sola).
+  - `tiempo_restante = %_actual / tasa` (con opción de proyectar hasta una reserva del 10 % en vez de hasta 0 %).
+- **Sobre la linealidad (decisión de diseño):** el % que reporta el fuel gauge ya viene aproximadamente linealizado respecto a la capacidad, así que **a carga constante la descarga es casi lineal**. Lo que NO es constante es la carga (pantalla, mapas, sensores, temperatura: el frío reduce capacidad y al final de la carga puede acelerarse la caída). Por eso el modelo correcto es **lineal por tramos con tasa adaptativa** (ventana móvil), no una única recta desde el inicio de la salida.
+- **Arranque en frío:** con ~20 h de autonomía nominal el 830 pierde ~1 % cada ~12 min → se necesitan ≥ 2–3 caídas de % (~30 min) para una primera estimación fiable. Mitigación: persistir la tasa media de salidas anteriores en `Application.Storage` y usarla como semilla hasta tener datos frescos de la salida actual.
+- **Dificultad:** 🟢 baja (sin acelerómetro, sin permisos, matemática simple). **Valor MTB:** ⭐⭐⭐ (muy útil en salidas largas / bikepacking).
+- **Rol:** independiente del resto — puede implementarse en cualquier fase, incluso como segundo módulo del MVP.
+
+### Opción G — "Stamina casera" (estimador de energía restante sin potenciómetro)
+- **Motivación:** la **Real-Time Stamina** nativa (Edge 840/540/1040, relojes recientes) es un modelo de Firstbeat que estima cuánta energía queda para seguir apretando. Requiere **potenciómetro** (usa la curva de potencia de los últimos 2–3 meses como calibración y la potencia instantánea como señal de intensidad) y **no está expuesta a Connect IQ**. Sin potenciómetro, el usuario no la tendrá ni siquiera en el 840 → una versión propia basada en FC tiene valor en ambos dispositivos.
+- **Idea clave del diseño:** el VO2max **no es la señal en tiempo real, es la calibración** del modelo (define el techo aeróbico del ciclista). La señal en vivo debe ser la **FC** (el usuario tiene banda): sin potencia, es el único proxy de intensidad disponible.
+- **Objetivo de producto (decidido con el usuario):** responder "¿puedo apretar un poco más?" y "¿me voy recuperando?". Dinámica lenta (decenas de segundos a minutos) es suficiente; capturar arranques de ~10 s queda **fuera de alcance deliberadamente**. Una aproximación honesta ya aporta valor.
+- **Entradas — todas opcionales, con cadena de fallbacks.** Van en los **App Settings del propio data field** (editables desde la app Garmin Connect del móvil). Importante: son ajustes de *nuestra* app, no el campo VO2max del perfil de Garmin — ese Garmin lo ignora si se introduce a mano, pero es irrelevante aquí porque nuestro modelo lee sus propios settings.
+  - **VO2max:** **semilla blanda**, no entrada crítica (ver nota de calibración abajo). Manual si el usuario lo tiene (laboratorio); si no, `VO2max ≈ 15,3 × FC_max / FC_reposo` (Uth et al. 2004). ⚠️ Sin potenciómetro no se puede estimar bien el VO2max *absoluto* — el método fiable (el de Firstbeat/Garmin) necesita la relación FC↔trabajo externo (vatios), que aquí no tenemos. La fórmula de Uth, además, es mal detector de *progreso*: su única palanca de fitness es la FC_reposo, así que con reposo estancado solo refleja la caída de FC_max por edad. Basta para dimensionar el depósito una vez; no para seguir la evolución.
+  - **FC máxima:** manual (de un test) o estimada por edad: `FC_max ≈ 208 − 0,7 × edad` (Tanaka), con la edad derivada de `UserProfile.birthYear`.
+  - **FC en reposo:** `UserProfile.restingHeartRate` (el Edge la conoce) o manual.
+  - **Peso:** `UserProfile.weight`.
+  - **FC umbral (LTHR):** manual si se conoce; por defecto ≈ 87–90 % de FC_max.
+- **Modelo propuesto (v1, a refinar):** modelo de "depósito" tipo W′bal pero conducido por FC:
+  - Intensidad instantánea: `%HRR = (FC − FC_reposo) / (FC_max − FC_reposo)`, que aproxima bien el %VO2max utilizado (relación casi 1:1 bien establecida en fisiología).
+  - Por encima de una intensidad crítica (≈ LTHR o ~85 % FC_max por defecto): el depósito se **vacía** a un ritmo proporcional al exceso de intensidad. Por debajo: se **recarga** con una constante de tiempo (recuperación).
+  - Tamaño del depósito calibrado con VO2max + peso (ciclistas con más motor aeróbico sostienen más tiempo el mismo %); **ajustable por el usuario por sensación** tras las primeras salidas ("se vació demasiado pronto" → depósito mayor). El VO2max es solo la semilla inicial de este tamaño; los **anclajes de FC (reposo, máxima y umbral) son el verdadero motor** del modelo, y todos son observables sin potenciómetro. La **Opción H (test de subida)** da la mejor semilla de VO2max disponible sin potenciómetro y debe preferirse a la fórmula de Uth cuando exista un resultado de test.
+  - Alternativa/complemento: usar `Activity.Info.energyExpenditure` (kcal/min, Firstbeat, ya derivado de FC) como tasa de gasto y modelar el depósito en kcal "por encima de umbral".
+  - Salida: % de stamina restante (número grande + barra de color), como la nativa.
+- **Limitaciones a documentar honestamente (gestión de expectativas):**
+  - La FC **retrasa** 30–60 s respecto al esfuerzo: los sprints cortos típicos del XC vacían reservas anaeróbicas antes de que la FC reaccione → el modelo suaviza los picos. **Aceptado por diseño** (ver objetivo de producto).
+  - **Deriva cardíaca** (calor, deshidratación) infla la FC al final de salidas largas → el modelo drenará más rápido; asumible e incluso deseable (correlaciona con fatiga real percibida).
+  - Es un **indicador de tendencia bien fundamentado, no una réplica de Firstbeat**: útil para dosificarse, no para ciencia.
+- **Dificultad:** 🟡🔴 media-alta (modelado + settings + calibración; sin acelerómetro). **Valor MTB:** ⭐⭐⭐⭐⭐ para dosificarse en salidas largas; sin equivalente accesible si no tenés potenciómetro.
+- **Rol:** independiente de la línea del acelerómetro (D/E); candidata natural tras el MVP. Formato: **data field** (la stamina se mira durante la actividad; un widget no sirve).
+
+#### Dos regímenes en el "tiempo restante" (modelo de Potencia Crítica / W′)
+
+El tiempo hasta el agotamiento NO es un número único: depende del régimen de intensidad. El data field debe distinguirlos:
+
+- **Por encima del umbral (apretando):** hay cuenta atrás finita y real. `tiempo_restante ≈ reserva_disponible / (intensidad_actual − umbral)`. Este es el número que responde "¿cuánto aguanto a este ritmo?". Mostrarlo como tiempo (p. ej. "~7 min").
+- **En/por debajo del umbral (sostenible):** el depósito se recarga, no se vacía → una cuenta atrás no tiene sentido físico (el limitante pasa a ser el combustible/glucógeno, escala de horas, **fuera de alcance v1**). Mostrar "sostenible" / "recuperando" y la barra rellenándose, no un tiempo.
+
+Esto reproduce el modelo de la stamina nativa de Garmin: **stamina potencial** (capacidad total del depósito) vs **stamina actual** (lo que queda ahora). El umbral (frontera entre regímenes) sale de los anclajes de FC (≈ LTHR) y su tamaño de depósito, de la calibración de capacidad (Opción H mejora esta calibración).
+
+#### Corrección subjetiva "escucha a tu cuerpo" (calibración por RPE) — requisito de diseño
+
+**Principio:** ninguna estimación basada en FC ve el calor, el sueño, la nutrición, la deshidratación ni la fatiga acumulada de días — pero **el propio ciclista sí los siente**. La sensación de esfuerzo (RPE, escala de Borg) es un integrador de fatiga directo y bien validado. Por tanto el modelo NO debe ser cerrado ("calcula y punto"): debe ser **adaptativo**, permitiendo que el usuario lo corrija en marcha. Esto convierte el modelo de bucle abierto a bucle cerrado y es lo que genera confianza en la métrica.
+
+**Mando único (UX):** exponer **un solo control** — un *factor de forma/capacidad* (p. ej. escala 1–5 o botones +/−), NO parámetros crudos como "VO2max" (poco intuitivos en movimiento). Semántica:
+- **"No doy más"** aunque el modelo diga "sostenible/vas sobrado" → bajar el factor → depósito más pequeño → el modelo drena antes y se vuelve conservador.
+- **"Me queda resto"** aunque el modelo me dé por fundido → subir el factor → depósito mayor.
+Internamente ese factor escala el tamaño del depósito (y opcionalmente reajusta el umbral / el VO2max-semilla), pero el usuario ve un botón, no fisiología.
+
+**Debe persistir y aprender:** la corrección no puede ser solo momentánea. Guardar el factor ajustado en `Application.Storage` para **arrancar mejor calibrado la próxima salida** (aprendizaje entre salidas). Corrección instantánea (este momento) + memoria (siguientes salidas).
+
+**Robustez:** el input subjetivo es ruidoso → **acotar** el rango del factor (p. ej. ×0,6–×1,4), suavizar los saltos y preferir el aprendizaje persistente a cambios bruscos por segundo.
+
+**Reto de ingeniería (no del modelo):** el input en marcha choca con la interacción táctil limitada de los data fields (misma limitación que la Opción C). Posibles vías, a decidir (ver pregunta abierta 8): (a) convertir el módulo de stamina en **device app** en vez de data field; (b) usar el botón de lap u otro gesto disponible; (c) a futuro, **auto-calibración** desde señales fisiológicas — p. ej. deriva cardíaca (FC que sigue trepando a esfuerzo supuestamente sostenible) como indicio de fatiga real que encoge el depósito automáticamente.
+
+**Encuesta de fin de salida ("¿cómo te sentiste?") — canal de calibración principal (session-RPE / método de Foster):**
+Al terminar la salida, con el usuario **parado**, preguntar una valoración simple del esfuerzo global (escala 1–5 o "fácil / justo / fundido"). Ventajas sobre el ajuste en marcha:
+- **Sin problema de input:** parado se interactúa con la pantalla sin fricción → es el canal más fiable y de menor esfuerzo. El +/− en marcha queda como refinamiento *opcional*.
+- **Método validado:** el session-RPE (Foster) es el estándar para cuantificar la carga de una sesión.
+- **Cierra el bucle de aprendizaje (aprendizaje supervisado):** el modelo conoce su **predicción** (p. ej. "acabaste al 40 % de depósito") y la contrasta con lo **sentido**. Si el usuario dice "fundido" y el modelo daba resto → encoger la capacidad para la próxima salida; si dice "fácil" y el modelo lo daba por fundido → agrandarla. La corrección persiste en `Application.Storage` y calibra la siguiente salida. En pocas rodadas el factor de forma converge a la fisiología real del usuario.
+
+⚠️ **Implicación de formato:** un data field **no puede** mostrar una pantalla interactiva al guardar la actividad (al terminar, el data field se destruye; no gestiona vistas propias). Una encuesta de fin de salida requiere una **device app** (controla su propia grabación y puede transicionar a una vista de resumen al parar) o, en su defecto, un glance/widget companion que pregunte por la última actividad guardada. Esto refuerza la decisión de la pregunta 8 hacia device app y, a la vez, la resuelve en gran parte: la calibración principal ya no depende de input en marcha.
+
+### Opción H — Test de subida de referencia (semilla de VO2max de campo + rastreador de forma)
+- **Qué es:** un modo de test opcional (el "Cooper en bici"). El usuario sube a tope una cuesta consistente durante ~5-6 min; con **desnivel + tiempo + masa total** se estima VO2max/MAP por física, sin potenciómetro. Sirve para dos cosas: (1) dar a la Opción G una **semilla de capacidad mucho mejor** que la fórmula de Uth, y (2) **seguir la evolución de la forma** repitiendo la misma subida (resuelve el problema de "envejezco pero mejoro": mide trabajo externo real, no una regresión de FC).
+- **Por qué una subida reduce el ruido:** en cuesta empinada la mayor parte de la potencia va contra la gravedad, que es física conocida. A VAM fija, la velocidad baja al empinar → aero (∝v³) y rodadura (∝v) se encogen y la gravedad domina (>90 % en pendientes fuertes), así que la estimación depende poco de CdA/Crr/viento.
+- **Cadena de cálculo (fórmulas verificadas):**
+  1. `VAM (m/h) = desnivel_ganado (m) / tiempo (s) × 3600`.
+  2. **VAM → W/kg.** Componente de gravedad (identidad exacta): `W/kg_grav = VAM / 367`. Estimación total (empírica, incluye rodadura+aero, **coeficiente corregido**): `W/kg = VAM / (200 + 10 × pendiente%)`. ⚠️ El denominador es `(200 + 10·grade)`, **no** `2·(200+10·grade)`. Ejemplos: 8 % → /280; 10 % → /300; 12 % → /320. El denominador tiende a 367 al empinar (~16,7 %), por eso ambas estimaciones convergen en cuestas duras.
+  3. **W/kg → VO2max.** Fórmula **hecha a medida para un test de 5 min** (la mejor para este uso): `VO2max (ml/kg/min) = 16,6 + 8,87 × (W/kg del test)`. Alternativa sobre potencia absoluta, Hawley & Noakes 1992 (r=0,97): `VO2max (L/min) = 0,01141 × MAP(W) + 0,435`. ⚠️ No usar la ecuación ACSM `10,8·W/masa + 7` aquí: está validada solo para 50-200 W en estado estable y a la potencia de un test máximo *subestima* (extrapola fuera de rango).
+- **Ejemplo numérico (realista):** subida al 8 %, se ganan **93 m de desnivel en 5 min** (300 s) → VAM = 93 × 3600/300 = 1116 m/h → W/kg = 1116/280 ≈ **4,0 W/kg** → VO2max ≈ 16,6 + 8,87×4,0 ≈ **52 ml/kg/min** (aficionado en buena forma). Comprobación cruzada: 4,0 W/kg para un rider de 75 kg = 300 W; Hawley & Noakes da (0,01141×300+0,435)/75×1000 ≈ 51 ml/kg/min → coherente (~2 %).
+- **Advertencias clave (a documentar en la app):**
+  - Un test de **~5-6 min** mide el techo aeróbico (VO2max/MAP). Un test de 20 min (tipo FTP) mide el **umbral**, no el VO2max — no confundirlos. El Cooper de 12 min es de *carrera* (fórmula de distancia), no traslada a potencia en bici.
+  - Es un **proxy sin analizador de gases**: número aproximado, no VO2max medido. Asume esfuerzo genuinamente máximo y sostenido.
+  - **MTB:** la rodadura en tierra (Crr alto y variable) ensucia el valor *absoluto* → para VO2max fiable, hacer el test en **asfalto o pista muy compacta**; para *seguir el progreso*, vale cualquier superficie mientras sea **siempre la misma subida en condiciones parecidas** (el cambio relativo es válido aunque el absoluto esté sesgado).
+  - Errores de altímetro barométrico sesgan la VAM directamente → calibrar altitud antes del test.
+- **Entradas:** masa total (usuario + bici + equipo; ajuste manual), y detección del segmento de test (marcar inicio/fin, o auto-detectar por pendiente sostenida). Requiere leer altitud, distancia y tiempo — todo ya disponible en `Activity.Info`.
+- **Dificultad:** 🟡 media (matemática simple ya verificada; el grueso es la UX del modo test y la detección del segmento). **Valor:** ⭐⭐⭐⭐ (alimenta G y da un rastreador de forma que ni el Garmin nativo ofrece sin potenciómetro).
+- **Rol:** complemento de la Opción G. Puede ser un segundo "modo" del mismo data field, o un data field aparte que persista el resultado en `Application.Storage` para que G lo lea como semilla de capacidad.
+
+---
+
+## 5. Roadmap recomendado
+
+1. **Fase 0 — Esqueleto:** proyecto Connect IQ tipo data field, manifiesto con `edge830` + `edge840`, "hola mundo" corriendo en el simulador con perfil Edge 830.
+2. **Fase 1 — MVP (Opción B):** data field "Descenso actual" completo, probado en simulador con datos simulados/FIT de ruta con desnivel, y luego sideload al Edge 830 real.
+3. **Fase 2 — Infraestructura de acelerómetro:** spike para validar `registerSensorDataListener` en el 830 (frecuencia real, permisos, consumo de memoria).
+4. **Fase 3 — Opción D (chunk meter)** sobre esa infraestructura.
+5. **Fase 4 — Opción E (saltos/air time)**, reutilizando el pipeline de señal.
+6. **Fase 5 (opcional) — Publicación** en Connect IQ Store (materiales de tienda, revisión de Garmin).
+
+Las opciones A y C quedan como extras opcionales (A como sub-métrica dentro de B; C solo si la interacción táctil en data fields resulta viable). La opción F es independiente y de baja dificultad: puede intercalarse en cualquier fase, p. ej. justo después del MVP.
+
+**Línea de stamina (independiente del acelerómetro D/E), en orden lógico:**
+- **Opción H (test de subida)** primero: da la semilla de capacidad y el rastreador de forma. Es autocontenida y de dificultad media — buen candidato tras el MVP.
+- **Opción G (stamina casera)** después: consume la semilla de H como calibración del depósito. Es el objetivo mayor de esta línea.
+
+Puede desarrollarse en paralelo a las fases 2–4 o priorizarse tras el MVP según interés.
+
+---
+
+## 6. Requisitos no funcionales
+
+- **Robustez sin sensores externos:** todo debe funcionar solo con GPS + barómetro + acelerómetro internos.
+- **Render adaptativo:** legible en celda pequeña (1 valor grande) y rica en pantalla completa (varias métricas). Fuentes grandes: se mira en movimiento, con guantes, con sol.
+- **Sin estado persistente obligatorio** en v1 (todo vive durante la actividad). Persistencia (p. ej. `Application.Storage` para ajustes) puede llegar después.
+- **Presupuesto de memoria:** mantenerse holgadamente por debajo del límite de data field del Edge 830; medirlo en el simulador (View > Memory).
+- **Código:** Monkey C idiomático, comentarios en inglés, estructura estándar de proyecto Connect IQ (`manifest.xml`, `monkey.jungle`, `source/`, `resources/`).
+
+---
+
+## 7. Criterios de aceptación del MVP (Fase 1)
+
+- [ ] Compila sin warnings para `edge830` y `edge840`.
+- [ ] En el simulador (Edge 830), con un FIT/simulación que incluya un descenso: el campo detecta la bajada, acumula desnivel/velocidad máx./tiempo, y congela el resumen al terminar.
+- [ ] No hay falsos cambios de estado en terreno ondulado (validar con histéresis usando datos con ruido).
+- [ ] El render es legible tanto en celda de media pantalla como en campo pequeño.
+- [ ] Uso de memoria dentro del límite del dispositivo con margen (> 20 % libre).
+
+---
+
+## 8. Fuera de alcance (v1)
+
+- Grit/Flow nativos de Garmin (API cerrada — no accesibles).
+- Conexión a internet o backend de cualquier tipo.
+- Soporte de dispositivos distintos de Edge 830/840.
+- Publicación en la tienda (se decide al final de la Fase 3/4).
+- Proyección de tiempo hasta el agotamiento **por debajo del umbral** (limitada por combustible/glucógeno, escala de horas — requiere modelar ingesta/glucógeno, fuera de v1).
+- VO2max medido con analizador de gases: la Opción H es una estimación de campo, no una medición de laboratorio.
+
+## 9. Preguntas abiertas (para decidir antes o durante la implementación)
+
+1. ¿Unidades métricas fijas o respetar la configuración del dispositivo? (propuesta: respetar configuración del usuario del Edge).
+2. En el MVP, ¿qué métrica merece el "número grande" durante la bajada: velocidad actual, desnivel perdido o tiempo?
+3. ¿Interesa grabar las métricas calculadas en el archivo FIT (`FitContributor`) para verlas luego en Garmin Connect? (posible extra de Fase 1–3).
+4. Nombre del proyecto/app (necesario para el manifiesto y, eventualmente, la tienda).
+5. Para la Opción G — **decidido:** el modelo debe funcionar sin VO2max de laboratorio, estimando todo desde edad/peso/FC disponibles (una aproximación ya sirve); el VO2max manual queda como refinamiento opcional. **También decidido:** el usuario dispone de una FC máxima observada en sus últimos meses de actividad → usarla como valor manual (es cota inferior de la real y mejor que la fórmula por edad; validar que no sea un artefacto de sensor mirando la curva de la actividad). La fórmula de Tanaka queda solo como fallback para usuarios sin histórico.
+6. Para la Opción H: ¿el test se implementa como un **modo dentro del data field de stamina** (más simple de mantener) o como un **data field/app aparte** que persiste el resultado? ¿La detección del segmento de test será manual (marcar inicio/fin) o automática (pendiente sostenida ≥ N min)?
+7. Para la Opción H: ¿de dónde sale la **pendiente media** del test para el coeficiente `(200 + 10·grade)` — del desnivel/distancia del propio segmento (más robusto) o de la pendiente instantánea? (propuesta: media del segmento).
+8. Para la corrección subjetiva de la Opción G: ¿cómo se introduce el ajuste en marcha dado el input táctil limitado de los data fields? Opciones: (a) module = device app; (b) botón de lap / gesto; (c) solo en App Settings entre salidas (sin ajuste instantáneo) + auto-calibración por deriva cardíaca a futuro. Es la decisión que condiciona si la stamina es data field o device app. **Nota:** la encuesta de fin de salida (session-RPE) inclina la balanza hacia **device app** y hace que el ajuste en marcha sea opcional, no imprescindible.
+9. ¿La stamina (G + calibración por RPE + encuesta de fin) se implementa como **device app** (necesaria para la pantalla de resumen al parar) mientras que "Descenso actual" (B), batería (F) y VAM (A) siguen como **data fields**? Es decir: ¿el proyecto acaba teniendo dos formatos (varios data fields + una device app de stamina)? Definir la arquitectura de módulos.

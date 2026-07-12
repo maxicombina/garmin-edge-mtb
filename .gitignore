@@ -1,0 +1,22 @@
+# Connect IQ build artifacts
+bin/
+*.iq
+*.prg
+*.prg.debug.xml
+*.debug.xml
+
+# Developer keys — NEVER commit these
+*.der
+*.pem
+developer_key*
+*.developer_key
+
+# SDK / tooling
+.jungle_cache/
+*.mss.map
+
+# Editor / OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+*.swp
