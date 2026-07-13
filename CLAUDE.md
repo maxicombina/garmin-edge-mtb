@@ -13,7 +13,14 @@ Apps Connect IQ para **Garmin Edge 830/840** orientadas a MTB (XC, senderos téc
 - **Fórmulas y coeficientes ya verificados contra fuentes** (Opción H, sección 3.2): NO "corregirlos" de memoria — si algo parece mal, verificar contra fuentes primero.
 - Roadmap (sección 5) y preguntas abiertas (sección 9).
 
-Cuando se tome una decisión de diseño en conversación, **actualizar la spec** en el mismo turno (las decisiones se anotan en la pregunta abierta correspondiente o en la opción afectada).
+## Persistencia de decisiones (regla dura)
+
+Toda decisión tomada en conversación se escribe **en el mismo turno** en que se toma — nunca "queda en el chat":
+
+- **Producto / diseño / fisiología / fórmulas** → `GARMIN_MTB_SPEC.md` (en la opción afectada, o resolviendo la pregunta abierta correspondiente).
+- **Convenciones de trabajo, estructura del repo, tooling, proceso** → este `CLAUDE.md`.
+- **Estado del proyecto** (fase alcanzada, qué está hecho/pendiente) → sección "Estado actual" de este `CLAUDE.md`.
+- Si el asistente dispone de **memoria persistente de sesión**, reflejar también ahí los cambios de estado y decisiones relevantes.
 
 ## Idioma
 
@@ -26,6 +33,12 @@ Cuando se tome una decisión de diseño en conversación, **actualizar la spec**
 - **Toolchain:** Connect IQ SDK + SDK Manager, VS Code con la extensión oficial "Monkey C", simulador del SDK.
 - **Dispositivos:** `edge830` + `edge840` en el manifiesto desde el día 1.
 - **API level:** compilar contra **CIQ 3.3** (el 830 llega a 3.3.6; es el mínimo común). No usar APIs 4.x/5.x.
+
+## Estructura del repo
+
+- **Monorepo de apps:** cada opción de la spec vive en `apps/<letra>-<slug>/` como proyecto Connect IQ **completo y auto-contenido** (su propio `manifest.xml`, `monkey.jungle`, `source/`, `resources/`). Motivo: en el futuro cada app podría extraerse a su propio repo sin cirugía.
+- **Nombres acordados** (crear el directorio solo cuando se empiece esa opción): `a-grade-vam`, `b-descent-tracker`, `c-stage-timer`, `d-chunk-meter`, `e-jump-airtime`, `f-battery-forecast`, `g-stamina`, `h-climb-test`.
+- **Nada compartido entre apps** salvo documentación. Si surge código común, decidir explícitamente (¿copiar? ¿extraer?) recordando la posible separación en repos.
 
 ## Restricciones técnicas que no hay que olvidar
 
@@ -40,8 +53,11 @@ Cuando se tome una decisión de diseño en conversación, **actualizar la spec**
 - **NUNCA** commitear la developer key (`*.der`, `*.pem`) — el `.gitignore` ya la cubre; no relajarlo.
 - **No commitear ni pushear sin que el usuario lo pida explícitamente.**
 - Identidad git de este repo: `maxicombina@gmail.com` (ya configurada localmente). Jamás el email de trabajo.
+- **Proyecto 100 % personal e independiente:** ninguna mención al empleador del usuario ni a sus proyectos/repos en NINGÚN archivo de este repo — ni en código, docs, mensajes de commit ni metadatos.
 - El remote es privado: `github.com/maxicombina/garmin-edge-mtb`. No hacerlo público ni compartir contenido fuera sin pedirlo.
 
 ## Estado actual
 
-Fase 0 pendiente: esqueleto Connect IQ (manifiesto `edge830`+`edge840`, hello-world en simulador). Aún no hay código — solo especificación.
+- Spec maestra completa (opciones A–H). Estructura `apps/` creada.
+- **Spec detallada de la Opción A escrita y verificada contra docs oficiales:** `apps/a-grade-vam/SPEC.md` (API names, límite 128 KB, VAM nativa del 830 descubierta, algoritmos, settings, criterios de aceptación).
+- **Fase 0 pendiente:** esqueleto Connect IQ en `apps/a-grade-vam/` (manifiesto `edge830`+`edge840`, hello-world en simulador). En paralelo, el usuario está instalando el toolchain (SDK Manager) guiado paso a paso.

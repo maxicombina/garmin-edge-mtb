@@ -21,6 +21,10 @@ La spec define el contexto (hardware, plataforma, restricciones), 8 opciones de 
 | G | Stamina casera (modelo de depósito por FC) | device app | idea |
 | H | Test de subida (VO2max de campo + tracker de forma) | data field / device app | idea |
 
+## Estructura
+
+Cada opción vive como proyecto Connect IQ auto-contenido en `apps/<letra>-<slug>/` (p. ej. [`apps/a-grade-vam/`](apps/a-grade-vam/)), de modo que en el futuro pueda extraerse a su propio repositorio sin reestructurar.
+
 ## Stack
 
 - **Lenguaje:** Monkey C

@@ -50,7 +50,7 @@ Tras evaluar los tipos de app disponibles (watch face, widget, data field, devic
 
 ### 3.3 Restricciones
 
-- **Memoria muy limitada** para data fields (decenas de KB; el límite exacto por dispositivo está en el SDK — consultarlo y diseñar con frugalidad: evitar objetos innecesarios, buffers acotados).
+- **Memoria limitada** para data fields: **128 KB (131 072 B) en Edge 830 y 840** (verificado en el device reference oficial). Holgado pero no infinito: diseñar con frugalidad (buffers acotados, sin allocations en `compute()`/`onUpdate()`), objetivo < 50 % de uso.
 - `compute()` se llama **1 vez por segundo**; `onUpdate()` redibuja según el layout. Cálculos pesados deben ser incrementales, nunca re-procesar históricos completos.
 - El data field puede ocupar desde una celda pequeña hasta pantalla completa: el renderizado debe **adaptarse al tamaño del campo** (mostrar menos info en campos chicos).
 - API level: el Edge 830 soporta hasta **Connect IQ 3.3.6** (confirmado); el Edge 840 soporta 4.x/5.x. **Compilar contra 3.3** (mínimo común) para compatibilidad total.
@@ -62,11 +62,12 @@ Tras evaluar los tipos de app disponibles (watch face, widget, data field, devic
 
 Ordenadas de menor a mayor complejidad. La visión es **incremental**: cada opción puede construirse sobre la anterior dentro del mismo proyecto.
 
-### Opción A — Pendiente + VAM
+### Opción A — Pendiente + VAM → **spec detallada: [`apps/a-grade-vam/SPEC.md`](apps/a-grade-vam/SPEC.md)**
 - **Qué muestra:** pendiente actual (%) y velocidad de ascenso vertical (VAM, m/h), calculadas de altitud + distancia.
-- **Cálculo:** `pendiente = Δaltitud / Δdistancia` (ventana móvil corta, p. ej. 5–10 s, para suavizar ruido barométrico); `VAM = Δaltitud / Δtiempo × 3600`.
-- **Dificultad:** 🟢 baja. **Valor MTB:** ⭐⭐ (existe mucho parecido en la tienda).
-- **Rol:** ejercicio de calentamiento; no es el objetivo final.
+- **Cálculo:** ver spec detallada (ventana por distancia para pendiente, ventana temporal configurable para VAM, filtro de outliers barométricos).
+- ⚠️ **Verificado 2026-07-13:** el Edge 830 **ya trae 4 campos VAM nativos** (VAM / 30s VAM / Avg VAM / Lap VAM) y pendiente nativa. Los diferenciales de esta app: ambas métricas en un campo, ventana de suavizado configurable (la nativa es fija a 30 s) y zonas de color. Connect IQ no expone VAM/pendiente nativas por API → igual hay que calcularlas.
+- **Dificultad:** 🟢 baja. **Valor MTB:** ⭐⭐ (duplica parcialmente lo nativo — su valor real es pedagógico y de pipeline).
+- **Rol:** ejercicio de calentamiento y **pipeline de altitud reutilizable** por B, G y H; no es el objetivo final.
 
 ### Opción B — "Descenso actual" ⭐ candidata a MVP
 - **Qué muestra:** al detectar que empieza una bajada, resetea y trackea métricas *de esta bajada*: desnivel perdido (m), velocidad máxima, tiempo de descenso, pendiente media. Al terminar la bajada, congela el resumen unos segundos.
@@ -172,7 +173,7 @@ Al terminar la salida, con el usuario **parado**, preguntar una valoración simp
   - Errores de altímetro barométrico sesgan la VAM directamente → calibrar altitud antes del test.
 - **Entradas:** masa total (usuario + bici + equipo; ajuste manual), y detección del segmento de test (marcar inicio/fin, o auto-detectar por pendiente sostenida). Requiere leer altitud, distancia y tiempo — todo ya disponible en `Activity.Info`.
 - **Dificultad:** 🟡 media (matemática simple ya verificada; el grueso es la UX del modo test y la detección del segmento). **Valor:** ⭐⭐⭐⭐ (alimenta G y da un rastreador de forma que ni el Garmin nativo ofrece sin potenciómetro).
-- **Rol:** complemento de la Opción G. Puede ser un segundo "modo" del mismo data field, o un data field aparte que persista el resultado en `Application.Storage` para que G lo lea como semilla de capacidad.
+- **Rol:** complemento de la Opción G. ⚠️ **Restricción de plataforma:** `Application.Storage` es un sandbox **por app** — dos apps Connect IQ distintas NO pueden leerse el storage entre sí. Por tanto H debe vivir **dentro de la misma app que G** (como un segundo modo/vista), o su resultado tendría que copiarse a mano vía App Settings. Esto refuerza la arquitectura de la pregunta abierta 9: G+H juntas en la device app de stamina.
 
 ---
 
@@ -184,6 +185,12 @@ Al terminar la salida, con el usuario **parado**, preguntar una valoración simp
 4. **Fase 3 — Opción D (chunk meter)** sobre esa infraestructura.
 5. **Fase 4 — Opción E (saltos/air time)**, reutilizando el pipeline de señal.
 6. **Fase 5 (opcional) — Publicación** en Connect IQ Store (materiales de tienda, revisión de Garmin).
+
+   **Monetización (estado 2025-2026, decisión: v1 gratis):**
+   - La tienda tiene **pago nativo con Garmin Pay** desde ago-2024 (apps premium desde ~4,99 USD; reparto Garmin/dev no publicado — investigar si se llega ahí). Vías alternativas: donaciones (PayPal/Ko-fi en la descripción) y trial + código de desbloqueo (soporte oficial de "Trial Apps"; servicios tipo KiezelPay).
+   - ⚠️ **Cualquier petición de dinero — incluidas donaciones/propinas — exige "verificación de trader"** (identidad + domicilio, por la DSA europea). Desde feb-2025 Garmin bloquea/retira apps de pago de desarrolladores no verificados. Publicar gratis sin pedir nada no requiere verificación.
+   - **Estrategia decidida:** v1 **gratis y sin petición de donaciones** (cero papeleo, acumular instalaciones/reviews). Si alguna app tracciona (candidatas: chunk meter, saltos, stamina sin potenciómetro — sin equivalente gratuito), completar verificación de trader y evaluar freemium (3-5 €) vs donaciones.
+   - Expectativa realista: nicho de nicho; los data fields con donaciones generan típicamente decenas-cientos de €/año. Esto es un proyecto por gusto con potencial de propina, no un negocio.
 
 Las opciones A y C quedan como extras opcionales (A como sub-métrica dentro de B; C solo si la interacción táctil en data fields resulta viable). La opción F es independiente y de baja dificultad: puede intercalarse en cualquier fase, p. ej. justo después del MVP.
 
@@ -202,6 +209,7 @@ Puede desarrollarse en paralelo a las fases 2–4 o priorizarse tras el MVP seg�
 - **Sin estado persistente obligatorio** en v1 (todo vive durante la actividad). Persistencia (p. ej. `Application.Storage` para ajustes) puede llegar después.
 - **Presupuesto de memoria:** mantenerse holgadamente por debajo del límite de data field del Edge 830; medirlo en el simulador (View > Memory).
 - **Código:** Monkey C idiomático, comentarios en inglés, estructura estándar de proyecto Connect IQ (`manifest.xml`, `monkey.jungle`, `source/`, `resources/`).
+- **Estructura del repo (decidido):** monorepo con cada opción como app auto-contenida en `apps/<letra>-<slug>/` (p. ej. `apps/a-grade-vam/`), extraíble a repo propio en el futuro. Nombres acordados en el CLAUDE.md. Sin código compartido entre apps salvo decisión explícita.
 
 ---
 
