@@ -40,6 +40,10 @@ Toda decisión tomada en conversación se escribe **en el mismo turno** en que s
 - **Nombres acordados** (crear el directorio solo cuando se empiece esa opción): `a-grade-vam`, `b-descent-tracker`, `c-stage-timer`, `d-chunk-meter`, `e-jump-airtime`, `f-battery-forecast`, `g-stamina`, `h-climb-test`.
 - **Nada compartido entre apps** salvo documentación. Si surge código común, decidir explícitamente (¿copiar? ¿extraer?) recordando la posible separación en repos.
 
+## Modo de trabajo con el usuario
+
+- **El usuario ejecuta, el asistente guía.** Para todo lo que sea setup, tooling, configuración de su máquina o cuentas (instalaciones, keys, settings de apps, movimientos de archivos fuera del repo): dar instrucciones claras paso a paso y **no ejecutarlo por él** — el objetivo es que aprenda. Verificar el resultado (lectura) está bien. Las ediciones de archivos *dentro del repo* y los commits que él pida siguen igual que siempre.
+
 ## Restricciones técnicas que no hay que olvidar
 
 - Data fields: `compute()` corre 1×/s; memoria de decenas de KB → cálculos incrementales, buffers acotados, nada de reprocesar históricos.
@@ -61,4 +65,5 @@ Toda decisión tomada en conversación se escribe **en el mismo turno** en que s
 
 - Spec maestra completa (opciones A–H). Estructura `apps/` creada.
 - **Spec detallada de la Opción A escrita y verificada contra docs oficiales:** `apps/a-grade-vam/SPEC.md` (API names, límite 128 KB, VAM nativa del 830 descubierta, algoritmos, settings, criterios de aceptación).
-- **Fase 0 pendiente:** esqueleto Connect IQ en `apps/a-grade-vam/` (manifiesto `edge830`+`edge840`, hello-world en simulador). En paralelo, el usuario está instalando el toolchain (SDK Manager) guiado paso a paso.
+- **Toolchain del usuario COMPLETO (2026-07-13):** SDK Manager + SDK 9.2.0 activo + perfiles de dispositivo + VS Code con extensión Monkey C + Temurin (Java) + developer key en `~/garmin-dev/developer_key` (fuera del repo, chmod 600; setting `monkeyC.developerKeyPath` apunta ahí).
+- **Fase 0 en curso:** esqueleto Connect IQ en `apps/a-grade-vam/` (manifiesto `edge830`+`edge840`, hello-world en simulador).

@@ -20,3 +20,6 @@ developer_key*
 .vscode/*
 !.vscode/extensions.json
 *.swp
+
+# Serena (local AI tooling)
+.serena/
