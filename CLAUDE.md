@@ -54,7 +54,7 @@ Toda decisión tomada en conversación se escribe **en el mismo turno** en que s
 - **No commitear ni pushear sin que el usuario lo pida explícitamente.**
 - Identidad git de este repo: `maxicombina@gmail.com` (ya configurada localmente). Jamás el email de trabajo.
 - **Proyecto 100 % personal e independiente:** ninguna mención al empleador del usuario ni a sus proyectos/repos en NINGÚN archivo de este repo — ni en código, docs, mensajes de commit ni metadatos.
-- **Mensajes de commit sin mención a la IA:** nada de nombres de modelo ni trailers `Co-Authored-By` de asistentes. Commits limpios, solo el contenido.
+- **Mensajes de commit — atribución de IA:** se permite el trailer `Co-Authored-By: Anthropic <noreply@anthropic.com>`. **NUNCA el nombre del modelo** (ni Fable, ni Opus, ni ningún otro) en ninguna parte del mensaje.
 - El remote es privado: `github.com/maxicombina/garmin-edge-mtb`. No hacerlo público ni compartir contenido fuera sin pedirlo.
 
 ## Estado actual
