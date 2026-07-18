@@ -222,7 +222,7 @@
 <button id="themeToggle" aria-label="Cambiar tema" style="position:fixed;top:14px;right:14px;z-index:10;font-family:var(--font-mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);cursor:pointer">tema</button>
 <div class="wrap">
   <header class="hero">
-    <p class="eyebrow">Connect IQ · data field · Edge 830 / 840</p>
+    <p class="eyebrow">Connect IQ · data field · Edge 830/840 (+ 11 compatibles)</p>
     <div class="hero-grid">
       <div>
         <h1>Cómo funciona <span style="color:var(--accent-ink)">a-activity-timer</span></h1>
@@ -279,7 +279,7 @@
       <p>Un proyecto Connect IQ autocontenido. El grueso de la lógica está en <code>ActivityTimerView.mc</code>.</p>
       <div class="tree">
 a-activity-timer/
-├── <b>manifest.xml</b>        <span class="accent">// datafield · edge830 + edge840 · API 3.3.0</span>
+├── <b>manifest.xml</b>        <span class="accent">// datafield · 13 Edge compatibles · API 3.3.0</span>
 ├── <b>monkey.jungle</b>       <span class="accent">// config de build</span>
 ├── source/
 │   ├── <b>ActivityTimerApp.mc</b>   <span class="accent">// AppBase → getInitialView()</span>
@@ -453,7 +453,7 @@ a-activity-timer/
         </div></li>
         <li><div>
           <h3>Medir para la tabla de la SPEC</h3>
-          <p>Un <code>System.println(dc.getWidth() + "x" + dc.getHeight())</code> en <code>onUpdate()</code> imprime el tamaño de cada layout en la consola de VS Code — justo lo que la §11.1 pide anotar.</p>
+          <p>Poné <code>DEBUG_MEASURE = true</code> (un hook incluido, al lado de <code>TEST_MODE</code>): imprime en la consola de VS Code el tamaño de cada celda (<code>dc.getWidth()×getHeight()</code>) y las alturas de las fuentes de la escalera — justo lo que la §11.1 pide anotar. Volvé a <code>false</code> al terminar.</p>
         </div></li>
       </ol>
     </section>
