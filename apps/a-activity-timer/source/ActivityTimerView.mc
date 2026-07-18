@@ -82,10 +82,10 @@ class ActivityTimerView extends WatchUi.DataField {
         DataField.initialize();
 
         mLadder = [
-            Graphics.FONT_NUMBER_THAI_HOT,   // numeric fonts (indices 0..3)
-            Graphics.FONT_NUMBER_HOT,
-            Graphics.FONT_NUMBER_MEDIUM,
-            Graphics.FONT_NUMBER_MILD,
+            Graphics.FONT_SYSTEM_NUMBER_THAI_HOT,   // numeric fonts (indices 0..3)
+            Graphics.FONT_SYSTEM_NUMBER_HOT,
+            Graphics.FONT_SYSTEM_NUMBER_MEDIUM,
+            Graphics.FONT_SYSTEM_NUMBER_MILD,
             Graphics.FONT_MEDIUM,            // text fonts
             Graphics.FONT_SMALL,
             Graphics.FONT_TINY,
@@ -191,8 +191,11 @@ class ActivityTimerView extends WatchUi.DataField {
         // "letters" font) with a small top margin so it does not touch the top edge.
         var labelH = 0;
         if (h >= LABEL_MIN_H) {
-            dc.drawText(w / 2, 2, Graphics.FONT_MEDIUM, mLabel, Graphics.TEXT_JUSTIFY_CENTER);
-            labelH = 2 + dc.getFontHeight(Graphics.FONT_MEDIUM);
+            // 6px top margin (not stuck to the edge). Reserve only the label's VISIBLE
+            // (ascent) height; its empty descent overlaps the value's top whitespace, so
+            // the value keeps its size while both get real breathing room.
+            dc.drawText(w / 2, 6, Graphics.FONT_MEDIUM, mLabel, Graphics.TEXT_JUSTIFY_CENTER);
+            labelH = 6 + Graphics.getFontAscent(Graphics.FONT_MEDIUM);
         }
         var valueH = h - labelH;
         var usableW = w - 2 * PAD;
@@ -202,10 +205,16 @@ class ActivityTimerView extends WatchUi.DataField {
             if (!mMeasuredFonts) {
                 mMeasuredFonts = true;
                 var fh = "MEASURE fontHeights:";
+                var fa = "MEASURE fontAscents:";
+                var fd = "MEASURE fontDescents:";
                 for (var fi = 0; fi < mLadder.size(); fi++) {
                     fh += " " + dc.getFontHeight(mLadder[fi]);
+                    fa += " " + Graphics.getFontAscent(mLadder[fi]);
+                    fd += " " + Graphics.getFontDescent(mLadder[fi]);
                 }
                 System.println(fh);
+                System.println(fa);
+                System.println(fd);
             }
         }
 
