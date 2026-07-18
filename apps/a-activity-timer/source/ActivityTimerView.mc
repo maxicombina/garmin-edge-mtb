@@ -194,7 +194,7 @@ class ActivityTimerView extends WatchUi.DataField {
             // 6px top margin (not stuck to the edge). Reserve only the label's VISIBLE
             // (ascent) height; its empty descent overlaps the value's top whitespace, so
             // the value keeps its size while both get real breathing room.
-            dc.drawText(w / 2, 6, Graphics.FONT_GLANCE, mLabel, Graphics.TEXT_JUSTIFY_CENTER);
+            dc.drawText(w / 2, 4, Graphics.FONT_GLANCE, mLabel, Graphics.TEXT_JUSTIFY_CENTER);
             labelH = 6 + Graphics.getFontAscent(Graphics.FONT_GLANCE);
         }
         var valueH = h - labelH;
@@ -230,7 +230,7 @@ class ActivityTimerView extends WatchUi.DataField {
         }
 
         // 4) Draw the value centred in the [labelH .. h] band.
-        var cY = labelH + valueH / 2;
+        var cY = labelH + valueH / 2 - 2;   // nudge the number up 2px (label position unchanged)
         if (mLevel == 2) {
             cY += Graphics.getFontDescent(mFontBig) / 2;   // drop the font's bottom whitespace so the digits optically centre
             // Compound: big "H:MM" + small superscript ":SS" (widths are live because the
