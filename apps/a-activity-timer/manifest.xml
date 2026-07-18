@@ -1,7 +1,6 @@
 <?xml version="1.0"?>
 <!--
   Connect IQ manifest for the a-activity-timer data field.
-  Fase 0 skeleton (hello-world). App id is a fixed UUID for this project.
 -->
 <iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
     <iq:application
