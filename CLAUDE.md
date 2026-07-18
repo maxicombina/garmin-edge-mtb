@@ -9,8 +9,8 @@ Apps Connect IQ para **Garmin Edge 830/840** orientadas a MTB (XC, senderos téc
 **`GARMIN_MTB_SPEC.md`** — leerla ANTES de escribir código. Contiene:
 
 - Hardware del usuario y restricciones de plataforma (sección 2–3).
-- Las opciones de producto A–H con su estado (sección 4).
-- **Fórmulas y coeficientes ya verificados contra fuentes** (Opción H, sección 3.2): NO "corregirlos" de memoria — si algo parece mal, verificar contra fuentes primero.
+- Las opciones de producto A–I con su estado (sección 4).
+- **Fórmulas y coeficientes ya verificados contra fuentes** (Opción I, sección 3.2): NO "corregirlos" de memoria — si algo parece mal, verificar contra fuentes primero.
 - Roadmap (sección 5) y preguntas abiertas (sección 9).
 
 ## Persistencia de decisiones (regla dura)
@@ -37,7 +37,7 @@ Toda decisión tomada en conversación se escribe **en el mismo turno** en que s
 ## Estructura del repo
 
 - **Monorepo de apps:** cada opción de la spec vive en `apps/<letra>-<slug>/` como proyecto Connect IQ **completo y auto-contenido** (su propio `manifest.xml`, `monkey.jungle`, `source/`, `resources/`). Motivo: en el futuro cada app podría extraerse a su propio repo sin cirugía.
-- **Nombres acordados** (crear el directorio solo cuando se empiece esa opción): `a-grade-vam`, `b-descent-tracker`, `c-stage-timer`, `d-chunk-meter`, `e-jump-airtime`, `f-battery-forecast`, `g-stamina`, `h-climb-test`.
+- **Nombres acordados** (crear el directorio solo cuando se empiece esa opción): `a-activity-timer`, `b-grade-vam`, `c-descent-tracker`, `d-stage-timer`, `e-chunk-meter`, `f-jump-airtime`, `g-battery-forecast`, `h-stamina`, `i-climb-test`. (Nomenclatura desplazada el 2026-07-18: el timer tutorial pasó a ser la Opción A y las antiguas A–H pasaron a B–I.)
 - **Nada compartido entre apps** salvo documentación. Si surge código común, decidir explícitamente (¿copiar? ¿extraer?) recordando la posible separación en repos.
 
 ## Modo de trabajo con el usuario
@@ -63,7 +63,7 @@ Toda decisión tomada en conversación se escribe **en el mismo turno** en que s
 
 ## Estado actual
 
-- Spec maestra completa (opciones A–H). Estructura `apps/` creada.
-- **Spec detallada de la Opción A escrita y verificada contra docs oficiales:** `apps/a-grade-vam/SPEC.md` (API names, límite 128 KB, VAM nativa del 830 descubierta, algoritmos, settings, criterios de aceptación).
+- Spec maestra completa (opciones A–I). Estructura `apps/` creada.
+- **Spec detallada de la Opción B escrita y verificada contra docs oficiales:** `apps/b-grade-vam/SPEC.md` (API names, límite 128 KB, VAM nativa del 830 descubierta, algoritmos, settings, criterios de aceptación).
 - **Toolchain del usuario COMPLETO (2026-07-13):** SDK Manager + SDK 9.2.0 activo + perfiles de dispositivo + VS Code con extensión Monkey C + Temurin (Java) + developer key en `~/garmin-dev/developer_key` (fuera del repo, chmod 600; setting `monkeyC.developerKeyPath` apunta ahí).
-- **Fase 0 en curso:** esqueleto Connect IQ en `apps/a-grade-vam/` (manifiesto `edge830`+`edge840`, hello-world en simulador).
+- **Fase 0 redefinida (2026-07-18) — Opción A, data field de tiempo de actividad:** vive en `apps/a-activity-timer/`; spec detallada escrita y verificada contra docs oficiales (`apps/a-activity-timer/SPEC.md`). El esqueleto/hello-world y la implementación se hacen ahí. Pendiente: implementar.

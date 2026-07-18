@@ -1,4 +1,4 @@
-# SPEC — `a-grade-vam` (Opción A)
+# SPEC — `b-grade-vam` (Opción B)
 
 > Data field Connect IQ para Edge 830/840: **pendiente actual (%) + VAM (m/h)** calculadas on-device desde el altímetro barométrico. Especificación de implementación, autocontenida: no requiere leer la conversación previa. La spec maestra del proyecto ([`GARMIN_MTB_SPEC.md`](../../GARMIN_MTB_SPEC.md)) da el contexto de producto.
 >
@@ -12,8 +12,8 @@
 
 Por tanto el rol de esta app es:
 
-1. **Vehículo de aprendizaje** (primer proyecto Monkey C del autor): tocar todas las piezas base — proyecto CIQ, `compute()`, render adaptativo, settings, simulador, sideload.
-2. **Pipeline reutilizable**: el buffer de muestras de altitud/distancia y su suavizado son la base directa de las opciones B (descenso), G (stamina) y H (test de subida).
+1. **Vehículo de aprendizaje** (segundo proyecto Monkey C del autor): primera app con algoritmos reales — buffers, suavizado, settings. Las piezas base (proyecto CIQ, `compute()`, render adaptativo, simulador, sideload) llegan aprendidas de la Opción A (`apps/a-activity-timer/`).
+2. **Pipeline reutilizable**: el buffer de muestras de altitud/distancia y su suavizado son la base directa de las opciones C (descenso), H (stamina) e I (test de subida).
 3. **Diferenciales reales frente a lo nativo** (los únicos motivos para usarla en la calle):
    - **Ambas métricas en un solo campo** (pendiente + VAM juntas; en nativo son dos celdas).
    - **Ventana de suavizado configurable** (la VAM nativa instantánea es una media móvil fija de 30 s; aquí 5/10/30 s a elección).
@@ -41,13 +41,13 @@ Nota: Connect IQ **no expone** la VAM ni la pendiente nativas por API (`Activity
 Estructura estándar CIQ del proyecto (autocontenida en esta carpeta):
 
 ```
-a-grade-vam/
+b-grade-vam/
 ├── manifest.xml          # type=datafield; products: edge830, edge840; minApiLevel 3.3.0
 ├── monkey.jungle
 ├── source/
-│   ├── AGradeVamApp.mc   # AppBase: getInitialView() → [view]  (v1 sin delegate táctil)
-│   ├── AGradeVamView.mc  # DataField: compute(), onLayout(), onUpdate(), hooks de timer
-│   └── SampleBuffer.mc   # ring buffer de muestras (reutilizable por B/G/H)
+│   ├── GradeVamApp.mc   # AppBase: getInitialView() → [view]  (v1 sin delegate táctil)
+│   ├── GradeVamView.mc  # DataField: compute(), onLayout(), onUpdate(), hooks de timer
+│   └── SampleBuffer.mc   # ring buffer de muestras (reutilizable por C/H/I)
 └── resources/
     ├── settings/         # properties.xml + settings.xml (sección 7)
     └── strings/          # strings.xml (label, unidades)
@@ -150,9 +150,9 @@ Mecanismo verificado para `datafield` en 3.3: `resources/settings/properties.xml
 ## 8. Fuera de alcance v1 (anotado para v1.1+)
 
 - **FIT recording** de grade/VAM como developer fields (`DataField.createField`, API 1.3 — verificado disponible): candidato natural a v1.1; responde la pregunta 3 de la spec maestra.
-- **Táctil:** verificado que los data fields de Edge táctiles SÍ reciben `onTap` (vía `[view, delegate]` en `getInitialView()`; debe devolver `true` para evitar el menú de navegación del Edge). No se usa en v1 — anotado porque **desbloquea la Opción C** (crono de tramos) y el ajuste en marcha de la G.
+- **Táctil:** verificado que los data fields de Edge táctiles SÍ reciben `onTap` (vía `[view, delegate]` en `getInitialView()`; debe devolver `true` para evitar el menú de navegación del Edge). No se usa en v1 — anotado porque **desbloquea la Opción D** (crono de tramos) y el ajuste en marcha de la H.
 - Alertas (`showAlert`, API 3.2 — disponible): no en v1.
-- Fuentes/gráficos custom, histéresis de estados (eso es de la Opción B).
+- Fuentes/gráficos custom, histéresis de estados (eso es de la Opción C).
 
 ## 9. Presupuesto y rendimiento
 

@@ -8,22 +8,23 @@ Proyecto personal, en fase de especificación. El objetivo es una familia de *da
 
 📋 **Especificación** — ver [`GARMIN_MTB_SPEC.md`](GARMIN_MTB_SPEC.md).
 
-La spec define el contexto (hardware, plataforma, restricciones), 8 opciones de producto evaluadas (A–H) y un roadmap incremental. Resumen de las opciones:
+La spec define el contexto (hardware, plataforma, restricciones), 9 opciones de producto evaluadas (A–I) y un roadmap incremental. Resumen de las opciones:
 
 | | Opción | Formato | Estado |
 |---|---|---|---|
-| A | Pendiente + VAM | data field | idea |
-| B | Descenso actual | data field | **MVP propuesto** |
-| C | Cronómetro de tramos (enduro) | data field / device app | idea |
-| D | Chunk meter (Grit casero, acelerómetro) | data field | idea |
-| E | Detector de saltos / air time | data field | idea |
-| F | Estimador de batería restante | data field | idea |
-| G | Stamina casera (modelo de depósito por FC) | device app | idea |
-| H | Test de subida (VO2max de campo + tracker de forma) | data field / device app | idea |
+| A | Tiempo de actividad (formato adaptativo) | data field | **Fase 0 — spec lista** |
+| B | Pendiente + VAM | data field | spec lista |
+| C | Descenso actual | data field | **MVP propuesto** |
+| D | Cronómetro de tramos (enduro) | data field / device app | idea |
+| E | Chunk meter (Grit casero, acelerómetro) | data field | idea |
+| F | Detector de saltos / air time | data field | idea |
+| G | Estimador de batería restante | data field | idea |
+| H | Stamina casera (modelo de depósito por FC) | device app | idea |
+| I | Test de subida (VO2max de campo + tracker de forma) | data field / device app | idea |
 
 ## Estructura
 
-Cada opción vive como proyecto Connect IQ auto-contenido en `apps/<letra>-<slug>/` (p. ej. [`apps/a-grade-vam/`](apps/a-grade-vam/)), de modo que en el futuro pueda extraerse a su propio repositorio sin reestructurar.
+Cada opción vive como proyecto Connect IQ auto-contenido en `apps/<letra>-<slug>/` (p. ej. [`apps/a-activity-timer/`](apps/a-activity-timer/)), de modo que en el futuro pueda extraerse a su propio repositorio sin reestructurar.
 
 ## Stack
 
@@ -34,4 +35,4 @@ Cada opción vive como proyecto Connect IQ auto-contenido en `apps/<letra>-<slug
 
 ## Desarrollo
 
-Pendiente (Fase 0): esqueleto del proyecto Connect IQ, manifiesto con `edge830` + `edge840`, y "hola mundo" en el simulador.
+En curso (Fase 0 — Opción A): data field de tiempo de actividad en [`apps/a-activity-timer/`](apps/a-activity-timer/) — esqueleto Connect IQ con manifiesto `edge830` + `edge840`, "hola mundo" en el simulador y, sobre él, el campo con formato adaptativo. Spec de implementación: [`apps/a-activity-timer/SPEC.md`](apps/a-activity-timer/SPEC.md).
