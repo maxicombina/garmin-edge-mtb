@@ -92,7 +92,7 @@ class ActivityTimerView extends WatchUi.DataField {
             Graphics.FONT_XTINY
         ];
 
-        mLabel = WatchUi.loadResource(Rez.Strings.FieldLabel) as String;
+        mLabel = (WatchUi.loadResource(Rez.Strings.FieldLabel) as String).toUpper();
 
         // Prime the value so the first onUpdate() (which may run before compute()) draws "0:00".
         updateFromMillis(0);
@@ -187,10 +187,12 @@ class ActivityTimerView extends WatchUi.DataField {
         dc.clear();
 
         // 2) Optional label on top, only when the cell is tall enough.
+        // Label like the native field: a bigger text font (FONT_MEDIUM is the biggest
+        // "letters" font) with a small top margin so it does not touch the top edge.
         var labelH = 0;
         if (h >= LABEL_MIN_H) {
-            labelH = dc.getFontHeight(Graphics.FONT_XTINY);
-            dc.drawText(w / 2, 0, Graphics.FONT_XTINY, mLabel, Graphics.TEXT_JUSTIFY_CENTER);
+            dc.drawText(w / 2, 2, Graphics.FONT_MEDIUM, mLabel, Graphics.TEXT_JUSTIFY_CENTER);
+            labelH = 2 + dc.getFontHeight(Graphics.FONT_MEDIUM);
         }
         var valueH = h - labelH;
         var usableW = w - 2 * PAD;
@@ -221,6 +223,7 @@ class ActivityTimerView extends WatchUi.DataField {
         // 4) Draw the value centred in the [labelH .. h] band.
         var cY = labelH + valueH / 2;
         if (mLevel == 2) {
+            cY += Graphics.getFontDescent(mFontBig) / 2;   // drop the font's bottom whitespace so the digits optically centre
             // Compound: big "H:MM" + small superscript ":SS" (widths are live because the
             // position depends on the real string; the LEVEL was already fixed via templates).
             var wBig = dc.getTextWidthInPixels(mValueShort, mFontBig);
@@ -232,6 +235,7 @@ class ActivityTimerView extends WatchUi.DataField {
             dc.drawText(leftX + wBig + GAP_SUP, topY, mFontSmall, mValueSup,
                         Graphics.TEXT_JUSTIFY_LEFT);
         } else {
+            cY += Graphics.getFontDescent(mFont) / 2;   // drop the font's bottom whitespace so the digits optically centre
             var str = (mLevel == 3) ? mValueShort : mValueLong;
             dc.drawText(w / 2, cY, mFont, str,
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
