@@ -2,6 +2,7 @@ import Toybox.WatchUi;
 import Toybox.Graphics;
 import Toybox.Activity;
 import Toybox.Lang;
+import Toybox.System;
 
 //
 // Activity-timer data field. Shows Activity.Info.timerTime (the activity stopwatch,
@@ -60,6 +61,11 @@ class ActivityTimerView extends WatchUi.DataField {
     private const TEST_STEP_MS = 30000;      // +30 s of fake time per real second
     private const TEST_MAX_MS = 39600000;    // wrap at 11:00:00
     private var mTestMs as Number = 0;
+
+    // --- Simulator measurement hook (SPEC 11.1): set true to print the cell size and
+    // the ladder font heights to the console (VS Code Debug Console). Ship with false. ---
+    private const DEBUG_MEASURE = false;
+    private var mMeasuredFonts as Boolean = false;
 
     // --- Selection cache. onUpdate() re-runs the ladder only when one of these changes:
     //     cell width/height, or a template (i.e. the digit pattern) changed. ---
@@ -188,6 +194,18 @@ class ActivityTimerView extends WatchUi.DataField {
         }
         var valueH = h - labelH;
         var usableW = w - 2 * PAD;
+
+        if (DEBUG_MEASURE) {
+            System.println("MEASURE cell=" + w + "x" + h + " labelH=" + labelH + " valueH=" + valueH);
+            if (!mMeasuredFonts) {
+                mMeasuredFonts = true;
+                var fh = "MEASURE fontHeights:";
+                for (var fi = 0; fi < mLadder.size(); fi++) {
+                    fh += " " + dc.getFontHeight(mLadder[fi]);
+                }
+                System.println(fh);
+            }
+        }
 
         // 3) Pick format level + font(s). Cached: recompute only when the cell size or the
         //    digit pattern changed, so the normal per-second tick does zero measuring.
