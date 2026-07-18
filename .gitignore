@@ -23,5 +23,6 @@ developer_key*
 .vscode/
 *.swp
 
-# Serena (local AI tooling)
+# Local AI tooling / agent worktrees
 .serena/
+.claude/
