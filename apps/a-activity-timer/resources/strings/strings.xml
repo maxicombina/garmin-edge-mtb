@@ -1,0 +1,5 @@
+<strings>
+    <string id="AppName">Activity Timer</string>
+    <!-- Label drawn above the value when the cell is tall enough (see SPEC 6.2). -->
+    <string id="FieldLabel">Timer</string>
+</strings>

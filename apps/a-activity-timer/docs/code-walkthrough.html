@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>a-activity-timer — cómo funciona el código</title>
+<style>
+  :root {
+    --bg: #F1F4F5;
+    --surface: #FFFFFF;
+    --surface-2: #E7ECEF;
+    --code-bg: #0F1417;
+    --code-ink: #D8E2E7;
+    --code-dim: #7F8E97;
+    --ink: #1A2126;
+    --ink-soft: #56646D;
+    --line: #D6DEE2;
+    --accent: #C65A08;
+    --accent-ink: #C65A08;
+    --paused: #85929B;
+    --link: #0C6E88;
+    --screen-bg: #12181C;
+    --screen-run: #F5842A;
+    --screen-idle: #7E8B94;
+    --radius: 14px;
+    --maxw: 860px;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0E1316;
+      --surface: #151B1F;
+      --surface-2: #1B2429;
+      --code-bg: #0A0E10;
+      --code-ink: #D8E2E7;
+      --code-dim: #6E7C85;
+      --ink: #E7EDF0;
+      --ink-soft: #97A5AE;
+      --line: #26313A;
+      --accent: #F5842A;
+      --accent-ink: #F79A4E;
+      --paused: #6E7C85;
+      --link: #55BBDB;
+      --screen-bg: #0A0E10;
+      --screen-run: #F5842A;
+      --screen-idle: #6E7C85;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #F1F4F5; --surface: #FFFFFF; --surface-2: #E7ECEF; --code-bg: #0F1417;
+    --code-ink: #D8E2E7; --code-dim: #7F8E97; --ink: #1A2126; --ink-soft: #56646D;
+    --line: #D6DEE2; --accent: #C65A08; --accent-ink: #C65A08; --paused: #85929B;
+    --link: #0C6E88; --screen-bg: #12181C; --screen-run: #F5842A; --screen-idle: #7E8B94;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0E1316; --surface: #151B1F; --surface-2: #1B2429; --code-bg: #0A0E10;
+    --code-ink: #D8E2E7; --code-dim: #6E7C85; --ink: #E7EDF0; --ink-soft: #97A5AE;
+    --line: #26313A; --accent: #F5842A; --accent-ink: #F79A4E; --paused: #6E7C85;
+    --link: #55BBDB; --screen-bg: #0A0E10; --screen-run: #F5842A; --screen-idle: #6E7C85;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 22px; }
+
+  /* rhythm */
+  main > section { padding: 40px 0; border-top: 1px solid var(--line); }
+  main > section:first-of-type { border-top: 0; }
+
+  h1, h2, h3 { text-wrap: balance; line-height: 1.15; letter-spacing: -0.02em; margin: 0; }
+  h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 800; }
+  h2 { font-size: clamp(1.4rem, 3.2vw, 1.9rem); font-weight: 750; margin-bottom: 6px; }
+  h3 { font-size: 1.12rem; font-weight: 700; margin: 22px 0 4px; letter-spacing: -0.01em; }
+  p { margin: 12px 0; max-width: 66ch; }
+  a { color: var(--link); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--link) 35%, transparent); }
+  a:hover { border-bottom-color: var(--link); }
+  strong { font-weight: 680; }
+
+  .eyebrow {
+    font-size: 0.74rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--accent-ink); margin: 0 0 10px;
+  }
+  .lead { font-size: 1.18rem; color: var(--ink-soft); max-width: 60ch; margin-top: 14px; }
+
+  code { font-family: var(--font-mono); font-size: 0.86em; background: var(--surface-2);
+    padding: 0.1em 0.38em; border-radius: 6px; }
+
+  pre.code {
+    font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.6;
+    background: var(--code-bg); color: var(--code-ink);
+    padding: 18px 20px; border-radius: 12px; overflow-x: auto;
+    border: 1px solid color-mix(in srgb, var(--code-ink) 12%, transparent);
+    margin: 16px 0; tab-size: 4;
+  }
+  pre.code .cm { color: var(--code-dim); }
+  pre.code .k  { color: #F5A15A; }
+  pre.code .s  { color: #93C9A6; }
+  pre.code .n  { color: #7FC7DE; }
+  pre.code b   { color: #FFFFFF; font-weight: 600; }
+
+  /* header */
+  header.hero { padding: 56px 0 20px; }
+  .hero-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 34px; align-items: center; }
+  @media (max-width: 720px) { .hero-grid { grid-template-columns: 1fr; } }
+
+  /* device screen mock */
+  .screen {
+    background: var(--screen-bg); border-radius: 16px; padding: 22px 20px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 8px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06), 0 12px 30px -18px rgba(0,0,0,0.6);
+    min-height: 132px;
+  }
+  .readout {
+    font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700;
+    color: var(--screen-run); letter-spacing: 0.01em; line-height: 1;
+    font-size: clamp(2.4rem, 8vw, 3.4rem);
+  }
+  .readout .sup { font-size: 0.5em; vertical-align: text-top; margin-left: 0.06em; }
+  .readout.idle { color: var(--screen-idle); }
+  .screen .cap { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--screen-idle); }
+
+  /* cards & grids */
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 20px 22px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+  .card h3 { margin-top: 0; }
+  .card .role { font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--accent-ink); }
+
+  /* flow */
+  .flow { display: flex; flex-direction: column; gap: 0; margin: 22px 0; }
+  .flow-step { background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    padding: 13px 18px; display: flex; gap: 14px; align-items: baseline; }
+  .flow-step .who { font-family: var(--font-mono); font-size: 0.76rem; color: var(--accent-ink);
+    min-width: 104px; letter-spacing: 0.02em; }
+  .flow-step .what { color: var(--ink); font-size: 0.98rem; }
+  .flow-step .what small { color: var(--ink-soft); }
+  .flow-arrow { align-self: center; color: var(--ink-soft); font-size: 1.05rem; line-height: 1; padding: 5px 0; }
+
+  /* numbered steps */
+  ol.steps { list-style: none; counter-reset: s; padding: 0; margin: 20px 0 0; display: flex;
+    flex-direction: column; gap: 18px; }
+  ol.steps > li { counter-increment: s; display: grid; grid-template-columns: 34px 1fr; gap: 14px; }
+  ol.steps > li::before { content: counter(s); font-family: var(--font-mono); font-weight: 700;
+    font-size: 0.85rem; color: var(--accent-ink); background: var(--surface-2);
+    width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
+    border: 1px solid var(--line); }
+  ol.steps > li > div { min-width: 0; }
+  ol.steps h3 { margin: 4px 0 2px; }
+  ol.steps p { margin: 6px 0; }
+
+  /* format cells grid */
+  .cells { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 20px 0; }
+  @media (max-width: 640px) { .cells { grid-template-columns: 1fr; } }
+  .cells .screen { min-height: 108px; }
+  .cells .readout { font-size: clamp(1.6rem, 6vw, 2.2rem); }
+  .cellcap { text-align: center; font-size: 0.85rem; color: var(--ink-soft); margin-top: 8px; }
+  .cellcap b { color: var(--ink); }
+
+  /* theme demo (white/black bg) */
+  .swatches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+  @media (max-width: 560px) { .swatches { grid-template-columns: 1fr; } }
+  .sw { border-radius: 12px; padding: 18px; text-align: center; border: 1px solid var(--line);
+    font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.5rem; }
+  .sw small { display: block; font-family: var(--font-sans); font-weight: 500; font-size: 0.72rem;
+    letter-spacing: 0.08em; text-transform: uppercase; margin-top: 8px; opacity: 0.8; }
+  .sw.white { background: #FFFFFF; color: #111; }
+  .sw.black { background: #000; color: #FFF; }
+  .sw.paused { background: #000; color: #8b98a1; }
+
+  /* geometry diagram */
+  .geo { background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    padding: 28px 22px; margin: 18px 0; overflow-x: auto; }
+  .geo-inner { position: relative; display: inline-flex; align-items: flex-start; gap: 6px;
+    font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink); }
+  .geo .big { font-size: 4rem; font-weight: 700; line-height: 1; }
+  .geo .sup { font-size: 2rem; font-weight: 700; line-height: 1; color: var(--accent-ink); }
+  .geo .tag { font-family: var(--font-sans); font-size: 0.72rem; color: var(--ink-soft);
+    letter-spacing: 0.04em; }
+
+  /* callout */
+  .callout { background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+    border-left: 3px solid var(--accent); border-radius: 10px; padding: 14px 18px; margin: 18px 0; }
+  .callout p { margin: 4px 0; }
+  .callout .k { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--accent-ink); font-weight: 700; }
+
+  /* file tree */
+  .tree { font-family: var(--font-mono); font-size: 0.84rem; line-height: 1.75; color: var(--ink-soft);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px;
+    overflow-x: auto; }
+  .tree b { color: var(--ink); font-weight: 600; }
+  .tree .accent { color: var(--accent-ink); }
+
+  .pill { display: inline-block; font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
+  .pill.run { color: #fff; background: var(--accent); }
+  .pill.pause { color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); }
+
+  ul.tight { margin: 12px 0; padding-left: 20px; }
+  ul.tight li { margin: 6px 0; max-width: 64ch; }
+
+  footer { border-top: 1px solid var(--line); padding: 30px 0 60px; color: var(--ink-soft);
+    font-size: 0.86rem; }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<button id="themeToggle" aria-label="Cambiar tema" style="position:fixed;top:14px;right:14px;z-index:10;font-family:var(--font-mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);cursor:pointer">tema</button>
+<div class="wrap">
+  <header class="hero">
+    <p class="eyebrow">Connect IQ · data field · Edge 830 / 840</p>
+    <div class="hero-grid">
+      <div>
+        <h1>Cómo funciona <span style="color:var(--accent-ink)">a-activity-timer</span></h1>
+        <p class="lead">Un campo de datos que muestra el tiempo de actividad y adapta el formato al tamaño de la celda. Acá está el código y el flujo, explicados paso a paso.</p>
+      </div>
+      <div class="screen" aria-hidden="true">
+        <div class="readout">1:23<span class="sup">:45</span></div>
+        <div class="cap">formato compuesto</div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>El modelo mental: dos funciones</h2>
+      <p>Todo campo de datos vive de dos funciones que hacen cosas <strong>distintas y separadas a propósito</strong>. Entender esta división es la mitad del proyecto.</p>
+      <div class="two">
+        <div class="card">
+          <div class="role">corre ~1×/s</div>
+          <h3>compute(info)</h3>
+          <p><strong>Calcula.</strong> Recibe <code>Activity.Info</code> (la foto de los datos), lee el timer, arma los textos y los guarda en variables. <em>No dibuja nada.</em></p>
+        </div>
+        <div class="card">
+          <div class="role">cuando hay que repintar</div>
+          <h3>onUpdate(dc)</h3>
+          <p><strong>Dibuja.</strong> Recibe un <code>Dc</code> (el lienzo de tu celda), elige fuente según el espacio y pinta lo que <code>compute()</code> preparó. <em>No calcula.</em></p>
+        </div>
+      </div>
+      <div class="callout">
+        <p class="k">la analogía</p>
+        <p><code>compute()</code> es quien <strong>lee el sensor y anota el número en un papel</strong> una vez por segundo. <code>onUpdate()</code> es quien <strong>agarra ese papel y lo pinta lindo</strong> cuando toca refrescar. El pintor nunca calcula; el que calcula nunca pinta.</p>
+      </div>
+      <p>Como no hay orden garantizado entre las dos (ni garantía de que <code>compute()</code> corra antes del primer <code>onUpdate()</code>), <strong>todo se inicializa en <code>initialize()</code></strong> y el primer dibujo muestra <code>0:00</code> sin romperse.</p>
+    </section>
+
+    <section>
+      <h2>El flujo de datos</h2>
+      <p>De punta a punta, una vuelta del ciclo:</p>
+      <div class="flow">
+        <div class="flow-step"><span class="who">sistema</span><span class="what">llama <code>compute(info)</code> una vez por segundo <small>— con los datos de la actividad</small></span></div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step"><span class="who">compute()</span><span class="what">lee <code>info.timerTime</code>, lo parte en H/M/S y arma los <strong>textos + plantillas</strong></span></div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step"><span class="who">variables</span><span class="what">quedan guardados <code>mValueLong</code>, <code>mValueShort</code>, <code>mValueSup</code> y sus plantillas <small>— el "papel"</small></span></div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step"><span class="who">sistema</span><span class="what">llama <code>onUpdate(dc)</code> cuando la pantalla se repinta <small>(~1×/s si está visible)</small></span></div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step"><span class="who">onUpdate()</span><span class="what">mide el espacio, elige nivel + fuente (con caché) y <strong>dibuja</strong> en la celda</span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Los archivos</h2>
+      <p>Un proyecto Connect IQ autocontenido. El grueso de la lógica está en <code>ActivityTimerView.mc</code>.</p>
+      <div class="tree">
+a-activity-timer/
+├── <b>manifest.xml</b>        <span class="accent">// datafield · edge830 + edge840 · API 3.3.0</span>
+├── <b>monkey.jungle</b>       <span class="accent">// config de build</span>
+├── source/
+│   ├── <b>ActivityTimerApp.mc</b>   <span class="accent">// AppBase → getInitialView()</span>
+│   └── <b>ActivityTimerView.mc</b>  <span class="accent">// DataField: compute() + onUpdate() ← acá está todo</span>
+└── resources/
+    ├── strings/strings.xml    <span class="accent">// nombre + label "Timer"</span>
+    └── drawables/…            <span class="accent">// ícono</span>
+      </div>
+    </section>
+
+    <section>
+      <h2>Paso a paso: <code>compute()</code></h2>
+      <p>Corre una vez por segundo. Su trabajo es dejar los textos listos para dibujar.</p>
+      <ol class="steps">
+        <li><div>
+          <h3>Leer el timer, a prueba de <code>null</code></h3>
+          <p><code>timerTime</code> viene en milisegundos y es <code>Number or Null</code>: antes de arrancar la actividad es <code>null</code>. La variable local <code>t</code> "estrecha" el tipo para poder asignarlo.</p>
+          <pre class="code"><span class="k">function</span> compute(info <span class="k">as</span> Activity.Info) <span class="k">as</span> Void {
+    <span class="k">var</span> ms = <span class="n">0</span>;
+    <span class="cm">// null before the activity starts</span>
+    <span class="k">if</span> (info has :timerTime) {
+        <span class="k">var</span> t = info.timerTime;
+        <span class="k">if</span> (t != <span class="k">null</span>) { ms = t; }
+    }
+    mTimerState = (info has :timerState) ? info.timerState : <span class="k">null</span>;
+    updateFromMillis(ms);
+}</pre>
+        </div></li>
+        <li><div>
+          <h3>Partir en horas / minutos / segundos</h3>
+          <p>División <strong>entera</strong> (trunca): el segundo 59 se muestra hasta que se cumple el 60 — igual que el campo nativo. <code>timerTime</code> ya se congela solo en pausa, así que no hay estado que mantener.</p>
+          <pre class="code"><span class="k">var</span> totalS  = totalMs / <span class="n">1000</span>;   <span class="cm">// trunca</span>
+<span class="k">var</span> hours   = totalS / <span class="n">3600</span>;
+<span class="k">var</span> minutes = (totalS % <span class="n">3600</span>) / <span class="n">60</span>;
+<span class="k">var</span> seconds = totalS % <span class="n">60</span>;</pre>
+        </div></li>
+        <li><div>
+          <h3>Armar los textos</h3>
+          <p>Con horas se arman tres candidatos; sin horas, solo <code>M:SS</code>. La elección final de cuál usar es de <code>onUpdate()</code>, que es quien conoce la celda.</p>
+          <pre class="code"><span class="k">if</span> (mHasHours) {
+    mValueLong  = Lang.format(<span class="s">"$1$:$2$:$3$"</span>, [hours, mm2, ss2]);  <span class="cm">// H:MM:SS</span>
+    mValueShort = Lang.format(<span class="s">"$1$:$2$"</span>, [hours, mm2]);         <span class="cm">// H:MM</span>
+    mValueSup   = <span class="s">":"</span> + ss2;                                 <span class="cm">// :SS</span>
+} <span class="k">else</span> {
+    mValueLong  = Lang.format(<span class="s">"$1$:$2$"</span>, [minutes, ss2]);       <span class="cm">// M:SS</span>
+    mValueShort = mValueLong;
+}</pre>
+        </div></li>
+        <li><div>
+          <h3>Armar las <em>plantillas</em> de ancho estable</h3>
+          <p>Junto a cada texto se guarda una plantilla con los dígitos como <code>8</code>. Es la clave del anti-parpadeo — se explica abajo.</p>
+        </div></li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>El truco anti-parpadeo: las plantillas</h2>
+      <p>La fuente se elige <strong>midiendo</strong> el texto. Pero si midiéramos el texto <em>vivo</em>, un valor con dígitos anchos podría entrar y otro no, y el formato saltaría de un segundo a otro. Solución: medir siempre una <strong>plantilla</strong> de ancho fijo (todos los dígitos como <code>8</code>).</p>
+      <div class="two">
+        <div class="card">
+          <div class="role">se mide esto</div>
+          <div class="readout" style="color:var(--ink); font-size:2.2rem; margin-top:6px">8:88:88</div>
+          <p style="margin-top:10px">La plantilla solo cambia cuando cambia el <strong>patrón de dígitos</strong> (aparecen horas, 9→10&nbsp;h…), nunca por el tick de segundos.</p>
+        </div>
+        <div class="card">
+          <div class="role">no esto</div>
+          <div class="readout" style="color:var(--ink-soft); font-size:2.2rem; margin-top:6px">1:11:11</div>
+          <div class="readout" style="color:var(--ink-soft); font-size:2.2rem">1:44:44</div>
+          <p style="margin-top:10px">Dos anchos distintos con el mismo formato → causarían parpadeo si se midieran directamente.</p>
+        </div>
+      </div>
+      <p>La plantilla se construye con <code>eights(n)</code>, que devuelve una cadena de <code>8</code> con tantos dígitos como el número — así <code>10:23</code> mide como <code>88:88</code> sin contar caracteres a mano.</p>
+    </section>
+
+    <section>
+      <h2>Paso a paso: <code>onUpdate()</code></h2>
+      <p>Recibe el <code>dc</code> (el lienzo, ya recortado a tu celda). <code>dc.getWidth()/getHeight()</code> dan el tamaño de <em>esta</em> celda — la base de todo lo adaptativo.</p>
+      <ol class="steps">
+        <li><div>
+          <h3>Colores según tema y estado</h3>
+          <p><code>getBackgroundColor()</code> dice si el fondo es blanco o negro (tema del usuario). Si el timer no está <span class="pill run">ON</span>, el valor se atenúa a gris <span class="pill pause">pausa</span> — se ve de un vistazo que no corre.</p>
+          <div class="swatches">
+            <div class="sw white">1:23:45<small>fondo blanco · corriendo</small></div>
+            <div class="sw black">1:23:45<small>fondo negro · corriendo</small></div>
+            <div class="sw paused">1:23:45<small>pausado · atenuado</small></div>
+          </div>
+        </div></li>
+        <li><div>
+          <h3>Label opcional</h3>
+          <p>Si la celda es lo bastante alta (<code>h ≥ 60&nbsp;px</code>), dibuja el label (<code>Timer</code> / <code>Tiempo</code> según el idioma) arriba en fuente chica. En celdas bajas se omite para dejarle todo el espacio al número.</p>
+        </div></li>
+        <li><div>
+          <h3>Elegir nivel + fuente (con caché)</h3>
+          <p>Solo recalcula si cambió el tamaño de celda o el patrón de dígitos. En un tick normal de segundos, <code>onUpdate()</code> no mide nada: reutiliza lo cacheado.</p>
+        </div></li>
+        <li><div>
+          <h3>Dibujar</h3>
+          <p>Una sola pieza (<code>drawText</code> centrado) para los formatos simples, o dos piezas para el compuesto.</p>
+        </div></li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>La decisión de formato: 3 niveles</h2>
+      <p>Hay una <strong>escalera de 8 fuentes</strong> (de mayor a menor); las 4 primeras son numéricas (diseñadas para valores de campo, legibles con guantes). Para <code>&lt;1h</code> siempre es <code>M:SS</code>. Para <code>≥1h</code>, el criterio es el <strong>ancho</strong> de la celda:</p>
+      <div class="cells">
+        <div>
+          <div class="screen"><div class="readout">1:23:45</div></div>
+          <p class="cellcap"><b>Nivel 1 · celda ancha</b><br><code>H:MM:SS</code> uniforme (entra a lo ancho)</p>
+        </div>
+        <div>
+          <div class="screen"><div class="readout">1:23<span class="sup">:45</span></div></div>
+          <p class="cellcap"><b>Nivel 2 · celda angosta</b><br><code>H:MM</code> grande + <code>:SS</code> chico volado</p>
+        </div>
+        <div>
+          <div class="screen"><div class="readout">1:23</div></div>
+          <p class="cellcap"><b>Nivel 3 · muy angosta</b><br><code>H:MM</code> pelado</p>
+        </div>
+      </div>
+      <div class="callout">
+        <p class="k">bonus del nivel 2</p>
+        <p>El compuesto <strong>resuelve una ambigüedad</strong>: <code>1:23</code> a secas podría leerse como 1h23m o 1m23s. Con <code>1:23</code> grande + <code>:45</code> chico, es inequívocamente 1h 23m 45s. Es la jerarquía inversa a la del 840 nativo (que vuela la hora chica); acá lo importante —H:MM— queda grande.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>El render compuesto</h2>
+      <p>El nivel 2 dibuja <strong>dos textos</strong>: el <code>H:MM</code> grande centrado verticalmente, y el <code>:SS</code> en una fuente chica <strong>alineada al techo</strong> del grande (superíndice). Las posiciones se calculan midiendo el ancho real con <code>getTextWidthInPixels</code>.</p>
+      <div class="geo">
+        <div class="geo-inner">
+          <span class="big">1:23</span><span class="sup">:45</span>
+        </div>
+        <div style="margin-top:14px; display:flex; gap:26px; flex-wrap:wrap">
+          <span class="tag">▸ pieza grande: <code>TEXT_JUSTIFY_LEFT | VCENTER</code></span>
+          <span class="tag">▸ pieza chica: <code>y = techo del grande</code></span>
+          <span class="tag">▸ separación: <code>GAP_SUP = 2px</code></span>
+        </div>
+      </div>
+      <p>La fuente chica se elige como la más grande de la escalera que no supere <code>≈0.6×</code> la altura de la grande — proporción constante, así se ve bien en cualquier celda.</p>
+    </section>
+
+    <section>
+      <h2>La caché: cuándo se recalcula</h2>
+      <p>Elegir fuente implica medir texto varias veces; hacerlo en cada repintado sería un desperdicio. La selección se guarda y solo se rehace cuando cambia algo real. La "llave" de la caché es:</p>
+      <pre class="code">(<b>w</b>, <b>h</b>, <b>mTplLong</b>, <b>mTplShort</b>)   <span class="cm">// tamaño de celda + patrón de dígitos</span></pre>
+      <ul class="tight">
+        <li><strong>Cambia el tamaño</strong> de celda (editás el layout en marcha) → recalcula.</li>
+        <li><strong>Rollover</strong> 59:59 → 1:00:00 (aparece el formato largo) → la plantilla cambia → recalcula.</li>
+        <li><strong>9:59:59 → 10:00:00</strong> o <strong>9:59 → 10:00</strong> (una plantilla se ensancha un dígito) → recalcula.</li>
+        <li><strong>Tick normal de segundos</strong> → las plantillas no cambian → <em>no</em> recalcula.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Cómo lo probás en el simulador</h2>
+      <p>Tu campo depende de <code>Activity.Info</code>, que en el simulador está vacío hasta que arrancás una actividad. Formas de probarlo sin salir a la calle:</p>
+      <ol class="steps">
+        <li><div>
+          <h3>Ver el render adaptativo</h3>
+          <p>Cambiá el <strong>layout de campos</strong> del simulador (1 / 2 / 5 / 10) para ver el mismo valor en celdas de distinto tamaño y disparar los 3 niveles. No necesita datos de actividad.</p>
+        </div></li>
+        <li><div>
+          <h3>Ver el timer corriendo y cruzar la hora — <code>TEST_MODE</code></h3>
+          <p>Poné <code>TEST_MODE = true</code> en los <em>tunables</em> de la vista: un reloj rápido suma 30&nbsp;s de tiempo falso por segundo real, así ves el valor subir y <strong>cruzar 1:00:00 en ~2 minutos</strong>, pasando por todos los formatos. Dejalo en <code>false</code> para uso real.</p>
+          <pre class="code"><span class="k">private const</span> TEST_MODE = <span class="k">true</span>;        <span class="cm">// prende el reloj rápido</span>
+<span class="k">private const</span> TEST_STEP_MS = <span class="n">30000</span>;   <span class="cm">// +30 s por segundo</span></pre>
+        </div></li>
+        <li><div>
+          <h3>Datos reales (tiempo real)</h3>
+          <p><strong>Simulation → Activity Data</strong> → elegí <em>Data simulation</em> o un <em>FIT/GPX Playable File</em>, y apretá <strong>Start</strong> en el dispositivo. Antes de Start, <code>timerTime</code> es <code>null</code> y el campo muestra <code>0:00</code> atenuado — eso es la null-safety, no un bug.</p>
+        </div></li>
+        <li><div>
+          <h3>Medir para la tabla de la SPEC</h3>
+          <p>Un <code>System.println(dc.getWidth() + "x" + dc.getHeight())</code> en <code>onUpdate()</code> imprime el tamaño de cada layout en la consola de VS Code — justo lo que la §11.1 pide anotar.</p>
+        </div></li>
+      </ol>
+    </section>
+  </main>
+
+  <footer>
+    <p>Proyecto personal · MTB · Fase 0 — <code>a-activity-timer</code>. Documento de lectura del código; la fuente de verdad es <code>apps/a-activity-timer/SPEC.md</code>.</p>
+  </footer>
+</div>
+<script>
+(function(){var b=document.getElementById("themeToggle");b.addEventListener("click",function(){var r=document.documentElement,cur=r.getAttribute("data-theme");if(!cur){cur=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";}r.setAttribute("data-theme",cur==="dark"?"light":"dark");});})();
+</script>
+</body>
+</html>

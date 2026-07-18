@@ -1,0 +1,3 @@
+# Build config. The SDK auto-discovers ./source and ./resources by convention,
+# so pointing at the manifest is enough for this project.
+project.manifest = manifest.xml

@@ -1,5 +1,8 @@
 # Connect IQ build artifacts
 bin/
+gen/
+mir/
+internal-mir/
 *.iq
 *.prg
 *.prg.debug.xml
@@ -15,10 +18,9 @@ developer_key*
 .jungle_cache/
 *.mss.map
 
-# Editor / OS
+# Editor / OS (ignore .vscode at any level — nested app workspaces too)
 .DS_Store
-.vscode/*
-!.vscode/extensions.json
+.vscode/
 *.swp
 
 # Serena (local AI tooling)

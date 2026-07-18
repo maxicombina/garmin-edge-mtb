@@ -14,7 +14,7 @@ Este campo **duplica a propósito** el campo nativo "Tiempo" (Timer) del Edge. E
 2. **El ciclo `compute()` / `onUpdate()`** y sus reglas (asincronía, null-safety, presupuesto de memoria).
 3. **Objetivo didáctico central: render adaptativo por medición de texto** — decidir formato y fuente según el espacio real de la celda (`dc.getWidth()/getHeight()` + `dc.getTextWidthInPixels()`), que es la base de todas las apps siguientes.
 
-Ventaja de duplicar lo nativo: **validación 1:1** — se pone el campo propio al lado del nativo "Tiempo" en la misma pantalla y deben coincidir siempre.
+Ventaja de duplicar lo nativo: **validación 1:1 del valor** — se pone el campo propio al lado del nativo "Tiempo" en la misma pantalla y el **tiempo** debe coincidir siempre (tolerancia 1 s de fase). El **aspecto** puede diferir a propósito: en celda no completa y ≥1h nuestro formato compuesto (5.2, nivel 2) invierte la jerarquía del nativo (segundos chicos volados en vez de hora chica volada).
 
 ## 2. Plataforma (verificado)
 
@@ -81,15 +81,20 @@ seconds = totalS % 60
 
 ### 5.2 Formatos (decisión de producto, cerrada 2026-07-18)
 
-| Condición | Formato | Ejemplo | Construcción (`Lang.format`, API 1.0.0 + `Number.format("%02d")`, API 1.0.0) |
-|---|---|---|---|
-| `hours == 0` — cualquier celda | `M:SS` | `0:00`, `5:07`, `59:59` | `Lang.format("$1$:$2$", [minutes, seconds.format("%02d")])` |
-| `hours > 0` y la celda tiene espacio (5.3) | `H:MM:SS` | `1:00:00`, `10:23:45` | `Lang.format("$1$:$2$:$3$", [hours, minutes.format("%02d"), seconds.format("%02d")])` |
-| `hours > 0` y la celda NO tiene espacio | `H:MM` | `1:00`, `10:23` | `Lang.format("$1$:$2$", [hours, minutes.format("%02d")])` |
+Para `hours > 0` hay **tres niveles** según el espacio de la celda (5.3), de más a menos ancho; `hours == 0` es un único formato.
 
+| # | Condición | Formato | Ejemplo | Notas de construcción |
+|---|---|---|---|---|
+| — | `hours == 0` — cualquier celda | `M:SS` (una pieza) | `0:00`, `5:07`, `59:59` | `Lang.format("$1$:$2$", [minutes, seconds.format("%02d")])` |
+| 1 | `hours > 0`, `H:MM:SS` entra **a lo ancho** en la misma fuente que usa `H:MM` (celda ancha) | `H:MM:SS` (una pieza, tamaño uniforme) | `1:00:00`, `10:23:45` | `Lang.format("$1$:$2$:$3$", [hours, minutes.format("%02d"), seconds.format("%02d")])` |
+| 2 | `hours > 0`, no entra el nivel 1 pero sí el compuesto | **`H:MM` grande + `:SS` chico volado** (dos piezas) | `1:23`＋`:45` | Pieza grande `Lang.format("$1$:$2$", [hours, minutes.format("%02d")])`; pieza chica `Lang.format(":$1$", [seconds.format("%02d")])`. Render en 6.6. |
+| 3 | `hours > 0`, no entra ni el compuesto | `H:MM` (una pieza) | `1:00`, `10:23` | `Lang.format("$1$:$2$", [hours, minutes.format("%02d")])` |
+
+- **Formato compuesto (nivel 2), decisión de producto cerrada 2026-07-18:** los segundos se dibujan en fuente más chica y **volados** (superíndice) a la derecha del `H:MM` grande, con `:` adelante (`1:23` grande, `:45` chico y arriba). Es la mejor jerarquía para un campo que se mira de reojo: `H:MM` es lo que importa, los segundos son el detalle fino. Origen: el 840 nativo hace lo inverso (hora chica volada + `MM:SS` grande) y la hora chica se lee mal → invertimos la jerarquía (ver observación en 11.3).
+- **La ambigüedad `H:MM` vs `M:SS` se resuelve** en el nivel 2: `1:23` grande + `:45` chico es inequívocamente 1 h 23 min 45 s, no se confunde con 1 min 23 s. Solo queda en el nivel 3 (celda tan chica que se tiran los segundos); ahí el label y el contexto (venías viendo `59:xx`) alcanzan.
 - Horas y el primer campo de minutos **sin cero inicial** (como el nativo). Horas pueden tener 2+ dígitos (`10:23:45`): el algoritmo de ajuste lo absorbe midiendo, no contando caracteres.
-- Ambigüedad conocida y aceptada: `1:23` puede leerse como 1 h 23 min (H:MM) o 1 min 23 s (M:SS). Con el label y el contexto (venías viendo `59:xx`) alcanza en v1; si molesta en la calle, anotar para v1.1 (sufijo "h" pequeño).
-- En `compute()` se construyen los strings candidatos del estado actual: si `hours == 0`, solo `M:SS`; si `hours > 0`, `H:MM:SS` **y** `H:MM` (la elección final es de `onUpdate()`, que es quien conoce la celda).
+- En `compute()` se construyen los strings candidatos del estado actual: si `hours == 0`, solo `M:SS`; si `hours > 0`, `H:MM:SS`, `H:MM` **y** `:SS` (la pieza chica del nivel 2). La elección de nivel es de `onUpdate()`, que es quien conoce la celda.
+- **Orden de implementación:** primero el camino de una sola pieza (niveles 1 y 3 + `M:SS`) con la selección de fuente andando en el simulador; **después** el nivel 2 compuesto (render de dos piezas, 6.6). El nivel 2 es el diseño objetivo v1, pero se agrega en una segunda iteración sobre una base ya verificada.
 
 ### 5.3 Selección de formato y fuente (en `onUpdate(dc)`, con caché)
 
@@ -100,7 +105,11 @@ LADDER = [FONT_NUMBER_THAI_HOT (8), FONT_NUMBER_HOT (7), FONT_NUMBER_MEDIUM (6),
           FONT_NUMBER_MILD (5), FONT_MEDIUM (3), FONT_SMALL (2), FONT_TINY (1), FONT_XTINY (0)]
 ```
 
-**Regla "la celda tiene espacio":** el formato `H:MM:SS` se usa si cabe en **alguna fuente numérica** (`FONT_NUMBER_*`, las cuatro primeras de la escalera — las diseñadas para valores de data field, legibles con guantes). Si `H:MM:SS` solo cabría en fuentes de texto (`FONT_MEDIUM` o menores) → la celda "no es completa" → formato `H:MM` y se re-recorre la escalera desde arriba.
+**Regla de espacio (`hours > 0`) — el discriminante es el ANCHO, no el tamaño de fuente:**
+0. `big` = la **fuente más grande de la escalera que entra `H:MM`** (por ancho y alto). Es el tamaño natural del valor para esa celda.
+1. **`H:MM:SS` uniforme** si el `H:MM:SS` completo **también entra a lo ancho a esa misma fuente `big`**. Consecuencia buscada: un campo **ancho pero bajo** (fuente chica por el alto) muestra igual el uniforme, porque el ancho alcanza. Corrección 2026-07-18: primero se ató mal al tamaño de fuente (el compuesto aparecía en campos anchos, no deseado); el discriminante correcto es el ancho.
+2. Si el `H:MM:SS` **no** entra a lo ancho a `big` (celda angosta) → **compuesto**: `H:MM` a `big` + `:SS` chico volado. Cabe si `ancho("8:88", big) + GAP_SUP + ancho(":88", fuenteChica) ≤ usableW`. La `fuenteChica` es la mayor de la escalera con `altura ≤ round(SUP_RATIO · altura(big))`. Constantes: `GAP_SUP = 2 px`, `SUP_RATIO = 0.6` (afinables en simulador).
+3. Si ni el compuesto entra → **`H:MM` pelado** a `big`.
 
 **Anti-parpadeo — medir plantillas, no el string vivo:** para que la decisión no cambie de un segundo a otro (dígitos de distinto ancho podrían hacer que `1:11:11` quepa y `1:44:44` no → alternancia de formato dentro de la misma hora), la medición usa una **plantilla de anchura estable**: el string candidato con todos los dígitos reemplazados por `8` (p. ej. `8:88:88`, `88:88:88`, `8:88`). La plantilla solo cambia cuando cambia el **patrón de dígitos** (aparecen horas, 9→10 h, 9→10 min en `M:SS`…), nunca por el tick de segundos.
 
@@ -112,24 +121,33 @@ LADDER = [FONT_NUMBER_THAI_HOT (8), FONT_NUMBER_HOT (7), FONT_NUMBER_MEDIUM (6),
 3. Zona de label (6.2): si h ≥ LABEL_MIN_H (inicial: 60 px) → labelH = altura de FONT_XTINY
    (dc.getFontHeight, API 1.0.0); valueH = h − labelH. Si no → labelH = 0; valueH = h.
 4. Caché: si (w, h, plantillaLarga, plantillaCorta) == último cálculo → saltar a 7.
-5. Si hours > 0:
-     font = primera de LADDER con getTextWidthInPixels(plantilla("8:88:88"…), font) ≤ usableW
-            y getFontHeight(font) ≤ valueH
-     si font es FONT_NUMBER_* → formato = H:MM:SS
-     si no → formato = H:MM; re-recorrer LADDER con plantilla("8:88" u "88:88" si horas ≥ 10) → font
+5. Elegir NIVEL y fuente(s):
    Si hours == 0:
-     formato = M:SS; font = primera de LADDER que cumpla ancho y alto con plantilla("88:88" o "8:88")
-6. Si ninguna fuente cumple (celda absurda): font = FONT_XTINY (se acepta clipping; los
-   criterios de aceptación exigen que no ocurra en ningún layout real). Guardar caché.
+     nivel = "M:SS"; font = primera de LADDER con ancho(plantillaCorta) ≤ usableW y alto ≤ valueH
+   Si hours > 0:
+     // fuente de H:MM: la mayor que entra por ancho y alto (define el tamaño del valor)
+     big = primera de LADDER con ancho(plantillaCorta) ≤ usableW y getFontHeight ≤ valueH
+           (si ninguna cumple → big = FONT_XTINY, se acepta clipping)
+     // Nivel 1 — uniforme si el H:MM:SS completo TAMBIÉN entra a lo ancho a esa misma `big`
+     si getTextWidthInPixels(plantillaLarga "8:88:88"…, big) ≤ usableW → nivel = 1; font = big
+     si no:
+       // Nivel 2 — H:MM a `big` + :SS chico volado
+       small = mayor de LADDER con getFontHeight(small) ≤ round(SUP_RATIO · getFontHeight(big))
+       wComp = getTextWidthInPixels(plantillaCorta, big) + GAP_SUP + getTextWidthInPixels(":88", small)
+       si wComp ≤ usableW → nivel = 2; fontBig = big; fontSmall = small
+       si no → nivel = 3; font = big   // Nivel 3 — H:MM pelado
+6. Guardar (nivel, fuentes) en caché.
 7. Colores (6.4) → dc.setColor(fg, bg); dc.clear()
 8. Si labelH > 0: drawText(w/2, 0, FONT_XTINY, label, TEXT_JUSTIFY_CENTER)
-9. drawText(w/2, labelH + valueH/2, font, stringVivo del formato elegido,
-            TEXT_JUSTIFY_CENTER | TEXT_JUSTIFY_VCENTER)
+9. Dibujar el valor centrado en la zona [labelH … h]:
+     nivel 1 / 3 / M:SS  → drawText(w/2, labelH + valueH/2, font, stringVivo,
+                                    TEXT_JUSTIFY_CENTER | TEXT_JUSTIFY_VCENTER)
+     nivel 2 (compuesto) → dos piezas, ver 6.6
 ```
 
 - Constantes verificadas: `TEXT_JUSTIFY_RIGHT=0, CENTER=1, LEFT=2, VCENTER=4` (OR-eable con la horizontal), `drawText` API 1.0.0.
 - **Invalidación de caché (por tupla, no por lista de casos):** se recalcula el paso 4 cuando cambia cualquier componente de la clave `(w, h, plantillaLarga, plantillaCorta)`. Así quedan cubiertos, sin enumerarlos a mano: cambio de tamaño de celda (el usuario edita el layout en marcha), 59:59→1:00:00 (aparece el formato largo), 9:59:59→10:00:00 y 9:59→10:00 (una plantilla se ensancha un dígito), y el paso a celda chica (`H:MM`/`8:88`). El tick normal de segundos no cambia ninguna plantilla → no invalida.
-- Coste en régimen: `onUpdate()` hace 0 mediciones con caché válida; ante invalidación, ≤ 2 pasadas × 8 fuentes de `getTextWidthInPixels` — trivial a 1 Hz.
+- Coste en régimen: `onUpdate()` hace 0 mediciones con caché válida; ante invalidación, ≤ 3 niveles × 8 fuentes de `getTextWidthInPixels` (el nivel 2 suma 1 medición de `getFontHeight` por fuente para elegir `fontSmall`) — trivial a 1 Hz.
 
 ### 5.4 Estados y ciclo de vida
 
@@ -143,7 +161,7 @@ LADDER = [FONT_NUMBER_THAI_HOT (8), FONT_NUMBER_HOT (7), FONT_NUMBER_MEDIUM (6),
 Una sola métrica, centrada, en la fuente más grande que quepa. Nada de layouts múltiples tipo FULL/HALF/SMALL (eso llega con la Opción B): aquí la adaptación es **continua** vía la escalera de fuentes + el cambio de formato.
 
 ### 6.2 Label
-- String `"Timer"` (resource `strings.xml`; traducciones fuera de alcance v1), `FONT_XTINY`, centrado arriba.
+- String del resource `FieldLabel`, `FONT_XTINY`, centrado arriba. **Localizado:** base `resources/` = `"Timer"` (inglés + fallback), `resources-spa/` = `"Tiempo"`. El idioma `spa` está declarado en `<iq:languages>` del manifest (si no, la carpeta se ignora). El `.mc` no cambia: `loadResource()` resuelve el idioma del dispositivo solo.
 - Se dibuja solo si `h ≥ LABEL_MIN_H` (**inicial: 60 px** — recalibrar con la tabla de medición 11.1 y anotar aquí el valor final).
 
 ### 6.3 Padding
@@ -158,8 +176,30 @@ Una sola métrica, centrada, en la fuente más grande que quepa. Nada de layouts
 El atenuado enseña de un vistazo que el timer no corre (y de paso enseña `timerState`).
 
 ### 6.5 Presupuesto de allocations
-- `compute()`: construye ≤ 4 strings/s (hasta 2 candidatos + 2 plantillas en el caso con horas) — aceptable, es la técnica estándar (los strings de Monkey C son inmutables; el GC absorbe 1×/s sin problema).
-- `onUpdate()`: cero allocations con caché válida (solo lecturas de miembros y `drawText`); la plantilla se construye en `compute()` junto con los candidatos.
+- `compute()`: construye ≤ 5 strings/s (con horas: 3 candidatos `H:MM:SS`/`H:MM`/`:SS` + 2 plantillas) — aceptable, es la técnica estándar (los strings de Monkey C son inmutables; el GC absorbe 1×/s sin problema).
+- `onUpdate()`: cero allocations con caché válida (solo lecturas de miembros y `drawText`); las plantillas se construyen en `compute()` junto con los candidatos.
+
+### 6.6 Render del formato compuesto (nivel 2)
+
+Dos `drawText` con `fontBig` (para `H:MM`) y `fontSmall` (para `:SS`), con los segundos **volados** (top-alineados con el techo del `H:MM`):
+
+```
+wBig   = getTextWidthInPixels(H:MM vivo, fontBig)
+wSmall = getTextWidthInPixels(:SS vivo, fontSmall)
+W      = wBig + GAP_SUP + wSmall                 // ancho total del compuesto
+leftX  = (w − W) / 2                             // centrado horizontal en la celda
+cY     = labelH + valueH / 2                     // centro vertical de la zona de valor
+topY   = cY − getFontHeight(fontBig) / 2         // techo del H:MM grande
+
+// pieza grande: H:MM centrado verticalmente, anclado a la izquierda
+dc.drawText(leftX, cY, fontBig, H:MM vivo, TEXT_JUSTIFY_LEFT | TEXT_JUSTIFY_VCENTER)
+// pieza chica volada: :SS con la 'y' = techo (sin VCENTER, la y es el tope del texto)
+dc.drawText(leftX + wBig + GAP_SUP, topY, fontSmall, :SS vivo, TEXT_JUSTIFY_LEFT)
+```
+
+- El color es el mismo (`fg`) para ambas piezas; el atenuado en pausa (6.4) aplica igual.
+- ⚠️ La alineación fina del volado depende del ascendente real de cada fuente; ajustar `topY` (y opcionalmente usar `Graphics.getFontAscent`, API 1.2.0) mirándolo en el simulador — anotar el offset que quede bien.
+- Las anchuras vivas (`wBig`/`wSmall`) se miden aquí porque la posición sí depende del string real; el **nivel** ya se decidió en 5.3 con plantillas estables, así que esto no reintroduce parpadeo.
 
 ## 7. Settings
 
@@ -168,8 +208,6 @@ El atenuado enseña de un vistazo que el timer no corre (y de paso enseña `time
 ## 8. Fuera de alcance v1 (anotado para después)
 
 - `elapsedTime` (tiempo total con pausas) como métrica alternativa o setting.
-- Sufijo desambiguador "h" en `H:MM`.
-- Traducciones del label.
 - Hooks de timer (`onTimerStart/...`, API 1.3.0) — innecesarios aquí; se aprenden en la B.
 - FIT recording, alertas, táctil: nada de eso aplica a este campo.
 
@@ -184,12 +222,13 @@ El atenuado enseña de un vistazo que el timer no corre (y de paso enseña `time
 - [ ] Sin actividad iniciada: muestra `0:00` atenuado; no crashea (null-safety de `timerTime`/`timerState`).
 - [ ] Start → cuenta `0:01, 0:02…` en formato `M:SS` en **todos** los layouts del simulador (1 a 10 campos).
 - [ ] **Transición 59:59 → 1:00:00** en celda grande (layout 1–2 campos): pasa a `H:MM:SS` sin parpadeo ni salto visual.
-- [ ] **Transición 59:59 → 1:00** en celda chica (layout 8–10 campos): pasa a `H:MM`.
-- [ ] **9:59:59 → 10:00:00**: el string se ensancha un dígito y la fuente/formato se re-selecciona correctamente (sin clipping).
+- [ ] **Transición 59:59 → 1:00 (o compuesto)** en celda chica (layout 8–10 campos): en cuanto no entra `H:MM:SS`, cae al **nivel 2** (`H:MM` grande + `:SS` chico volado) o, si la celda es aún más chica, al **nivel 3** (`H:MM` pelado).
+- [ ] **Formato compuesto (nivel 2)**: en una celda intermedia (≥1h), `H:MM` se ve grande y `:SS` chico y **volado** arriba a la derecha, con `:` adelante; alineación correcta (segundos no se solapan ni se cortan) en fondo blanco y negro.
+- [ ] **9:59:59 → 10:00:00**: el string se ensancha un dígito y el nivel/fuente se re-selecciona correctamente (sin clipping), tanto en `H:MM:SS` como en el compuesto (`10:00`+`:00`).
 - [ ] **Sin flapping**: con el timer en 1:XX:XX estable en una celda dada, el formato no alterna entre updates (verificar la caché por plantilla).
 - [ ] Pausa manual y auto-pausa: el valor se congela y se atenúa; al reanudar recupera color y sigue. (Además responde la pregunta ⚠️: ¿`compute()` sigue llamándose en pausa?)
 - [ ] Reset/guardar actividad: vuelve a `0:00` atenuado sin crash.
-- [ ] **Validación 1:1**: junto al campo nativo "Tiempo" en la misma pantalla, coincide siempre (tolerancia 1 s de fase).
+- [ ] **Validación 1:1 del valor**: junto al campo nativo "Tiempo" en la misma pantalla, el tiempo coincide siempre (tolerancia 1 s de fase). El aspecto puede diferir a propósito (nivel 2 compuesto).
 - [ ] Fondo blanco y fondo negro: contraste correcto en ambos temas.
 - [ ] Los `:` se renderizan bien en todas las fuentes de la escalera (⚠️ glifos de `FONT_NUMBER_*` no documentados).
 - [ ] Memoria en régimen < 32 KB en el simulador.
@@ -213,6 +252,7 @@ Simulator → *Simulation → Activity Data*: start, correr > 1 h (el simulador 
 3. Valor de `timerTime`/`timerState` antes de arrancar: ¿null o 0/OFF?
 4. ¿El campo nativo "Tiempo" trunca o redondea los segundos? ¿Muestra `M:SS` antes de la hora?
 5. ¿`FONT_NUMBER_*` del Edge 830 incluyen el glifo `:`? Alturas reales de cada fuente.
+6. **Observado (Edge 840, 2026-07-18):** en celda no completa y ≥1h, el campo nativo dibuja la **hora chica y volada** (superíndice) seguida de `MM:SS` grande (p. ej. `1`⁺`30:20`). Fue el origen del formato compuesto del nivel 2 (5.2), pero con la jerarquía **invertida**: nosotros dejamos `H:MM` grande y volamos `:SS` chico, porque la hora chica se lee mal. Confirmar el mismo comportamiento (o no) en el 830.
 
 ### 11.4 Validación 1:1
 Pantalla con el campo propio + el nativo "Tiempo": correr 5 min con pausas → deben coincidir siempre.
@@ -227,3 +267,15 @@ Pantalla con el campo propio + el nativo "Tiempo": correr 5 min con pausas → d
 - `Lang.format` / `Number.format`: https://developer.garmin.com/connect-iq/api-docs/Toybox/Lang.html / Lang/Number.html
 - Manual Edge 830 — data fields nativos (Timer/Elapsed Time) y Auto Pause: https://www8.garmin.com/manuals/webhelp/edge830/EN-US/GUID-53FC7978-187F-4E53-AA33-04853F86B05F.html
 - Semántica timer vs elapsed en pausa (foro, ⚠️ no oficial): https://forums.garmin.com/developer/connect-iq/f/discussion/4731/sys-gettimer-vs-info-elapsedtime-in-compute-data-field
+
+## 13. Pendiente antes de publicar
+
+Checklist de lo que falta para una publicación real (no bloquea la Fase 0 de aprendizaje):
+
+- [ ] **Ícono real.** El actual (`resources/drawables/launcher_icon.png`) es un placeholder (cuadrado naranja). **Tamaño ya corregido a 35×35** (edge830 y edge840 piden 35×35 → sin warning de compilación). Falta un ícono **diseñado** de verdad. Si se suman devices con otro tamaño de launcher, hará falta un PNG por tamaño vía `resources-<device>/drawables/`.
+- [ ] **Tipos de actividad / deportes.** ⚠️ Investigar si conviene/es posible acotar el campo a ciertos deportes. Los data fields normalmente están disponibles en cualquier actividad; confirmar en la doc si hay una declaración aplicable en el manifest o si se deja universal (probablemente universal). No asumir de memoria.
+- [ ] **Compatibilidad con otros Edge.** Hoy `<iq:products>` solo tiene `edge830` + `edge840`. Candidatos táctiles a color (en el SDK): `edge520plus`, `edge530`, `edge540`, `edge550`, `edge820`, `edge850`, `edge1030`/`edge1030plus`, `edge1040`, `edge1050`, `edgeexplore2`, `edgemtb`. **Excluir** monocromo/chicos (`edge130`/`edge130plus`). ⚠️ Cada uno suma resolución, fuentes y tamaño de ícono propios → **probar el render adaptativo en cada perfil** antes de listarlo (recalibrar `LABEL_MIN_H`, revisar la escalera, ícono por tamaño). Compilar contra el mínimo común de API.
+- [ ] **Nombre y metadatos de tienda.** Nombre app: `Activity Timer` / `Tiempo de Actividad` (ya bilingüe). Falta descripción, capturas, categoría, versión.
+- [x] **`TEST_MODE = false`** en `ActivityTimerView.mc` (hecho).
+- [ ] **Prueba en dispositivo real** (sideload al Edge 830/840), no solo simulador.
+- [ ] Rellenar la **tabla de medición §11.1** (tamaños de celda por layout) y recalibrar constantes.

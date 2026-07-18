@@ -1,0 +1,6 @@
+<strings>
+    <!-- Spanish (spa) overrides. Any id not listed here falls back to resources/strings.
+         AppName is repeated (unchanged) only to avoid the "untranslated resource" warning. -->
+    <string id="AppName">Tiempo de Actividad</string>
+    <string id="FieldLabel">Tiempo</string>
+</strings>
