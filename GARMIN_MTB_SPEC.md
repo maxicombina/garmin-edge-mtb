@@ -58,6 +58,16 @@ Tras evaluar los tipos de app disponibles (watch face, widget, data field, devic
 
 ---
 
+### 3.4 Fuentes y render — verificado en device real (Fase 0, 2026-07-19)
+
+Aprendizajes de la Opción A en el Edge 840, aplicables a **todas** las apps del proyecto:
+
+- **Para igualar el estilo de los campos nativos, usar las fuentes del SISTEMA:** `FONT_SYSTEM_NUMBER_*` para dígitos y `FONT_GLANCE` para labels (en MAYÚSCULAS). Las `FONT_NUMBER_*`/`FONT_MEDIUM` "de app" miden lo mismo pero el trazo es distinto.
+- **Métricas (perfil edge830/840, 246×322)** — alto/ascent/descent: `SYSTEM_NUMBER_THAI_HOT` 67/53/14 · `HOT` 55/43/12 · `MEDIUM` 42/33/9 · `MILD` 35/28/7 · texto `MEDIUM…XTINY` 19-11/14-8/5-3. Tabla completa y tamaños de celda: `apps/a-activity-timer/SPEC.md` §11.1.
+- **Centrado vertical:** las fuentes numéricas reservan descendente que los dígitos no usan → centrar por caja deja hueco abajo. Regla: al valor `cY += descent/2`; a los labels reservarles solo el `ascent` + margen explícito (~4 px); ajustes finos de ±2 px se validan a ojo contra el nativo.
+- **Cadencia:** un data field CIQ muestrea `Activity.Info` ~1×/s → hasta ~1 s de atraso visual vs el campo nativo. Cosmético (el FIT graba bien).
+- **Sideload en Mac:** Edge 540/840/1040+ usan **MTP** (Garmin quitó el modo disco) → no montan en Finder. Funciona **OpenMTP** (probado en Mac M4): copiar el `.prg` a `GARMIN/Apps/` y el device lo consume al reiniciar. La alternativa sin cable es la IQ Store (OTA).
+
 ## 4. Opciones de producto evaluadas
 
 Ordenadas de menor a mayor complejidad. La visión es **incremental**: cada opción puede construirse sobre la anterior dentro del mismo proyecto.

@@ -101,9 +101,11 @@ Para `hours > 0` hay **tres niveles** según el espacio de la celda (5.3), de m�
 **Escalera de fuentes** (constantes API 1.0.0, de mayor a menor):
 
 ```
-LADDER = [FONT_NUMBER_THAI_HOT (8), FONT_NUMBER_HOT (7), FONT_NUMBER_MEDIUM (6),
-          FONT_NUMBER_MILD (5), FONT_MEDIUM (3), FONT_SMALL (2), FONT_TINY (1), FONT_XTINY (0)]
+LADDER = [FONT_SYSTEM_NUMBER_THAI_HOT, FONT_SYSTEM_NUMBER_HOT, FONT_SYSTEM_NUMBER_MEDIUM,
+          FONT_SYSTEM_NUMBER_MILD, FONT_MEDIUM, FONT_SMALL, FONT_TINY, FONT_XTINY]
 ```
+
+- **Fuentes del SISTEMA (decisión en device, 2026-07-19):** las cuatro numéricas son `FONT_SYSTEM_NUMBER_*` porque su trazo **iguala el del campo nativo**; las `FONT_NUMBER_*` "de app" miden lo mismo (alturas en 11.1) pero el estilo difiere. Verificado a ojo contra el campo nativo en el Edge 840 real.
 
 **Regla de espacio (`hours > 0`) — el discriminante es el ANCHO, no el tamaño de fuente:**
 0. `big` = la **fuente más grande de la escalera que entra `H:MM`** (por ancho y alto). Es el tamaño natural del valor para esa celda.
@@ -161,7 +163,7 @@ LADDER = [FONT_NUMBER_THAI_HOT (8), FONT_NUMBER_HOT (7), FONT_NUMBER_MEDIUM (6),
 Una sola métrica, centrada, en la fuente más grande que quepa. Nada de layouts múltiples tipo FULL/HALF/SMALL (eso llega con la Opción B): aquí la adaptación es **continua** vía la escalera de fuentes + el cambio de formato.
 
 ### 6.2 Label
-- String del resource `FieldLabel`, `FONT_XTINY`, centrado arriba. **Localizado:** base `resources/` = `"Timer"` (inglés + fallback), `resources-spa/` = `"Tiempo"`. El idioma `spa` está declarado en `<iq:languages>` del manifest (si no, la carpeta se ignora). El `.mc` no cambia: `loadResource()` resuelve el idioma del dispositivo solo.
+- String del resource `FieldLabel` en **MAYÚSCULAS**, fuente **`FONT_GLANCE`** (la del sistema que iguala el estilo del label nativo; decidido en device 2026-07-19 tras probar `FONT_MEDIUM` y `FONT_SYSTEM_MEDIUM`), centrada, con **margen superior de 4 px**. Se reserva solo su **ascent** (lo visible): el descendente vacío se solapa con el aire superior del valor y deja más lugar al número. Fuente fija: no escala con la celda (decisión — el target es la celda de 2 campos). **Localizado:** base `resources/` = `"Timer"` (inglés + fallback), `resources-spa/` = `"Tiempo"`. El idioma `spa` está declarado en `<iq:languages>` del manifest (si no, la carpeta se ignora). El `.mc` no cambia: `loadResource()` resuelve el idioma del dispositivo solo.
 - Se dibuja solo si `h ≥ LABEL_MIN_H` (**inicial: 60 px** — recalibrar con la tabla de medición 11.1 y anotar aquí el valor final).
 
 ### 6.3 Padding
@@ -201,6 +203,13 @@ dc.drawText(leftX + wBig + GAP_SUP, topY, fontSmall, :SS vivo, TEXT_JUSTIFY_LEFT
 - ⚠️ La alineación fina del volado depende del ascendente real de cada fuente; ajustar `topY` (y opcionalmente usar `Graphics.getFontAscent`, API 1.2.0) mirándolo en el simulador — anotar el offset que quede bien.
 - Las anchuras vivas (`wBig`/`wSmall`) se miden aquí porque la posición sí depende del string real; el **nivel** ya se decidió en 5.3 con plantillas estables, así que esto no reintroduce parpadeo.
 
+### 6.7 Centrado vertical (validado en device, 2026-07-19)
+
+Las fuentes numéricas reservan **descendente** que los dígitos no usan → centrar por la caja deja el número alto, con hueco abajo. Reglas aplicadas:
+- **Valor:** centrar y luego empujar `cY += getFontDescent(font)/2` (centra lo visible).
+- **Label:** reservar solo `getFontAscent` + margen explícito (4 px), no la caja completa.
+- **Ajustes finos:** label y valor 2 px más arriba cada uno (nudges validados a ojo contra el nativo en el 840 real). El resultado quedó pixel-perfect vs el campo nativo (v0.1.5).
+
 ## 7. Settings
 
 **No hay** (decisión de producto: solo timer, sin opciones). El mecanismo de settings se aprende en la Opción B.
@@ -209,6 +218,7 @@ dc.drawText(leftX + wBig + GAP_SUP, topY, fontSmall, :SS vivo, TEXT_JUSTIFY_LEFT
 
 - `elapsedTime` (tiempo total con pausas) como métrica alternativa o setting.
 - Hooks de timer (`onTimerStart/...`, API 1.3.0) — innecesarios aquí; se aprenden en la B.
+- **Iconito monocromo junto al label** (estilo nativo, como el fueguito de calorías): dibujarlo con primitivas de `dc` (círculo + detalles de cronómetro, ~14 px) en el color de frente → se adapta solo al tema día/noche, sin PNG ni tintado. Candidato natural para v1.1.
 - FIT recording, alertas, táctil: nada de eso aplica a este campo.
 
 ## 9. Presupuesto y rendimiento
@@ -236,12 +246,19 @@ dc.drawText(leftX + wBig + GAP_SUP, topY, fontSmall, :SS vivo, TEXT_JUSTIFY_LEFT
 
 ## 11. Plan de pruebas en simulador (y mediciones pendientes ⚠️)
 
-### 11.1 Tabla de medición (rellenar en Fase 0 — es parte del entregable)
-Con un `System.println` temporal en `onUpdate()`, anotar por layout del Edge 830: `dc.getWidth() × dc.getHeight()`, y una vez: `dc.getFontHeight()` de las 8 fuentes de la escalera. Con esos datos, recalibrar `LABEL_MIN_H` y validar la regla "fuente numérica mínima".
+### 11.1 Tabla de medición — MEDIDA (hook `DEBUG_MEASURE`, perfil edge830/840, 2026-07-19)
 
-| Layout (campos) | Ancho × alto de celda (px) |
-|---|---|
-| 1 / 2 / 3 / … / 10 | *(medir)* |
+Alturas de fuente de la escalera (constantes por device):
+
+| Fuente | alto | ascent | descent |
+|---|---|---|---|
+| `FONT_SYSTEM_NUMBER_THAI_HOT` | 67 | 53 | 14 |
+| `FONT_SYSTEM_NUMBER_HOT` | 55 | 43 | 12 |
+| `FONT_SYSTEM_NUMBER_MEDIUM` | 42 | 33 | 9 |
+| `FONT_SYSTEM_NUMBER_MILD` | 35 | 28 | 7 |
+| `FONT_MEDIUM` / `SMALL` / `TINY` / `XTINY` | 19 / 17 / 14 / 11 | 14 / 12 / 10 / 8 | 5 / 5 / 4 / 3 |
+
+Tamaños de celda observados (246×322): pantalla completa **246×322**; celdas de **media fila 122×62–66** (p. ej. layout con 2 campos arriba — ahí el valor usa `SYSTEM_NUMBER_MEDIUM` 42, igual que el nativo); celdas de ancho completo en layouts mixtos ≈ **246×136–139**. `LABEL_MIN_H = 60` queda **validado** para estos tamaños. Completar otros layouts solo si hace falta.
 
 ### 11.2 Ciclo básico
 Simulator → *Simulation → Activity Data*: start, correr > 1 h (el simulador permite acelerar/forzar valores; si no, editar el tiempo simulado), pausa, resume, stop, reset. Repetir en layouts 1, 2, 5 y 10 campos, y con perfil `edge840`.
@@ -272,12 +289,12 @@ Pantalla con el campo propio + el nativo "Tiempo": correr 5 min con pausas → d
 
 Checklist de lo que falta para una publicación real (no bloquea la Fase 0 de aprendizaje):
 
-- [ ] **Ícono real.** El actual (`resources/drawables/launcher_icon.png`) es un placeholder (cuadrado naranja). **Tamaño ya corregido a 35×35** (edge830 y edge840 piden 35×35 → sin warning de compilación). Falta un ícono **diseñado** de verdad. Si se suman devices con otro tamaño de launcher, hará falta un PNG por tamaño vía `resources-<device>/drawables/`.
+- [x] **Ícono real — HECHO (2026-07-19):** cronómetro (master 1024×1024, fondo transparente) exportado al tamaño exacto de cada device (35/36/40/56/68) vía base + `resources-<device>/drawables/`. Cero warnings en los 13 builds. Cover 500×500 para la ficha, generado.
 - [x] **Tipos de actividad / deportes — resuelto (2026-07-18):** existe `<iq:activityFilter>` en el manifest, pero es **API 5.2+ / System 8** → el **edge830 (3.3) no lo soporta**, y para un timer que sirve en cualquier actividad conviene **dejarlo universal, sin filtro**. No se agrega.
 - [x] **Permisos — resuelto:** `<iq:permissions/>` vacío es correcto. El campo solo **lee** `timerTime` (que llega a `compute()` sin permiso); no escribe al FIT, así que **no** necesita `FitContributor` ni ningún otro permiso.
-- [ ] **Metadatos de tienda (portal, NO manifest):** al publicar en la IQ Store se cargan aparte descripción, categoría, capturas, precio, versión. El `manifest.xml` en sí ya está completo para publicar.
+- [~] **Tienda:** subida como **BETA** (serie v0.1.x; la versión se pone en el portal al subir, no en ningún XML — los tags de git `v0.1.0`–`v0.1.5` registran cada build). Ficha con descripción/cover cargadas. **NO publicada:** el portal exige subir la versión de producción como app nueva con **otro ID de app** (⚠️ implicará cambiar el `id` del `manifest.xml` para el build de producción — decidir el flujo beta/prod cuando toque publicar). Pendiente: capturas + esa subida de producción.
 - [~] **Compatibilidad con otros Edge — ampliada (2026-07-18):** `<iq:products>` ahora lista los **13** Edge compatibles (soportan `datafield` + color + CIQ ≥ 3.3): `edge530`, `edge540`, `edge830`, `edge840` (todos **246×322**, resolución probada), + `edge550`, `edge850`, `edge1030`/`edge1030plus`/`edge1030bontrager`, `edge1040`, `edge1050`, `edgeexplore2`, `edgemtb` (otras resoluciones). **Excluidos** por CIQ < 3.3: `edge520plus`, `edge820`, `edgeexplore`, `edge_520`, `edge_1000`. Por monocromo: `edge130`/`edge130plus`. ⚠️ **Pendiente:** probar el render en las resoluciones ≠ 246×322 (el diseño se validó solo en 246×322; recalibrar `LABEL_MIN_H`, revisar la escalera) y **íconos por tamaño** (35/36/40/56/68 px según device → hoy hay warnings de escalado del placeholder).
 - [ ] **Nombre y metadatos de tienda.** Nombre app: `Activity Timer` / `Tiempo de Actividad` (ya bilingüe). Falta descripción, capturas, categoría, versión.
 - [x] **`TEST_MODE = false`** en `ActivityTimerView.mc` (hecho).
-- [ ] **Prueba en dispositivo real** (sideload al Edge 830/840), no solo simulador.
-- [ ] Rellenar la **tabla de medición §11.1** (tamaños de celda por layout) y recalibrar constantes.
+- [x] **Prueba en dispositivo real — HECHA (2026-07-19):** probado y afinado pixel-perfect contra el campo nativo en el Edge 840 del usuario (sideload vía OpenMTP; el 840 es MTP y no monta en Finder). Atraso visual ~1 s vs nativo por muestreo 1×/s: **aceptado** (el FIT graba bien).
+- [x] **Tabla de medición §11.1 rellenada** (2026-07-19) y constantes validadas (`LABEL_MIN_H = 60`).
