@@ -194,8 +194,8 @@ class ActivityTimerView extends WatchUi.DataField {
             // 6px top margin (not stuck to the edge). Reserve only the label's VISIBLE
             // (ascent) height; its empty descent overlaps the value's top whitespace, so
             // the value keeps its size while both get real breathing room.
-            dc.drawText(w / 2, 6, Graphics.FONT_SYSTEM_MEDIUM, mLabel, Graphics.TEXT_JUSTIFY_CENTER);
-            labelH = 6 + Graphics.getFontAscent(Graphics.FONT_SYSTEM_MEDIUM);
+            dc.drawText(w / 2, 6, Graphics.FONT_GLANCE, mLabel, Graphics.TEXT_JUSTIFY_CENTER);
+            labelH = 6 + Graphics.getFontAscent(Graphics.FONT_GLANCE);
         }
         var valueH = h - labelH;
         var usableW = w - 2 * PAD;
