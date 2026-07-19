@@ -52,6 +52,7 @@ Toda decisión tomada en conversación se escribe **en el mismo turno** en que s
   - Cada release: `git checkout release && git merge main` (el id de prod queda sin conflicto — solo cambió de un lado) → "Export Project" desde `release` → `git tag vX.Y.Z`.
   - **Regla de oro:** desarrollar SIEMPRE en `main`; solo mergear **`main→release`, NUNCA al revés**.
   - El **id de producción** (rama `release`) es **`90f54fc135bd444f966d9b0c69849851`** — generado 2026-07-19 con `uuidgen | tr -d '-' | tr 'A-Z' 'a-z'`, aplicado a mano en el `manifest.xml` de `release`; primer tag de prod **`v0.1.7`**. El id **beta** sigue siendo `953a28119edc4511b09dca2366738f5e` en `main`. **Nunca cambiar estos ids** (cada uno es una app distinta en la store).
+  - **Contacto de la ficha del store:** `el.soldador.garmin@gmail.com` — email dedicado cargado en el portal (NO el personal `maxicombina@gmail.com` ni el de git del repo).
   - La **developer key es la misma** para ambos ids (`~/garmin-dev/developer_key`); `TEST_MODE=false` antes de todo build de release.
   - ⚠️ **No tocar el `id` con el editor visual del manifest** (reescribe/reformatea el XML — ya borró `spa` una vez); editarlo **a mano**, o el merge `main→release` dará conflicto.
 - **Por qué Opción A:** durabilidad del id + cero swapping por release. Descartadas: (0) un solo id en `main` (se quiere conservar el canal beta-store); (B) branch descartable al releasear (el id "se sentía perdido", aunque igual se anota acá).
