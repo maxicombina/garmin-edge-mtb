@@ -148,46 +148,18 @@ class ActivityTimerView extends WatchUi.DataField {
         updateFromMillis(ms);
     }
 
-    // Splits a millisecond count into the value strings + width templates (SPEC 5.1/5.2).
+    // Thin wrapper over the pure TimeFormat.format() (see TimeFormat.mc): turns the ms count
+    // into the value strings + width templates and stores them in members. The actual logic
+    // lives in TimeFormat so it can be unit-tested off-device (TimeFormatTest.mc); this only
+    // copies the result out — one small object per second (compute cadence), negligible.
     private function updateFromMillis(totalMs as Number) as Void {
-        // Integer division truncates (matches the native "Timer": the 59th second shows
-        // until the 60th completes). timerTime is already the paused-aware stopwatch.
-        var totalS = totalMs / 1000;
-        var hours = totalS / 3600;
-        var minutes = (totalS % 3600) / 60;
-        var seconds = totalS % 60;
-        var ss2 = seconds.format("%02d");   // seconds always 2 digits
-
-        mHasHours = (hours > 0);
-        if (mHasHours) {
-            var mm2 = minutes.format("%02d");                 // minutes 2 digits once hours are shown
-            mValueLong = Lang.format("$1$:$2$:$3$", [hours, mm2, ss2]);
-            mValueShort = Lang.format("$1$:$2$", [hours, mm2]);
-            mValueSup = ":" + ss2;
-            // Template = same shape with every digit shown as '8' (stable width). Minutes
-            // and seconds are always 2 digits here; hours vary (1:.., 10:.., 100:..).
-            var he = eights(hours);
-            mTplLong = he + ":88:88";
-            mTplShort = he + ":88";
-        } else {
-            // Under one hour: no leading hours, no bare fallback (M:SS always fits).
-            mValueLong = Lang.format("$1$:$2$", [minutes, ss2]);
-            mValueShort = mValueLong;
-            mValueSup = "";
-            mTplLong = eights(minutes) + ":88";   // minutes 1-2 digits, seconds always 2
-            mTplShort = mTplLong;
-        }
-    }
-
-    // Builds a string of '8' with as many digits as n. Used to give the templates a
-    // width-stable form so the font choice doesn't flicker as digits change (SPEC 5.3).
-    private function eights(n as Number) as String {
-        var len = n.toString().length();
-        var out = "";
-        for (var i = 0; i < len; i++) {
-            out += "8";
-        }
-        return out;
+        var p = TimeFormat.format(totalMs);
+        mHasHours = p.hasHours;
+        mValueLong = p.valueLong;
+        mValueShort = p.valueShort;
+        mValueSup = p.valueSup;
+        mTplLong = p.tplLong;
+        mTplShort = p.tplShort;
     }
 
     // Draws the whole cell. The system calls this on its own schedule (~1x/second while

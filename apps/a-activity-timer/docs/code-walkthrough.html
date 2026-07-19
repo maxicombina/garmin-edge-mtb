@@ -368,8 +368,8 @@ a-activity-timer/
           </div>
         </div></li>
         <li><div>
-          <h3>Label opcional</h3>
-          <p>Si la celda es lo bastante alta (<code>h ≥ 60&nbsp;px</code>), dibuja el label (<code>Timer</code> / <code>Tiempo</code> según el idioma) arriba en fuente chica. En celdas bajas se omite para dejarle todo el espacio al número.</p>
+          <h3>Label + iconito opcional</h3>
+          <p>Si la celda es lo bastante alta (<code>h ≥ 60&nbsp;px</code>), dibuja arriba el label (<code>Timer</code> / <code>Tiempo</code> según el idioma) con un <strong>iconito de cronómetro</strong> a su izquierda — hecho con primitivas de <code>dc</code> (círculo + corona + aguja) en el color de frente, así se adapta al tema día/noche y se atenúa en pausa <em>sin PNG</em>. El grupo <code>[ícono + texto]</code> va centrado; si no entra a lo ancho, cae a solo texto. En celdas bajas se omite todo para dejarle el espacio al número.</p>
         </div></li>
         <li><div>
           <h3>Elegir nivel + fuente (con caché)</h3>
@@ -431,6 +431,7 @@ a-activity-timer/
         <li><strong>9:59:59 → 10:00:00</strong> o <strong>9:59 → 10:00</strong> (una plantilla se ensancha un dígito) → recalcula.</li>
         <li><strong>Tick normal de segundos</strong> → las plantillas no cambian → <em>no</em> recalcula.</li>
       </ul>
+      <p>El <strong>label + iconito</strong> usa una caché gemela (llave <code>w</code>, <code>h</code>, <code>mLabel</code>): su tamaño y posición se calculan una sola vez y el tick por segundo solo redibuja. Resultado: en régimen, un <code>onUpdate()</code> normal <strong>no mide nada</strong> — por eso el campo consume prácticamente nada de batería.</p>
     </section>
 
     <section>
@@ -443,9 +444,9 @@ a-activity-timer/
         </div></li>
         <li><div>
           <h3>Ver el timer corriendo y cruzar la hora — <code>TEST_MODE</code></h3>
-          <p>Poné <code>TEST_MODE = true</code> en los <em>tunables</em> de la vista: un reloj rápido suma 30&nbsp;s de tiempo falso por segundo real, así ves el valor subir y <strong>cruzar 1:00:00 en ~2 minutos</strong>, pasando por todos los formatos. Dejalo en <code>false</code> para uso real.</p>
+          <p>Poné <code>TEST_MODE = true</code> en los <em>tunables</em> de la vista: un reloj rápido suma 45&nbsp;s de tiempo falso por segundo real, así ves el valor subir y <strong>cruzar 1:00:00 en ~80&nbsp;s</strong>, pasando por todos los formatos. Dejalo en <code>false</code> para uso real.</p>
           <pre class="code"><span class="k">private const</span> TEST_MODE = <span class="k">true</span>;        <span class="cm">// prende el reloj rápido</span>
-<span class="k">private const</span> TEST_STEP_MS = <span class="n">30000</span>;   <span class="cm">// +30 s por segundo</span></pre>
+<span class="k">private const</span> TEST_STEP_MS = <span class="n">45000</span>;   <span class="cm">// +45 s por segundo</span></pre>
         </div></li>
         <li><div>
           <h3>Datos reales (tiempo real)</h3>

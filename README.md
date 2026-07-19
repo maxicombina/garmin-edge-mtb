@@ -2,17 +2,17 @@
 
 Aplicaciones Connect IQ para **Garmin Edge** (830 / 840) orientadas a MTB (XC / senderos técnicos).
 
-Proyecto personal, en fase de especificación. El objetivo es una familia de *data fields* y una *device app* que aporten métricas útiles durante la rodada, calculadas on-device y sin depender de potenciómetro.
+Proyecto personal. El objetivo es una familia de *data fields* y una *device app* que aporten métricas útiles durante la rodada, calculadas on-device y sin depender de potenciómetro. La primera app (Opción A) ya está implementada, probada en un Edge real y publicada como **beta** en la Connect IQ Store; el resto está en especificación.
 
 ## Estado
 
-📋 **Especificación** — ver [`GARMIN_MTB_SPEC.md`](GARMIN_MTB_SPEC.md).
+🚴 **Opción A completada (Fase 0) y en beta**; el resto de las opciones, en especificación — ver [`GARMIN_MTB_SPEC.md`](GARMIN_MTB_SPEC.md).
 
 La spec define el contexto (hardware, plataforma, restricciones), 9 opciones de producto evaluadas (A–I) y un roadmap incremental. Resumen de las opciones:
 
 | | Opción | Formato | Estado |
 |---|---|---|---|
-| A | Tiempo de actividad (formato adaptativo) | data field | **Fase 0 — spec lista** |
+| A | Tiempo de actividad (formato adaptativo) | data field | **✅ Fase 0 completada · beta `v0.1.6`** |
 | B | Pendiente + VAM | data field | spec lista |
 | C | Descenso actual | data field | **MVP propuesto** |
 | D | Cronómetro de tramos (enduro) | data field / device app | idea |
@@ -31,8 +31,10 @@ Cada opción vive como proyecto Connect IQ auto-contenido en `apps/<letra>-<slug
 - **Lenguaje:** Monkey C
 - **SDK:** Connect IQ SDK + SDK Manager
 - **IDE:** VS Code + extensión Monkey C
-- **Target:** Edge 830 (Connect IQ 3.3.6) y Edge 840; se compila contra 3.3 como mínimo común.
+- **Target:** Edge 830 (Connect IQ 3.3.6) y 840 como referencia; el manifiesto lista **13 Edge** compatibles (CIQ ≥ 3.3). Se compila contra 3.3 como mínimo común.
 
 ## Desarrollo
 
-En curso (Fase 0 — Opción A): data field de tiempo de actividad en [`apps/a-activity-timer/`](apps/a-activity-timer/) — esqueleto Connect IQ con manifiesto `edge830` + `edge840`, "hola mundo" en el simulador y, sobre él, el campo con formato adaptativo. Spec de implementación: [`apps/a-activity-timer/SPEC.md`](apps/a-activity-timer/SPEC.md).
+**Fase 0 (Opción A) — completada:** data field de tiempo de actividad en [`apps/a-activity-timer/`](apps/a-activity-timer/), con formato adaptativo de 3 niveles (incluido el compuesto `H:MM` + `:SS` volado), iconito de cronómetro junto al label, fuentes del sistema afinadas pixel-perfect contra el campo nativo, y hooks de debug excluidos del build de release. Probado en un Edge 840 real y publicado como **beta** (`v0.1.6`). Spec de implementación: [`apps/a-activity-timer/SPEC.md`](apps/a-activity-timer/SPEC.md) · walkthrough del código: [`docs/code-walkthrough.html`](apps/a-activity-timer/docs/code-walkthrough.html).
+
+Próximo: **Opción B** (pendiente + VAM), que ya tiene spec detallada.
