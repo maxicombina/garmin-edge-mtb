@@ -56,16 +56,24 @@ class ActivityTimerView extends WatchUi.DataField {
     // --- Simulator test hook (SPEC 11). When TEST_MODE is true, compute() ignores the
     // real timer and runs a FAST clock: it adds TEST_STEP_MS of fake time every second,
     // so you can watch the value climb, cross 1:00:00, and reach the H:MM:SS tiers in
-    // ~2 minutes instead of an hour. It wraps at TEST_MAX_MS. Keep false for real use. ---
+    // ~2 minutes instead of an hour. It wraps at TEST_MAX_MS. Keep false for real use.
+    //
+    // Release-safety (SPEC 13): TEST_MODE stays a PLAIN const so the `if (TEST_MODE)` guard
+    // in compute() is dead-code-eliminated by the release optimizer (const false -> the
+    // whole block, call included, is dropped with -r). Everything the fast clock needs is
+    // (:debug)-annotated, so those DEFINITIONS never enter a release binary and their only
+    // reference lives inside that eliminated guard. Flip to true + run a DEBUG build to use. ---
     private const TEST_MODE = false;
-    private const TEST_STEP_MS = 30000;      // +30 s of fake time per real second
-    private const TEST_MAX_MS = 39600000;    // wrap at 11:00:00
-    private var mTestMs as Number = 0;
+    (:debug) private const TEST_STEP_MS = 30000;    // +30 s of fake time per real second
+    (:debug) private const TEST_MAX_MS = 39600000;  // wrap at 11:00:00
+    (:debug) private var mTestMs as Number = 0;
 
-    // --- Simulator measurement hook (SPEC 11.1): set true to print the cell size and
-    // the ladder font heights to the console (VS Code Debug Console). Ship with false. ---
+    // --- Simulator measurement hook (SPEC 11.1): set DEBUG_MEASURE true to print the cell
+    // size and the ladder font heights to the console (VS Code Debug Console). Ship with
+    // false. Same release-safety scheme as the test hook: DEBUG_MEASURE is a plain const
+    // (so its onUpdate() guard is eliminated with -r), the state it needs is (:debug)-only. ---
     private const DEBUG_MEASURE = false;
-    private var mMeasuredFonts as Boolean = false;
+    (:debug) private var mMeasuredFonts as Boolean = false;
 
     // --- Selection cache. onUpdate() re-runs the ladder only when one of these changes:
     //     cell width/height, or a template (i.e. the digit pattern) changed. ---
@@ -105,12 +113,9 @@ class ActivityTimerView extends WatchUi.DataField {
         if (TEST_MODE) {
             // Fast simulator clock: climb quickly so every tier (M:SS -> H:MM:SS /
             // compound / bare) is reachable in the simulator without a FIT file.
-            ms = mTestMs;
-            mTestMs += TEST_STEP_MS;
-            if (mTestMs > TEST_MAX_MS) {
-                mTestMs = 0;
-            }
-            mTimerState = Activity.TIMER_STATE_ON;
+            // The body lives in the (:debug)-only testClockMs(); this guard is const-false
+            // in release, so both the call and the callee vanish from the release binary.
+            ms = testClockMs();
         } else {
             // timerTime is "Number or Null" and is null before the activity starts.
             // The local narrows the type so it can be assigned to ms safely.
@@ -201,21 +206,9 @@ class ActivityTimerView extends WatchUi.DataField {
         var usableW = w - 2 * PAD;
 
         if (DEBUG_MEASURE) {
-            System.println("MEASURE cell=" + w + "x" + h + " labelH=" + labelH + " valueH=" + valueH);
-            if (!mMeasuredFonts) {
-                mMeasuredFonts = true;
-                var fh = "MEASURE fontHeights:";
-                var fa = "MEASURE fontAscents:";
-                var fd = "MEASURE fontDescents:";
-                for (var fi = 0; fi < mLadder.size(); fi++) {
-                    fh += " " + dc.getFontHeight(mLadder[fi]);
-                    fa += " " + Graphics.getFontAscent(mLadder[fi]);
-                    fd += " " + Graphics.getFontDescent(mLadder[fi]);
-                }
-                System.println(fh);
-                System.println(fa);
-                System.println(fd);
-            }
+            // Body lives in the (:debug)-only debugMeasure(); this guard is const-false in
+            // release, so both the call and the callee vanish from the release binary.
+            debugMeasure(dc, w, h, labelH, valueH);
         }
 
         // 3) Pick format level + font(s). Cached: recompute only when the cell size or the
@@ -325,5 +318,69 @@ class ActivityTimerView extends WatchUi.DataField {
             }
         }
         return Graphics.FONT_XTINY;
+    }
+
+    // --- Debug/simulator-only helpers (SPEC 11 / 13) --------------------------------
+    // Each hook is a PAIR of functions selected by the built-in :debug / :release
+    // annotations, so exactly one definition of each name enters a given build:
+    //   * the (:debug) version carries the real behaviour AND all its residue (the
+    //     "MEASURE" strings, the fast-clock state) — it is compiled ONLY into debug builds;
+    //   * the (:release) version is a residue-free stub that exists ONLY so the call sites
+    //     (which the compiler resolves BEFORE it dead-code-eliminates anything) still find a
+    //     symbol in a release build. It is never actually run: the call sits inside an
+    //     `if (TEST_MODE)` / `if (DEBUG_MEASURE)` guard whose const is a plain `false`, so
+    //     the release optimizer strips the guarded block (call included) and then prunes the
+    //     now-unreferenced stub. Net result: zero test/debug residue in a release binary.
+    // To use a hook: flip TEST_MODE / DEBUG_MEASURE to true and run a DEBUG build (F5).
+
+    // One tick of the fast simulator clock: returns the current fake elapsed time, then
+    // advances it by TEST_STEP_MS and wraps at TEST_MAX_MS, and forces the timer state to
+    // ON so the value renders as "running". Behaviour is identical to the former inline
+    // block in compute().
+    (:debug)
+    private function testClockMs() as Number {
+        var ms = mTestMs;
+        mTestMs += TEST_STEP_MS;
+        if (mTestMs > TEST_MAX_MS) {
+            mTestMs = 0;
+        }
+        mTimerState = Activity.TIMER_STATE_ON;
+        return ms;
+    }
+
+    // Release stub: never called (guarded by `if (TEST_MODE)`, const false). Present only
+    // so the call site resolves in a release build; the optimizer then drops it.
+    (:release)
+    private function testClockMs() as Number {
+        return 0;
+    }
+
+    // Prints the cell geometry every frame and the ladder font heights/ascents/descents
+    // once, to the console. Output is identical to the former inline block in onUpdate().
+    (:debug)
+    private function debugMeasure(dc as Graphics.Dc, w as Number, h as Number,
+                                  labelH as Number, valueH as Number) as Void {
+        System.println("MEASURE cell=" + w + "x" + h + " labelH=" + labelH + " valueH=" + valueH);
+        if (!mMeasuredFonts) {
+            mMeasuredFonts = true;
+            var fh = "MEASURE fontHeights:";
+            var fa = "MEASURE fontAscents:";
+            var fd = "MEASURE fontDescents:";
+            for (var fi = 0; fi < mLadder.size(); fi++) {
+                fh += " " + dc.getFontHeight(mLadder[fi]);
+                fa += " " + Graphics.getFontAscent(mLadder[fi]);
+                fd += " " + Graphics.getFontDescent(mLadder[fi]);
+            }
+            System.println(fh);
+            System.println(fa);
+            System.println(fd);
+        }
+    }
+
+    // Release stub: never called (guarded by `if (DEBUG_MEASURE)`, const false). Present
+    // only so the call site resolves in a release build; the optimizer then drops it.
+    (:release)
+    private function debugMeasure(dc as Graphics.Dc, w as Number, h as Number,
+                                  labelH as Number, valueH as Number) as Void {
     }
 }
