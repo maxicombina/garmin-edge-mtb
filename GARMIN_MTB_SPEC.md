@@ -224,6 +224,7 @@ Puede desarrollarse en paralelo a las fases 2–4 o priorizarse tras el MVP seg�
 - **Sin estado persistente obligatorio** en v1 (todo vive durante la actividad). Persistencia (p. ej. `Application.Storage` para ajustes) puede llegar después.
 - **Presupuesto de memoria:** mantenerse holgadamente por debajo del límite de data field del Edge 830; medirlo en el simulador (View > Memory).
 - **Código:** Monkey C idiomático, comentarios en inglés, estructura estándar de proyecto Connect IQ (`manifest.xml`, `monkey.jungle`, `source/`, `resources/`).
+- **Unit tests (desde la Opción B, 2026-07-19):** la lógica de cálculo va en módulos puros con tests `(:test)` de `Toybox.Test` (excluidos del release). Convención completa en `CLAUDE.md`; patrón en la Opción A (`TimeFormat*.mc`).
 - **Estructura del repo (decidido):** monorepo con cada opción como app auto-contenida en `apps/<letra>-<slug>/` (p. ej. `apps/b-grade-vam/`), extraíble a repo propio en el futuro. Nombres acordados en el CLAUDE.md. Sin código compartido entre apps salvo decisión explícita.
 
 ---
@@ -242,7 +243,7 @@ Puede desarrollarse en paralelo a las fases 2–4 o priorizarse tras el MVP seg�
 
 - Grit/Flow nativos de Garmin (API cerrada — no accesibles).
 - Conexión a internet o backend de cualquier tipo.
-- Soporte de dispositivos distintos de Edge 830/840.
+- Soporte de dispositivos que no sean Edge. (Actualizado 2026-07-19: dentro de la línea Edge se apunta a **los 13 devices con CIQ ≥ 3.3** — la Opción A ya los shippea y se verificó que el límite de memoria de datafield es idéntico (128 KB) en todos; el **Edge 840 es el device de referencia y prioridad** por ser el del autor. Regla: máxima compatibilidad salvo que cueste funcionalidad.)
 - Publicación en la tienda (se decide al final de la Fase 3/4).
 - Proyección de tiempo hasta el agotamiento **por debajo del umbral** (limitada por combustible/glucógeno, escala de horas — requiere modelar ingesta/glucógeno, fuera de v1).
 - VO2max medido con analizador de gases: la Opción I es una estimación de campo, no una medición de laboratorio.

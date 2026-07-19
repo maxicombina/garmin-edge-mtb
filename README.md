@@ -37,7 +37,9 @@ Cada opción vive como proyecto Connect IQ auto-contenido en `apps/<letra>-<slug
 
 **Fase 0 (Opción A) — completada:** data field de tiempo de actividad en [`apps/a-activity-timer/`](apps/a-activity-timer/), con formato adaptativo de 3 niveles (incluido el compuesto `H:MM` + `:SS` volado), iconito de cronómetro junto al label, fuentes del sistema afinadas pixel-perfect contra el campo nativo, y hooks de debug excluidos del build de release. Probado en un Edge 840 real y publicado como **beta** (`v0.1.6`). Spec de implementación: [`apps/a-activity-timer/SPEC.md`](apps/a-activity-timer/SPEC.md) · walkthrough del código: [`docs/code-walkthrough.html`](apps/a-activity-timer/docs/code-walkthrough.html).
 
-Próximo: **Opción B** (pendiente + VAM), que ya tiene spec detallada.
+Próximo: **Opción B** (pendiente + VAM) — spec detallada revisada y lista para implementar ([`apps/b-grade-vam/SPEC.md`](apps/b-grade-vam/SPEC.md)).
+
+**Convención de tests (desde la Opción B):** toda la lógica de cálculo vive en módulos puros con **unit tests** (`Toybox.Test`, funciones `(:test)` excluidas del release). Patrón en `apps/a-activity-timer/source/TimeFormat*.mc`; convención completa en `CLAUDE.md`.
 
 ## Contacto
 
