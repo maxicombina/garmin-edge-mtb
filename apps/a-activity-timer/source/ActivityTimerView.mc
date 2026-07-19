@@ -28,6 +28,7 @@ class ActivityTimerView extends WatchUi.DataField {
     private const PAD = 2;            // horizontal padding per side, px
     private const LABEL_MIN_H = 60;   // draw the "Timer" label only if the cell is this tall
     private const GAP_SUP = 2;        // gap between "H:MM" and the superscript ":SS", px
+    private const ICON_GAP = 4;       // gap between the stopwatch icon and the label text, px
     private const SUP_NUM = 6;        // superscript font height ~= 6/10 of the big font (SUP_RATIO 0.6)
     private const SUP_DEN = 10;
     private const SUP_TEMPLATE = ":88"; // seconds are always 2 digits -> stable width for measuring
@@ -64,7 +65,7 @@ class ActivityTimerView extends WatchUi.DataField {
     // (:debug)-annotated, so those DEFINITIONS never enter a release binary and their only
     // reference lives inside that eliminated guard. Flip to true + run a DEBUG build to use. ---
     private const TEST_MODE = false;
-    (:debug) private const TEST_STEP_MS = 30000;    // +30 s of fake time per real second
+    (:debug) private const TEST_STEP_MS = 45000;    // +45 s of fake time per real second
     (:debug) private const TEST_MAX_MS = 39600000;  // wrap at 11:00:00
     (:debug) private var mTestMs as Number = 0;
 
@@ -85,6 +86,22 @@ class ActivityTimerView extends WatchUi.DataField {
     private var mFont as Graphics.FontType = Graphics.FONT_MEDIUM;     // for levels 1 and 3
     private var mFontBig as Graphics.FontType = Graphics.FONT_MEDIUM;  // level 2, the H:MM part
     private var mFontSmall as Graphics.FontType = Graphics.FONT_XTINY; // level 2, the :SS superscript
+
+    // --- Label + icon layout cache (SPEC 8). Same idea as the selection cache above:
+    //     the icon size/position and the label x/justify are invariant per second, so they
+    //     are recomputed only when the cell size or the label string changes; the per-second
+    //     tick just DRAWS them (zero measuring). ---
+    private var mLblCacheW as Number = -1;
+    private var mLblCacheH as Number = -1;
+    private var mLblCacheLabel as String or Null = null;
+    private var mLabelShow as Boolean = false;             // cell tall enough for a label?
+    private var mLabelH as Number = 0;                     // reserved top height (0 when no label)
+    private var mIconShow as Boolean = false;              // does [icon+gap+text] fit? then draw the icon
+    private var mIconCx as Number = 0;                     // icon body centre x
+    private var mIconCy as Number = 0;                     // icon body centre y
+    private var mIconR as Number = 0;                      // icon body radius
+    private var mLabelX as Number = 0;                     // x passed to the label drawText
+    private var mLabelJust as Number = Graphics.TEXT_JUSTIFY_CENTER;   // its horizontal justify
 
     function initialize() {
         DataField.initialize();
@@ -191,17 +208,25 @@ class ActivityTimerView extends WatchUi.DataField {
         dc.setColor(fg, bg);
         dc.clear();
 
-        // 2) Optional label on top, only when the cell is tall enough.
-        // Label like the native field: a bigger text font (FONT_MEDIUM is the biggest
-        // "letters" font) with a small top margin so it does not touch the top edge.
-        var labelH = 0;
-        if (h >= LABEL_MIN_H) {
-            // 6px top margin (not stuck to the edge). Reserve only the label's VISIBLE
-            // (ascent) height; its empty descent overlaps the value's top whitespace, so
-            // the value keeps its size while both get real breathing room.
-            dc.drawText(w / 2, 4, Graphics.FONT_GLANCE, mLabel, Graphics.TEXT_JUSTIFY_CENTER);
-            labelH = 6 + Graphics.getFontAscent(Graphics.FONT_GLANCE);
+        // 2) Optional label + stopwatch icon on top, only when the cell is tall enough.
+        //    The layout (icon size/position, label x/justify, reserved height) is invariant
+        //    per second, so it is cached and recomputed only when w/h/label change -- the
+        //    per-second tick just DRAWS it, matching the value cache below (zero measuring).
+        //    The icon itself is a native-field-style glyph drawn from dc primitives in the
+        //    current foreground colour, so it is theme-aware and dims on pause. SPEC 8.
+        if (w != mLblCacheW || h != mLblCacheH || !mLabel.equals(mLblCacheLabel)) {
+            computeLabelLayout(dc, w, h);
+            mLblCacheW = w;
+            mLblCacheH = h;
+            mLblCacheLabel = mLabel;
         }
+        if (mLabelShow) {
+            if (mIconShow) {
+                drawStopwatchIcon(dc, mIconCx, mIconCy, mIconR);
+            }
+            dc.drawText(mLabelX, 4, Graphics.FONT_GLANCE, mLabel, mLabelJust);
+        }
+        var labelH = mLabelH;
         var valueH = h - labelH;
         var usableW = w - 2 * PAD;
 
@@ -242,6 +267,62 @@ class ActivityTimerView extends WatchUi.DataField {
             dc.drawText(w / 2, cY, mFont, str,
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
+    }
+
+    // Computes (does NOT draw) the label + stopwatch-icon layout for the current cell, into
+    // the mLabel*/mIcon* members. onUpdate() caches this behind a w/h/label check so the
+    // per-second tick only redraws. The whole [icon + gap + text] group is centred; the icon
+    // size scales with the label font (so it holds across resolutions), and if the group
+    // would overflow the cell width we drop the icon and centre the text alone (narrow cells
+    // stay safe). 4px top margin; we reserve only the label's VISIBLE (ascent) height because
+    // its empty descent overlaps the value's top whitespace. SPEC 8.
+    private function computeLabelLayout(dc as Graphics.Dc, w as Number, h as Number) as Void {
+        mLabelShow = (h >= LABEL_MIN_H);
+        if (!mLabelShow) {
+            mLabelH = 0;
+            mIconShow = false;
+            return;
+        }
+        var ascent = Graphics.getFontAscent(Graphics.FONT_GLANCE);
+        mLabelH = 6 + ascent;
+        var iconD = (ascent * 4) / 5;                 // a touch smaller than the text height
+        var r = iconD / 2;
+        var labelW = dc.getTextWidthInPixels(mLabel, Graphics.FONT_GLANCE);
+        var groupW = iconD + ICON_GAP + labelW;
+        if (iconD >= 8 && groupW <= w - 2 * PAD) {
+            var leftX = (w - groupW) / 2;
+            mIconShow = true;
+            mIconCx = leftX + r;
+            mIconCy = 4 + ascent / 2;                  // align icon centre with the text's optical centre
+            mIconR = r;
+            mLabelX = leftX + iconD + ICON_GAP;
+            mLabelJust = Graphics.TEXT_JUSTIFY_LEFT;
+        } else {
+            mIconShow = false;
+            mLabelX = w / 2;
+            mLabelJust = Graphics.TEXT_JUSTIFY_CENTER;
+        }
+    }
+
+    // Small stopwatch glyph drawn from primitives (SPEC 8): body circle + a crown button
+    // on top + one hand pointing to ~1 o'clock. It paints with whatever colour onUpdate()
+    // already set (the theme foreground, dimmed on pause), so no colour handling is needed
+    // here. (cx,cy) is the body centre, r its radius. Pen width is restored to 1 on the way
+    // out so the value text drawn afterwards is unaffected.
+    private function drawStopwatchIcon(dc as Graphics.Dc, cx as Number, cy as Number, r as Number) as Void {
+        var pen = (r >= 6) ? 2 : 1;
+        dc.setPenWidth(pen);
+        dc.drawCircle(cx, cy, r);                              // watch body
+        var ch = (r >= 6) ? 3 : 2;                            // crown button height
+        var cw = pen + 2;                                     // crown button width
+        dc.fillRectangle(cx - cw / 2, cy - r - ch, cw, ch);   // crown, centred on top of the body
+        // Hand: longer (~0.85r, nearly to the rim), a touch thicker than the outline, and
+        // steeper (mostly upward) so it reads clearly as a single stopwatch hand at ~1 o'clock.
+        dc.setPenWidth(pen + 1);
+        dc.drawLine(cx, cy, cx + r / 2, cy - (r * 7) / 10);
+        dc.setPenWidth(pen);
+        dc.fillCircle(cx, cy, pen);                           // centre pip
+        dc.setPenWidth(1);                                    // restore default for the value text
     }
 
     // Chooses the format level + font(s). The discriminator is WIDTH, not overall size:
