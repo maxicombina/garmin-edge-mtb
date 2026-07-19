@@ -41,6 +41,21 @@ Toda decisión tomada en conversación se escribe **en el mismo turno** en que s
 - **Nada compartido entre apps** salvo documentación. Si surge código común, decidir explícitamente (¿copiar? ¿extraer?) recordando la posible separación en repos.
 - **Assets de la tienda por app → `apps/<app>/store/`:** ahí van los assets del submission al portal de Connect IQ (NO son recursos de build, no van en `resources/`): `store-icon-500.png` (500×500, fondo gris sólido, para la ficha), `icon-master-1024.png` (master del ícono, transparencia real, para regenerar), y capturas (`*.png`). Se generan con Pillow en un venv fuera del repo y se dejan versionados acá.
 
+## Flujo de release y publicación (DECIDIDO 2026-07-19, aún NO ejecutado)
+
+- **Testeo (diario):** simulador (F5) + sideload del `.prg` por OpenMTP → **no dependen del `id` ni de la store**, andan con cualquier id.
+- **`.iq` de subida a la store:** se genera con **"Monkey C: Export Project"** (VS Code) — empaqueta los 13 devices y lo firma con la developer key. Distinto del `.prg` de F5 (debug, por device).
+- **Beta (actual):** el `id` del `manifest.xml` en `main` es `953a28119edc4511b09dca2366738f5e`. Se sube al portal como beta (serie de tags `v0.1.x`).
+- **Producción — Opción A elegida (rama `release` permanente + tags):**
+  - `main` = id **beta**, desarrollo diario.
+  - **Una sola** rama `release` (permanente, **NO** una por versión) que sale de `main` con **un** commit que cambia el `id` al de **producción**. Las versiones son **tags sobre `release`** (el tag, no la rama, es el release reproducible).
+  - Cada release: `git checkout release && git merge main` (el id de prod queda sin conflicto — solo cambió de un lado) → "Export Project" desde `release` → `git tag vX.Y.Z`.
+  - **Regla de oro:** desarrollar SIEMPRE en `main`; solo mergear **`main→release`, NUNCA al revés**.
+  - El **id de producción** se genera cuando se publique (`uuidgen | tr -d '-' | tr 'A-Z' 'a-z'`) y se **anota acá** (aún no existe).
+  - La **developer key es la misma** para ambos ids (`~/garmin-dev/developer_key`); `TEST_MODE=false` antes de todo build de release.
+  - ⚠️ **No tocar el `id` con el editor visual del manifest** (reescribe/reformatea el XML — ya borró `spa` una vez); editarlo **a mano**, o el merge `main→release` dará conflicto.
+- **Por qué Opción A:** durabilidad del id + cero swapping por release. Descartadas: (0) un solo id en `main` (se quiere conservar el canal beta-store); (B) branch descartable al releasear (el id "se sentía perdido", aunque igual se anota acá).
+
 ## Modo de trabajo con el usuario
 
 - **El usuario ejecuta, el asistente guía.** Para todo lo que sea setup, tooling, configuración de su máquina o cuentas (instalaciones, keys, settings de apps, movimientos de archivos fuera del repo): dar instrucciones claras paso a paso y **no ejecutarlo por él** — el objetivo es que aprenda. Verificar el resultado (lectura) está bien. Las ediciones de archivos *dentro del repo* y los commits que él pida siguen igual que siempre.
@@ -76,6 +91,6 @@ Toda decisión tomada en conversación se escribe **en el mismo turno** en que s
   3. **Assets del store en `apps/a-activity-timer/store/`:** `store-icon-500.png` (500×500, gris claro sólido) regenerado desde el nuevo **master analógico** `icon-master-1024.png` (transparencia real — el PNG de Gemini traía un **damero horneado** que hubo que remover por flood-fill). 6 capturas 482×232: `activity-timer-{1,2,3}.png` (fondo blanco/día) + `-inv` (fondo negro/noche).
 
 **Pendientes:**
-1. **Flujo de submit de producción — EN PAUSA (decisión del usuario, 2026-07-19):** requiere **id de app nuevo** en `manifest.xml` (el actual `953a28119edc4511b09dca2366738f5e` es el de la beta). El testeo (simulador F5 + sideload OpenMTP) anda con cualquier id; la developer key no cambia; `TEST_MODE=false` antes del build de prod. Approaches evaluados: rama `release` fija (un commit que cambia el id; merges `main→release` sin conflicto) vs branch descartable al releasear. ⚠️ el editor visual del manifest reescribe el XML (ya borró `spa` una vez) → tocar el id **a mano**. Retomar cuando el usuario decida.
+1. **Submit de producción — EN PAUSA (sin publish oficial todavía).** El flujo ya está **DECIDIDO y documentado** arriba en «Flujo de release y publicación» (Opción A: rama `release` permanente + tags; id de prod a generar y anotar). Retomar cuando se quiera publicar.
 2. **Ficha del store:** falta descripción y categoría (nombre bilingüe ✅, capturas ✅).
 3. Menor/no bloqueante: ¿el umbral de ancho del compuesto es demasiado conservador en 240×400? (cae a `H:MM` pelado en celdas densas).
