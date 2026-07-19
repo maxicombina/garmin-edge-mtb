@@ -41,7 +41,7 @@ Toda decisión tomada en conversación se escribe **en el mismo turno** en que s
 - **Nada compartido entre apps** salvo documentación. Si surge código común, decidir explícitamente (¿copiar? ¿extraer?) recordando la posible separación en repos.
 - **Assets de la tienda por app → `apps/<app>/store/`:** ahí van los assets del submission al portal de Connect IQ (NO son recursos de build, no van en `resources/`): `store-icon-500.png` (500×500, fondo gris sólido, para la ficha), `icon-master-1024.png` (master del ícono, transparencia real, para regenerar), y capturas (`*.png`). Se generan con Pillow en un venv fuera del repo y se dejan versionados acá.
 
-## Flujo de release y publicación (DECIDIDO 2026-07-19, aún NO ejecutado)
+## Flujo de release y publicación (DECIDIDO y EJECUTADO 2026-07-19)
 
 - **Testeo (diario):** simulador (F5) + sideload del `.prg` por OpenMTP → **no dependen del `id` ni de la store**, andan con cualquier id.
 - **`.iq` de subida a la store:** se genera con **"Monkey C: Export Project"** (VS Code) — empaqueta los 13 devices y lo firma con la developer key. Distinto del `.prg` de F5 (debug, por device).
@@ -51,7 +51,7 @@ Toda decisión tomada en conversación se escribe **en el mismo turno** en que s
   - **Una sola** rama `release` (permanente, **NO** una por versión) que sale de `main` con **un** commit que cambia el `id` al de **producción**. Las versiones son **tags sobre `release`** (el tag, no la rama, es el release reproducible).
   - Cada release: `git checkout release && git merge main` (el id de prod queda sin conflicto — solo cambió de un lado) → "Export Project" desde `release` → `git tag vX.Y.Z`.
   - **Regla de oro:** desarrollar SIEMPRE en `main`; solo mergear **`main→release`, NUNCA al revés**.
-  - El **id de producción** se genera cuando se publique (`uuidgen | tr -d '-' | tr 'A-Z' 'a-z'`) y se **anota acá** (aún no existe).
+  - El **id de producción** (rama `release`) es **`90f54fc135bd444f966d9b0c69849851`** — generado 2026-07-19 con `uuidgen | tr -d '-' | tr 'A-Z' 'a-z'`, aplicado a mano en el `manifest.xml` de `release`; primer tag de prod **`v0.1.7`**. El id **beta** sigue siendo `953a28119edc4511b09dca2366738f5e` en `main`. **Nunca cambiar estos ids** (cada uno es una app distinta en la store).
   - La **developer key es la misma** para ambos ids (`~/garmin-dev/developer_key`); `TEST_MODE=false` antes de todo build de release.
   - ⚠️ **No tocar el `id` con el editor visual del manifest** (reescribe/reformatea el XML — ya borró `spa` una vez); editarlo **a mano**, o el merge `main→release` dará conflicto.
 - **Por qué Opción A:** durabilidad del id + cero swapping por release. Descartadas: (0) un solo id en `main` (se quiere conservar el canal beta-store); (B) branch descartable al releasear (el id "se sentía perdido", aunque igual se anota acá).
@@ -91,6 +91,6 @@ Toda decisión tomada en conversación se escribe **en el mismo turno** en que s
   3. **Assets del store en `apps/a-activity-timer/store/`:** `store-icon-500.png` (500×500, gris claro sólido) regenerado desde el nuevo **master analógico** `icon-master-1024.png` (transparencia real — el PNG de Gemini traía un **damero horneado** que hubo que remover por flood-fill). 6 capturas 482×232: `activity-timer-{1,2,3}.png` (fondo blanco/día) + `-inv` (fondo negro/noche).
 
 **Pendientes:**
-1. **Submit de producción — EN PAUSA (sin publish oficial todavía).** El flujo ya está **DECIDIDO y documentado** arriba en «Flujo de release y publicación» (Opción A: rama `release` permanente + tags; id de prod a generar y anotar). Retomar cuando se quiera publicar.
+1. **Submit de producción — EN CURSO (2026-07-19):** rama `release` **creada** con el id de prod nuevo (`90f54fc1…`), tag **`v0.1.7`**, pusheada. **Falta (lo hace el autor):** exportar el `.iq` desde la rama `release` ("Monkey C: Export Project") y subirlo al portal como **app NUEVA** (id nuevo) + cargar los textos de la ficha (descripción, categoría, capturas — hay ayuda pendiente con los textos).
 2. **Ficha del store:** falta descripción y categoría (nombre bilingüe ✅, capturas ✅).
 3. Menor/no bloqueante: ¿el umbral de ancho del compuesto es demasiado conservador en 240×400? (cae a `H:MM` pelado en celdas densas).
