@@ -4,7 +4,7 @@
 -->
 <iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
     <iq:application
-        id="953a28119edc4511b09dca2366738f5e"
+        id="90f54fc135bd444f966d9b0c69849851"
         type="datafield"
         name="@Strings.AppName"
         entry="ActivityTimerApp"
