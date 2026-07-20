@@ -1,0 +1,451 @@
+<style>
+  :root {
+    --bg: #F0F3F4;
+    --surface: #FFFFFF;
+    --surface-2: #E6ECEE;
+    --code-bg: #0F1417;
+    --code-ink: #D8E2E7;
+    --code-dim: #7F8E97;
+    --ink: #18211C;
+    --ink-soft: #52625B;
+    --line: #D5DEDF;
+    --accent: #B7620A;
+    --accent-ink: #B7620A;
+    --link: #0C6E88;
+    --z-down: #2C6FB3;   /* grade color zones — the app's own signature spectrum */
+    --z-flat: #6E7C85;
+    --z-easy: #2E8B57;
+    --z-hard: #C98A16;
+    --z-steep: #C0392B;
+    --screen-bg: #10161A;
+    --radius: 14px;
+    --maxw: 880px;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0D1215; --surface: #141B1F; --surface-2: #1A2429; --code-bg: #090D0F;
+      --code-ink: #D8E2E7; --code-dim: #6E7C85; --ink: #E6EDEA; --ink-soft: #93A29B;
+      --line: #253039; --accent: #F0912E; --accent-ink: #F4A24E; --link: #55BBDB;
+      --z-down: #5AA0E0; --z-flat: #8B99A2; --z-easy: #4FC17E; --z-hard: #E6B341; --z-steep: #E86555;
+      --screen-bg: #090D0F;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #F0F3F4; --surface: #FFFFFF; --surface-2: #E6ECEE; --code-bg: #0F1417;
+    --code-ink: #D8E2E7; --code-dim: #7F8E97; --ink: #18211C; --ink-soft: #52625B;
+    --line: #D5DEDF; --accent: #B7620A; --accent-ink: #B7620A; --link: #0C6E88;
+    --z-down: #2C6FB3; --z-flat: #6E7C85; --z-easy: #2E8B57; --z-hard: #C98A16; --z-steep: #C0392B;
+    --screen-bg: #10161A;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0D1215; --surface: #141B1F; --surface-2: #1A2429; --code-bg: #090D0F;
+    --code-ink: #D8E2E7; --code-dim: #6E7C85; --ink: #E6EDEA; --ink-soft: #93A29B;
+    --line: #253039; --accent: #F0912E; --accent-ink: #F4A24E; --link: #55BBDB;
+    --z-down: #5AA0E0; --z-flat: #8B99A2; --z-easy: #4FC17E; --z-hard: #E6B341; --z-steep: #E86555;
+    --screen-bg: #090D0F;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--font-sans); font-size: 17px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 22px; }
+  main > section { padding: 42px 0; border-top: 1px solid var(--line); }
+
+  h1, h2, h3 { text-wrap: balance; line-height: 1.14; letter-spacing: -0.02em; margin: 0; }
+  h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 800; }
+  h2 { font-size: clamp(1.4rem, 3.2vw, 1.9rem); font-weight: 750; margin-bottom: 6px; }
+  h3 { font-size: 1.1rem; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.01em; }
+  p { margin: 12px 0; max-width: 66ch; }
+  a { color: var(--link); text-decoration: none;
+      border-bottom: 1px solid color-mix(in srgb, var(--link) 35%, transparent); }
+  a:hover { border-bottom-color: var(--link); }
+  strong { font-weight: 680; }
+
+  .eyebrow { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--accent-ink); margin: 0 0 10px; }
+  .lead { font-size: 1.16rem; color: var(--ink-soft); max-width: 62ch; margin-top: 14px; }
+
+  code { font-family: var(--font-mono); font-size: 0.85em; background: var(--surface-2);
+    padding: 0.1em 0.38em; border-radius: 6px; }
+  pre.code { font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.6;
+    background: var(--code-bg); color: var(--code-ink); padding: 16px 18px;
+    border-radius: 12px; overflow-x: auto; margin: 16px 0; tab-size: 4;
+    border: 1px solid color-mix(in srgb, var(--code-ink) 12%, transparent); }
+  pre.code .cm { color: var(--code-dim); }
+  pre.code .k  { color: #F5A15A; }
+  pre.code .s  { color: #93C9A6; }
+  pre.code .n  { color: #7FC7DE; }
+  pre.code b   { color: #FFFFFF; font-weight: 600; }
+
+  /* hero */
+  header.hero { padding: 54px 0 18px; }
+  .hero-grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 32px; align-items: center; }
+  @media (max-width: 720px) { .hero-grid { grid-template-columns: 1fr; } }
+  .screen { background: var(--screen-bg); border-radius: 16px; padding: 20px 18px;
+    display: flex; flex-direction: column; gap: 4px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06), 0 14px 34px -20px rgba(0,0,0,0.6); }
+  .screen .cell { display: flex; flex-direction: column; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .screen .cell:last-child { border-bottom: 0; }
+  .screen .lbl { font-size: 0.62rem; letter-spacing: 0.18em; color: #8B99A2;
+    text-transform: uppercase; }
+  .screen .val { font-family: var(--font-mono); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .screen .val.grade { font-size: 2.6rem; color: var(--z-easy); line-height: 1.05; }
+  .screen .val.vam   { font-size: 1.9rem; color: #E6EDEA; }
+  .screen .aux { font-size: 0.72rem; color: #8B99A2; font-family: var(--font-mono); }
+
+  /* generic cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px; margin: 20px 0 4px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 16px 18px; }
+  .card p { margin: 6px 0 0; font-size: 0.94rem; color: var(--ink-soft); max-width: none; }
+  .tag { font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent-ink); }
+
+  /* module map */
+  .modmap { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 10px; }
+  .mod { background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; }
+  .mod .name { font-family: var(--font-mono); font-weight: 700; font-size: 0.9rem; }
+  .mod .pure { display: inline-block; font-size: 0.62rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--z-easy); font-weight: 700; margin-left: 6px; }
+  .mod .role { font-size: 0.84rem; color: var(--ink-soft); margin-top: 4px; }
+
+  /* pipeline */
+  ol.flow { counter-reset: s; list-style: none; padding: 0; margin: 18px 0 0;
+    display: grid; gap: 8px; }
+  ol.flow li { counter-increment: s; position: relative; padding: 12px 14px 12px 52px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    font-size: 0.95rem; }
+  ol.flow li::before { content: counter(s); position: absolute; left: 12px; top: 11px;
+    width: 26px; height: 26px; border-radius: 7px; background: var(--surface-2);
+    color: var(--accent-ink); font-family: var(--font-mono); font-weight: 700; font-size: 0.85rem;
+    display: flex; align-items: center; justify-content: center; }
+  ol.flow li b { font-weight: 680; }
+
+  /* grade-zone strip */
+  .zones { display: flex; border-radius: 10px; overflow: hidden; margin: 16px 0 4px;
+    border: 1px solid var(--line); font-family: var(--font-mono); font-size: 0.78rem; }
+  .zones div { flex: 1; padding: 10px 8px; text-align: center; color: #fff; font-weight: 600; }
+  .z0 { background: var(--z-down); } .z1 { background: var(--z-flat); }
+  .z2 { background: var(--z-easy); } .z3 { background: var(--z-hard); }
+  .z4 { background: var(--z-steep); }
+
+  /* table */
+  .tblwrap { overflow-x: auto; margin: 18px 0 4px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line);
+    vertical-align: top; }
+  th { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+  td code { font-size: 0.82em; }
+  td.n { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .note { background: var(--surface-2); border-left: 3px solid var(--accent);
+    border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 18px 0 4px; font-size: 0.94rem; }
+  .note p { margin: 0; max-width: none; }
+
+  footer { padding: 34px 0 60px; color: var(--ink-soft); font-size: 0.88rem; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+</style>
+
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <p class="eyebrow">Opción B · Connect IQ data field · Edge 830/840</p>
+      <h1>Pendiente&nbsp;+&nbsp;VAM, calculadas a mano</h1>
+      <p class="lead">
+        Garmin ya trae VAM y pendiente nativas — pero <strong>Connect IQ no las expone por API</strong>.
+        Este campo las reconstruye desde cero, solo con el altímetro barométrico y la distancia,
+        y las muestra <strong>juntas en una celda</strong>. Este documento explica cómo, y por qué
+        cada decisión rara es la correcta.
+      </p>
+    </div>
+    <div class="screen" aria-hidden="true">
+      <div class="cell">
+        <span class="lbl">Grade</span>
+        <span class="val grade">7%</span>
+      </div>
+      <div class="cell">
+        <span class="lbl">VAM m/h</span>
+        <span class="val vam">560</span>
+      </div>
+      <div class="cell">
+        <span class="aux">↑ 342 m</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section>
+    <div class="wrap">
+      <h2>El rol honesto</h2>
+      <p>
+        El Edge 830 ya incluye de fábrica <code>VAM</code>, <code>30s VAM</code>, <code>Avg VAM</code>,
+        <code>Lap VAM</code> y pendiente. Un campo que solo repita eso no aporta nada. Por eso B
+        existe por tres motivos concretos — y solo esos justifican usarla en la calle:
+      </p>
+      <div class="cards">
+        <div class="card">
+          <h3>Dos métricas, una celda</h3>
+          <p>Pendiente + VAM en un solo campo. En nativo son dos celdas separadas.</p>
+        </div>
+        <div class="card">
+          <h3>Ventana configurable</h3>
+          <p>La VAM nativa es una media fija de 30&nbsp;s. Acá elegís 5&nbsp;/&nbsp;10&nbsp;/&nbsp;30&nbsp;s
+             según lo reactiva que la quieras.</p>
+        </div>
+        <div class="card">
+          <h3>Zonas de color</h3>
+          <p>La pendiente se lee de un vistazo, con guantes, por color — no por número.</p>
+        </div>
+      </div>
+      <p style="margin-top:18px">
+        Y, sobre todo, es el <strong>segundo proyecto Monkey&nbsp;C</strong> del autor: la primera app
+        con algoritmos de verdad (buffers, filtros, suavizado, settings). El buffer de muestras que
+        se construye acá es la base directa de las Opciones C (descenso), H (stamina) e I (test de subida).
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>La arquitectura: una regla que manda</h2>
+      <p>
+        <strong>Toda la matemática vive en módulos puros y testeables</strong> — sin <code>Dc</code>,
+        sin <code>Activity.Info</code>, sin estado del device. La <code>View</code> es un wrapper fino
+        que null-chequea las entradas y delega. Es el mismo patrón que la Opción A
+        (<code>TimeFormat</code> ⟷ <code>ActivityTimerView</code>), pero escalado a ocho módulos.
+      </p>
+      <div class="modmap" style="margin-top:16px">
+        <div class="mod"><span class="name">SampleBuffer</span><span class="pure">puro</span>
+          <div class="role">Ring buffer de 64 muestras (t/d/h), cero allocations en régimen.</div></div>
+        <div class="mod"><span class="name">AltFilter</span><span class="pure">puro</span>
+          <div class="role">Mediana-3, EMA y el gate de outliers con re-seed.</div></div>
+        <div class="mod"><span class="name">GradeMath</span><span class="pure">puro</span>
+          <div class="role">100·Δh/Δd + guardas de parado y de rango.</div></div>
+        <div class="mod"><span class="name">VamMath</span><span class="pure">puro</span>
+          <div class="role">Δh/Δt·3.6e6 + guardas de Δt y clamp.</div></div>
+        <div class="mod"><span class="name">RefSelect</span><span class="pure">puro</span>
+          <div class="role">Elige la muestra de referencia: por distancia / por tiempo.</div></div>
+        <div class="mod"><span class="name">EngineState</span><span class="pure">puro</span>
+          <div class="role">Transiciones del timer → acción; gate de muestreo.</div></div>
+        <div class="mod"><span class="name">Units</span><span class="pure">puro</span>
+          <div class="role">Conversión ft/h + strings (signo, redondeo, <code>--</code>).</div></div>
+        <div class="mod"><span class="name">GradeVamEngine</span><span class="pure">puro</span>
+          <div class="role">Orquestador: junta todo lo anterior en un <code>update()</code>.</div></div>
+        <div class="mod"><span class="name">GradeVamView</span>
+          <div class="role">Wrapper fino NO testeable: lee, formatea, dibuja los 3 modos.</div></div>
+        <div class="mod"><span class="name">GradeVamApp</span>
+          <div class="role">AppBase: entrega la View y reenvía <code>onSettingsChanged</code>.</div></div>
+      </div>
+      <p style="margin-top:16px">
+        ¿Por qué tanta ceremonia? Porque <code>compute()</code> corre una vez por segundo durante horas
+        y no se puede depurar en la montaña. Si la matemática es pura, se prueba <strong>entera y sin
+        simulador</strong> — y la View queda tan chica que casi no tiene dónde esconder un bug.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>El pipeline: de un dato a dos números</h2>
+      <p>Cada segundo, <code>GradeVamEngine.update(timerState, t, d, h, speed)</code> hace esto, en orden:</p>
+      <ol class="flow">
+        <li><b>Transición de estado.</b> ¿Arrancó, pausó, reanudó o reseteó? Decide la acción antes que nada.</li>
+        <li><b>Gate.</b> Solo se muestrea con el timer en <code>ON</code>. En pausa se congela.</li>
+        <li><b>Mediana de 3</b> sobre la altitud cruda → mata un pico de una sola muestra.</li>
+        <li><b>Gate de outliers</b> contra la última muestra <em>buena</em> → <code>ACCEPT</code> / <code>REJECT</code> / <code>RESEED</code>.</li>
+        <li><b>EMA (α=0,4)</b> sobre lo aceptado → baja el ruido barométrico ~2×.</li>
+        <li><b>Push</b> de la terna <code>{t, d, h_suavizada}</code> al ring buffer.</li>
+        <li><b>RefSelect + GradeMath / VamMath</b> → la pendiente y la VAM actuales.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Las decisiones difíciles</h2>
+      <p>Casi todo el diseño real está en los casos borde. Estas son las que parecen raras y no lo son:</p>
+
+      <div class="cards">
+        <div class="card">
+          <span class="tag">AltFilter</span>
+          <h3>Re-seed obligatorio</h3>
+          <p>Un pico dura 1–2 muestras; una recalibración del baro o un túnel duran <em>para siempre</em>.
+             Sin re-seed, el filtro rechazaría todo el resto de la salida. Regla: 3 rechazos seguidos →
+             nueva línea base y se vacía el buffer.</p>
+        </div>
+        <div class="card">
+          <span class="tag">EngineState</span>
+          <h3>Reanudar = vaciar el buffer</h3>
+          <p>En pausa, <code>t</code> y <code>d</code> se congelan pero la altitud sigue derivando. Conservar
+             muestras pre-pausa fabricaría un pico (Δd≈0 con Δh real). Se tira todo; el costo es un
+             warm-up de unos segundos.</p>
+        </div>
+        <div class="card">
+          <span class="tag">RefSelect</span>
+          <h3>Ventana de pendiente híbrida</h3>
+          <p>Por distancia (20&nbsp;m), pero con piso de 3 muestras. En un descenso a 40&nbsp;km/h,
+             una ventana pura de distancia degeneraría a una diferencia de 1&nbsp;segundo, pura ruido.</p>
+        </div>
+        <div class="card">
+          <span class="tag">VamMath</span>
+          <h3>Guardas antes de dividir</h3>
+          <p>Monkey&nbsp;C tira error de runtime al dividir por cero. Se exige Δt&nbsp;≥&nbsp;max(2&nbsp;s, W/2)
+             y ≥&nbsp;2 muestras <em>antes</em> de la división. Parado → <code>0</code> (dato válido), no ruido.</p>
+        </div>
+        <div class="card">
+          <span class="tag">GradeMath</span>
+          <h3>Fuera de rango → <code>--</code></h3>
+          <p>Si <code>|grade| &gt; 40&nbsp;%</code> es un error de datos. Se muestra <code>--</code>, no el valor
+             clavado en 40: presentar un error como lectura real es peor que no mostrar nada.</p>
+        </div>
+        <div class="card">
+          <span class="tag">disciplina de tipos</span>
+          <h3><code>t</code> es <code>Number</code>, no <code>Float</code></h3>
+          <p>Un <code>Float</code> de 32 bits pierde exactitud entera pasadas las ~4&nbsp;h&nbsp;40&nbsp;m.
+             El tiempo se guarda en ms enteros y la resta se hace en <code>Number</code> antes de convertir.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Units · View</span>
+          <h3>Histéresis de display</h3>
+          <p>El entero mostrado se mantiene hasta que el crudo se aleja más de 1&nbsp;% del valor
+             actual → no parpadea <code>7↔8</code> por el ruido del baro. El color de zona usa
+             ese mismo entero, así número y color se mueven en lock-step.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Zonas de color</h2>
+      <p>La pendiente se pinta por franja (setting on/off). Los tonos se adaptan al fondo del tema para
+         mantener contraste; en pausa todo se atenúa a gris y las zonas se apagan.</p>
+      <div class="zones">
+        <div class="z0">≤ −3 bajando</div>
+        <div class="z1">−2…2 llano</div>
+        <div class="z2">3…7 verde</div>
+        <div class="z3">8…12 amarillo</div>
+        <div class="z4">≥ 13 rojo</div>
+      </div>
+      <p style="margin-top:12px">
+        Las bandas van sobre el <strong>entero que se muestra</strong> (no el valor crudo), así el
+        color y el número siempre coinciden y no hay bordes solapados.
+      </p>
+      <p style="margin-top:14px">
+        Y en un campo <strong>chico</strong>, en vez de elegir una sola métrica, se muestran las dos
+        juntas y compactas — <code>7%/560</code> — con la pendiente en su color de zona. Si la celda
+        tiene alto suficiente, aparece además un rótulo <code>PEND/VAM</code> arriba; si es muy chata,
+        se omite y el número usa todo el espacio (el campo lo decide midiendo, no se asume). La VAM
+        sigue las unidades del device — <strong>m/h</strong> en métrico, <strong>ft/h</strong> en
+        imperial — igual que el campo VAM nativo de Garmin.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Cómo se prueba</h2>
+      <p>
+        Criterio de aceptación del repo: <strong>los unit tests en verde antes de la validación visual</strong>.
+        Cada módulo puro tiene su <code>*Test.mc</code> con <code>(:test)</code> de <code>Toybox.Test</code>,
+        que el compilador saca del release (costo cero contra los 128&nbsp;KB). Se corren con
+        “Monkey&nbsp;C: Run Tests”, perfil edge840 — <strong>y ya corrieron: 41&nbsp;tests, 41&nbsp;PASS,
+        0&nbsp;fallos</strong> (compilando y ejecutando en el simulador, no solo revisando el código).
+      </p>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>Módulo</th><th>Qué fija el test</th></tr></thead>
+          <tbody>
+            <tr><td><code>GradeMath</code></td><td>subida/descenso; guarda &lt;5&nbsp;m (5,0 exacto calcula); 40,0 exacto no se descarta; Δd≤0 → null sin dividir.</td></tr>
+            <tr><td><code>VamMath</code></td><td>1&nbsp;m/10&nbsp;s → 360; Δt=0 → null (nunca Infinity); usa el Δt real; llano → 0 (no null); clamp 5000.</td></tr>
+            <tr><td><code>AltFilter</code></td><td>4,9 acepta, 5,0 acepta, 5,1 rechaza; el pico se compara contra la última <em>buena</em>; 3 rechazos → reseed.</td></tr>
+            <tr><td><code>SampleBuffer</code></td><td>integridad de la terna t/d/h; wraparound con cap 4 y con cap 64; <code>clear()</code>.</td></tr>
+            <tr><td><code>RefSelect</code></td><td>con velocidad variable, distancia y tiempo eligen índices <em>distintos</em>; piso de span; borde inclusivo.</td></tr>
+            <tr><td><code>EngineState</code></td><td>tabla completa de transiciones; <code>shouldPush</code> solo en <code>ON</code>.</td></tr>
+            <tr><td><code>Units</code></td><td>VAM sigue el device (m/h · ft/h ×3,281); grade sin <code>+</code> (<code>7</code>, <code>-8</code>, <code>0</code>, <code>--</code>, half-away-from-zero); histéresis <code>holdGrade</code>; el <code>%</code> lo dibuja la View aparte.</td></tr>
+            <tr><td><code>GradeVamEngine</code></td><td>cold start; guardas independientes; input null; PAUSED no pushea; <em>el asesino de picos</em>; 7% constante → 7±1.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        <p><strong>Un matiz que enseña algo.</strong> El caso “2 muestras → VAM 360” pasa por el pipeline
+        completo, y el EMA atenúa el primer escalón de altitud (1&nbsp;m crudo → ~0,4&nbsp;m con solo dos
+        muestras). Por eso el test de <em>integración</em> afirma la <strong>independencia de las guardas</strong>
+        (pendiente <code>null</code>, VAM real y positiva), no un número clavado. El 360 exacto se prueba en
+        <code>VamMathTest</code>, que es puro y no tiene EMA. Cada aserción, en la capa que le corresponde.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Depurar sin salir a andar</h2>
+      <p>
+        Con <code>TEST_MODE = true</code> en un build de debug, <code>compute()</code> ignora el sensor y
+        consume un generador sintético: subida 7% → descenso −10% → llano, con ruido barométrico. Alcanza
+        para ver los 3 modos de render, las zonas de color, la VAM negativa y el warm-up sin FIT ni device.
+      </p>
+      <p>
+        La clave está en que <strong>no deje rastro en el release</strong> — el mismo esquema que la Opción A:
+      </p>
+      <pre class="code"><span class="cm">// const PLANO false: el optimizador -r elimina el bloque entero, llamada incluida.</span>
+<span class="k">private const</span> TEST_MODE = <span class="k">false</span>;
+
+<span class="k">if</span> (TEST_MODE) {           <span class="cm">// se borra en release</span>
+    <span class="k">var</span> syn = nextSynthetic();   <span class="cm">// (:debug) real / (:release) stub vacío</span>
+    ...
+}</pre>
+      <div class="note">
+        <p><strong>La trampa sutil:</strong> nunca referenciar un miembro <code>(:debug)</code> fuera de una
+        función <code>(:debug)</code>. En release ese símbolo no existe y la compilación falla. Por eso el
+        ascent sintético se <em>devuelve</em> desde <code>nextSynthetic()</code> en vez de leerse de un miembro
+        dentro de <code>compute()</code>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Qué falta</h2>
+      <div class="cards">
+        <div class="card">
+          <h3>1 · Tests en verde</h3>
+          <p>“Monkey&nbsp;C: Run Tests” (edge840). Los §10 deben pasar antes de mirar nada en pantalla.</p>
+        </div>
+        <div class="card">
+          <h3>2 · Render en simulador</h3>
+          <p>F5 con <code>TEST_MODE</code>; afinar los umbrales de los 3 modos en las 6 resoluciones,
+             como se hizo con la A.</p>
+        </div>
+        <div class="card">
+          <h3>3 · Íconos reales</h3>
+          <p>Los launcher actuales son placeholder (el cronómetro de la A). Rediseñar con motivo de
+             pendiente/VAM en Pillow.</p>
+        </div>
+        <div class="card">
+          <h3>4 · Validación en device</h3>
+          <p>FIT real con subida/bajada conocidas; cruzar contra la “30s&nbsp;VAM” nativa; probar el escalón
+             de presión y una salida &gt;5&nbsp;h.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>apps/b-grade-vam · Opción B</span>
+    <span>·</span>
+    <span>Monkey C · Connect IQ 3.3 · 13 Edge (referencia: 840)</span>
+    <span>·</span>
+    <span>La fuente de verdad es <code>SPEC.md</code>.</span>
+  </div>
+</footer>

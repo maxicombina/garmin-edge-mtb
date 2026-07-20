@@ -3,10 +3,12 @@ bin/
 gen/
 mir/
 internal-mir/
+external-mir/
 *.iq
 *.prg
 *.prg.debug.xml
 *.debug.xml
+*-settings.json
 
 # Developer keys — NEVER commit these
 *.der

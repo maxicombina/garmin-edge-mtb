@@ -1,0 +1,23 @@
+<strings>
+    <!-- English is the base / fallback language (SPEC 6.4). -->
+    <string id="AppName">Grade + VAM</string>
+
+    <!-- Field labels drawn above the values (uppercased at runtime). -->
+    <string id="GradeLabel">Grade</string>
+    <string id="VamLabel">VAM</string>
+
+    <!-- Settings UI (Garmin Connect Mobile / Express) -->
+    <string id="SetVamWindow">VAM window (s)</string>
+    <string id="SetGradeWindow">Grade window (m)</string>
+    <string id="SetPrimaryMetric">First value (small field)</string>
+    <string id="SetColorZones">Grade color zones</string>
+
+    <string id="Sec5">5 s</string>
+    <string id="Sec10">10 s</string>
+    <string id="Sec30">30 s</string>
+    <string id="Met10">10 m</string>
+    <string id="Met20">20 m</string>
+    <string id="Met30">30 m</string>
+    <string id="OrderGradeFirst">Grade / VAM</string>
+    <string id="OrderVamFirst">VAM / Grade</string>
+</strings>

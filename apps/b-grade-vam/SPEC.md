@@ -125,8 +125,8 @@ grade = 100 × (h_now − h_ref) / (d_now − d_ref)
 - **Fallback de buffer corto:** si el buffer no abarca `W_grade`, usar la muestra más vieja disponible (ventana efectiva = `min(W_grade, span del buffer)`), siempre que pase la guarda de parado. Documentado: la ventana elegida es un máximo, no una promesa.
 - **Guarda de parado:** si `(d_now − d_ref) < 5 m` → no calcular → `--`.
 - **Fuera de rango = error de datos:** si `|grade| > 40 %` → mostrar **`--`** (NO el valor clavado en ±40: un valor fuera de rango es error de datos, y mostrarlo clavado presenta un error como lectura real).
-- Redondeo a entero, **half away from zero** (7,5→8; −7,5→−8). Signo siempre visible (`+7`/`−12`); el cero sin signo (`0`).
-- **Histéresis de display:** el entero mostrado solo cambia cuando el valor crudo cruza el límite de redondeo con un margen de 0,5 % — evita el parpadeo residual entre dos enteros vecinos.
+- Redondeo a **entero**, **half away from zero** (7,5→8; −7,5→−8). **Formato como el nativo (DECIDIDO 2026-07-20): SIN `+` en subidas** (`7%`, no `+7%`), el `−` se mantiene en descensos (`−4%`), cero `0%`, sin dato `--`. **El `%` se dibuja aparte, en fuente de TEXTO** (`FONT_TINY`/`FONT_XTINY`) como sufijo del número — porque las fuentes numéricas `FONT_SYSTEM_NUMBER_*` **no tienen el glifo `%`** (saldría en blanco). `Units.gradeIntString` devuelve solo el número (entero, ya pasado por la histéresis `holdGrade`); la View arma el bloque `número + %`. **DECIDIDO 2026-07-19: entero, NO 1 decimal.** Se evaluó mostrar `2.2 %`; se descartó porque con ruido de baro σ≈0,4 m el error ya suavizado es ~±1‑2 %, o sea el decimal cae **bajo el piso de ruido** y el último dígito parpadearía cada segundo — rompería el criterio de estabilidad de §12. (El nativo de Garmin también muestra entero.)
+- **Histéresis de display (IMPLEMENTADA 2026-07-20):** el entero mostrado solo cambia cuando el valor crudo se aleja más de `0,5` (límite de redondeo) `+ 0,5` (margen) `= 1,0 %` del entero actual; dentro de esa banda muerta se mantiene → mata el parpadeo residual `7↔8↔7` por ruido de baro. Función **pura y testeada** `Units.holdGrade(raw, prevShown, margin)`; la View guarda `mShownGrade` entre ticks y **las zonas de color bandean ese MISMO entero** (número y color en lock-step). El margen (`GRADE_HYST_MARGIN=0,5`) es tunable; con margen 0,5 hay hasta ~1 % de lag (aceptable: el grade ya es ±1 % incierto).
 
 ### 5.3 VAM (m/h)
 
@@ -159,8 +159,8 @@ Transiciones sobre `timerState` **observado en `compute()`** (los hooks son secu
 ### 5.5 Unidades y formateo (`Units`)
 
 - Pendiente: `%` universal.
-- VAM: `System.getDeviceSettings().elevationUnits` — `UNIT_METRIC` → m/h; `UNIT_STATUTE` → **ft/h (×3,281)**. **Releer en `compute()`** (1×/s, barato): el cambio de unidades del device NO dispara `onSettingsChanged` (eso es solo para app settings).
-- ⚠️ **Presupuesto de glifos:** en ft/h una VAM normal de descenso (−1500 m/h) son **6 glifos** (`-4921`); la selección de fuentes de §6 DEBE medirse con plantillas de ancho estable de 6 glifos en modo statute (`-88888`), 5 en métrico (`-8888`).
+- VAM: **sigue las unidades del device** (`System.getDeviceSettings().elevationUnits`) como el campo VAM nativo — `UNIT_METRIC` → m/h; `UNIT_STATUTE` → **ft/h (×3,281)** (decisión 2026-07-20, ver §8). **Releer en `compute()`** (barato): un cambio de unidades del device NO dispara `onSettingsChanged`. El label lleva la unidad (`VAM M/H` / `VAM FT/H`).
+- **Presupuesto de glifos:** métrico ≤ **5 glifos** (`-8888`, máx ~−5000 m/h); statute ≤ **6 glifos** (`-88888`, máx ~−16405 ft/h). La selección de fuentes de §6 mide la plantilla correcta según las unidades (y re-selecciona al cambiarlas). En SMALL se combinan pendiente + VAM → `-88/-8888` (métrico) o `-88/-88888` (statute).
 - Strings pre-formateados en `compute()` y guardados en miembros; `onUpdate()` solo dibuja (cero formateo/medición por tick).
 
 ## 6. Render adaptativo (`onUpdate(dc)`)
@@ -173,7 +173,9 @@ Umbrales sanity-checkeados contra la tabla medida de la A (§11.1: media fila 12
 |---|---|---|
 | **FULL** | ≥ 200 px | pendiente XL con zona de color + VAM grande + línea auxiliar = **`totalAscent`** (con `--` si null) |
 | **HALF** | 90–199 px | pendiente + VAM lado a lado, número grande + etiqueta pequeña |
-| **SMALL** | < 90 px | **una** métrica (setting `primaryMetric`) + etiqueta mínima |
+| **SMALL** | < 90 px | **ambas** métricas compactas como `pendiente/VAM` (p. ej. `+7/560`); pendiente coloreada + `/` + VAM en frente; **header `PEND/VAM` adaptativo** (ver nota) |
+
+**Nota (2026-07-19):** SMALL muestra **las dos** métricas como `X/Y` (decisión de producto: no perder ninguna en celda chica). El setting `primaryMetric` se repropuso a **qué valor va primero** (§7). Plantilla del par: `-88/-8888` (métrico) o `-88/-88888` (statute). **Header adaptativo:** se dibuja un rótulo chico arriba (`PEND/VAM` o `VAM/PEND` según el orden, `FONT_XTINY`) SOLO si la celda tiene alto ≥ `SMALL_LABEL_MIN_H` (46 px, tunable) **y** el rótulo entra en el ancho; si no, se omite y el valor usa toda la celda. Mismo criterio `LABEL_MIN_H` que la A — el campo decide solo, no se asume que "no entra". **El header se dibuja en `y = LABEL_MARGIN` (4 px) y la banda reservada es `LABEL_MARGIN + ascent + 2`**, para que deje aire arriba y NO quede pegado al techo (bug detectado a ojo comparando con la A el 2026-07-20; antes se dibujaba en `y = 0`).
 
 Re-validar los umbrales en las 6 resoluciones en el simulador (como se hizo con la A).
 
@@ -181,17 +183,27 @@ Re-validar los umbrales en las 6 resoluciones en el simulador (como se hizo con 
 
 - **Dígitos: `FONT_SYSTEM_NUMBER_*`** (THAI_HOT 67 px / HOT 55 / MEDIUM 42 / MILD 35 en 246×322) — NO las `FONT_NUMBER_*` "de app": miden igual pero el trazo no es el nativo. Confirmadas en 3.3.
 - **Labels: `FONT_GLANCE`, texto en MAYÚSCULAS**, reservando solo el `ascent` + margen (~4 px). ⚠️ **Salvedad verificada 2026-07-19:** la constante existe desde 3.1.8 y compila, pero el device profile del **edge830 no tiene glance font** (el 840 sí) → en el 830 cae a un fallback no documentado. **Verificar el render con el perfil edge830 en el simulador**; si se ve mal, fallback explícito a `FONT_XTINY`/`FONT_TINY` para el label en ese device.
-- **Centrado vertical:** las fuentes numéricas reservan descendente que los dígitos no usan → al centrar el valor, `cY += getFontDescent(font)/2`; nudges finos de ±2 px se validan a ojo contra campos nativos (en el 840 real).
-- **Selección con caché (patrón A):** fuentes por slot elegidas midiendo **plantillas de ancho estable** (grade: `-88`; VAM: `-8888` métrico / `-88888` statute), recalculadas SOLO cuando cambian `(w, h, unidades)` — cero medición en el tick normal.
+- **Centrado vertical (OBLIGATORIO — regla dura del repo, ver spec maestra §3.4):** las fuentes numéricas reservan descendente que los dígitos no usan → al centrar el valor, `cY += getFontDescent(font)/2`; a los labels reservarles **solo el `ascent` + margen** (~4 px); nudge fino de ~2 px validado a ojo contra campos nativos (en el 840 real). **Implementado en la View 2026-07-20** (FULL/HALF/SMALL; en HALF el valor se centra en la banda debajo del label). NO re-descubrir: ya estaba resuelto en la Opción A §6.7.
+- **Selección con caché (patrón A):** fuentes por slot elegidas midiendo **plantillas de ancho estable** (grade: `-88`; VAM: `-8888` métrico / `-88888` statute; par SMALL: `-88/-8888` o `-88/-88888`), recalculadas SOLO cuando cambia `(w, h, unidades)` — cero medición en el tick normal (SMALL mide sus 3 segmentos cortos por tick para centrar el `/`, despreciable).
 
 ### 6.3 Zonas de color de pendiente
 
-Setting on/off (default on): `< −3 %` azul (bajando) · `−3…3` neutro · `3…8` verde · `8…12` amarillo · `> 12` rojo. Contraste según `getBackgroundColor()` (fondo blanco → tonos oscuros; fondo negro → brillantes).
+Setting on/off (default on). **Bandas sobre el ENTERO mostrado** (no el crudo float) → color y número siempre coinciden, sin solapes ni huecos (decisión 2026-07-20):
+
+| Zona | Entero | Color |
+|---|---|---|
+| bajando | ≤ −3 | azul |
+| llano | −2 … 2 | neutro (frente) |
+| verde | 3 … 7 | verde |
+| amarillo | 8 … 12 | amarillo |
+| rojo | ≥ 13 | rojo |
+
+Contraste según `getBackgroundColor()` (fondo blanco → tonos oscuros; fondo negro → brillantes). Implementación: se bandea el **entero mostrado con histéresis** (`mShownGrade`, ver §5.2) → color y número siempre coinciden y comparten la estabilidad. (Historial: llano pasó de −3…3 a −2…2 el 2026-07-19; bandas por entero sin solape el 2026-07-20.)
 
 ### 6.4 Labels e i18n (patrón A)
 
 - Recursos bilingües: base `resources/` = inglés (fallback), `resources-spa/` = español; `<iq:language>eng|spa</iq:language>` en el manifest.
-- Labels: EN `GRADE` / `VAM`; ES `PEND` / `VAM`. App name: `Grade & VAM` / `Pendiente y VAM`.
+- Labels: EN `GRADE` / `VAM`; ES `PEND` / `VAM`. App name: **`Grade + VAM`** / `Pendiente y VAM` (el `&` está prohibido en el nombre de app por el packager — verificado 2026-07-19: `Grade & VAM` falla el build). En FULL/HALF el label de VAM lleva la unidad: `VAM M/H`.
 
 ## 7. Settings (decisión de producto: estas 4 y ninguna más)
 
@@ -201,12 +213,15 @@ Mecanismo re-verificado 2026-07-19 para `datafield` en 3.3: `resources/settings/
 |---|---|---|---|---|
 | `vamWindowSec` | number (list) | 10 | 5 / 10 / 30 | EL diferenciador vs la VAM nativa fija de 30 s |
 | `gradeWindowM` | number (list) | 20 | 10 / 20 / 30 | responsividad vs estabilidad en MTB |
-| `primaryMetric` | number (list) | 0 | 0 = grade, 1 = VAM | en SMALL solo entra una métrica |
+| `primaryMetric` | number (list) | 0 | 0 = pendiente primero, 1 = VAM primero | orden del par `X/Y` en SMALL (repropuesto 2026-07-19: SMALL ahora muestra ambas) |
 | `colorZones` | boolean | true | on/off | gustos/contraste |
 
 **Implementación:** leer los 4 valores UNA vez en `initialize()` y recargarlos en `onSettingsChanged()` (cachear en miembros + `engine.setWindows(...)` + `WatchUi.requestUpdate()`). NO llamar `Properties.getValue()` en cada `compute()`.
 
 ## 8. Fuera de alcance v1 (anotado para v1.1+)
+
+- **Unidad de VAM — RESUELTO (2026-07-20): sigue el device (m/h métrico, ft/h statute), como el campo VAM nativo.** Se verificó en docs/foros de Garmin que el **VAM nativo sí sigue `elevationUnits`** ("VAM is never measured in mile/h. It's either metres per hour or feet per hour" — foro Edge 530; el "mile/h" reportado era un bug de etiqueta del idioma sueco; el manual del 840 no aclara la unidad). Aunque la *convención del deporte* (Strava/TrainingPeaks, fórmula de Ferrari con coef. 200 métrico) es m/h universal, se eligió **seguir el device** para ser consistente con el nativo y no sorprender a un usuario imperial (y para cruzar limpio contra la "30s VAM" nativa). Para el autor (métrico) es idéntico: m/h. **Implementado:** `elevationUnits` releído en `compute()`, `Units.feetPerHour` + `vamString(vam, statute)`, ascent también convertido, plantilla de VAM 6 glifos en statute, cache de fuentes re-selecciona al cambiar unidades. Refs: foro Edge 530 (unidades), manual Edge 840 (data fields), Garmin Support "What is VAM?". (Descartada la idea previa —errónea— de que "ft/h sería raro".)
+
 
 - **FIT recording** de grade/VAM como developer fields (`FitContributor`, verificado disponible): candidato natural a v1.1.
 - **Táctil** (verificado que los datafields de Edge táctiles reciben `onTap`): no en v1 — desbloquea la Opción D.
@@ -215,16 +230,18 @@ Mecanismo re-verificado 2026-07-19 para `datafield` en 3.3: `resources/settings/
 
 ## 9. Hooks de debug para el simulador (patrón A §13 — obligatorio)
 
-- **`TEST_MODE`** (`const false` plano): con `true` + build DEBUG, `compute()` ignora `Activity.Info` y consume un **generador sintético de salida** (`(:debug)`): ciclo subida 7 % @ 8 km/h (~90 s) → descenso −10 % @ 30 km/h (~45 s) → llano (~20 s), con ruido gaussiano σ=0,4 m sobre h. Permite ver los 3 modos de render, las zonas de color, VAM negativa y el warm-up sin FIT ni device.
-- **Esquema de exclusión del release (idéntico a la A):** guard `if (TEST_MODE)` con const plano `false` (el optimizador `-r` elimina el bloque) + definiciones de debug anotadas `(:debug)` + pares `(:debug)`/`(:release)` para funciones llamadas desde el guard. Cero residuo en release; verificado en la A.
+- **`TEST_MODE`** (`const false` plano): con `true` + build DEBUG, `compute()` ignora `Activity.Info` y consume un **generador sintético de salida** (`(:debug)`). **Perfil variado (2026-07-20):** una tabla de tramos `{pendiente %, velocidad km/h, segundos}` que recorre llanos, subidas hasta **+20 %** y descensos hasta **−20 %**, barriendo **todas las zonas de color**, con ruido uniforme ±0,4 m sobre h. Permite ver los 3 modos de render, las zonas, VAM negativa y el warm-up sin FIT ni device. Nota: las velocidades de descenso se dejan moderadas a propósito para que la VAM quede dentro del clamp de ±5000 m/h y **muestre número** (un descenso empinado genuinamente más rápido clamparía a `--`, que es el comportamiento correcto).
+- **`DEBUG_MEASURE`** (`const false` plano, patrón A §11.1/§13): con `true` + build DEBUG, `onUpdate()` imprime a la consola (Debug Console de VS Code) **cada tamaño de celda distinto** + el modo elegido (FULL/HALF/SMALL) + las métricas (alto/ascent/descent) de las fuentes elegidas. Es la data para afinar el centrado vertical en las 6 resoluciones (así se armó la tabla §11.1 de la A). Loguea una línea por tamaño (en un layout multi-campo, una por celda). Añadido 2026-07-20.
+- **Esquema de exclusión del release (idéntico a la A):** guards `if (TEST_MODE)` / `if (DEBUG_MEASURE)` con const plano `false` (el optimizador `-r` elimina el bloque) + definiciones de debug anotadas `(:debug)` + pares `(:debug)`/`(:release)` para funciones llamadas desde el guard (`nextSynthetic`, `debugMeasure`). Cero residuo en release; verificado (build de release limpio). ⚠️ Volver **ambos** flags a `false` antes de todo build de release.
 
 ## 10. Unit tests (obligatorios — convención del repo desde 2026-07-19)
 
 Patrón de la A (`TimeFormat.mc`/`TimeFormatTest.mc`): módulos **puros** + funciones **`(:test)`** (`Toybox.Test`), un `<Módulo>Test.mc` junto a cada módulo. Se corren con "Monkey C: Run Tests" (o `monkeydo … -t`); el código `(:test)` queda excluido del release (costo cero contra los 128 KB). Novedades que B necesita y A no tenía, en `TestUtil.mc`:
 
 ```monkeyc
-(:test) function assertNear(actual, expected, tol, msg) { Test.assertMessage((actual-expected).abs() < tol, msg); }
-(:test) function assertIsNumber(x, msg) { Test.assertMessage(x == x, msg); }  // caza NaN
+// PLAIN functions (NO (:test) — ver nota abajo): el runner corre toda (:test) como caso.
+function assertNear(actual, expected, tol, msg) { Test.assertMessage((actual-expected).abs() < tol, msg); }
+function assertIsNumber(x, msg) { Test.assertMessage(x == x, msg); }  // caza NaN
 ```
 
 Tolerancias: 0,01 para grade %, 0,5 para VAM m/h, 0,05 para conversiones ft/h.
@@ -237,8 +254,14 @@ Tolerancias: 0,01 para grade %, 0,5 para VAM m/h, 0,05 para conversiones ft/h.
 - **`SampleBuffer`** — vacío; llenado con integridad de la terna t/d/h; wraparound con cap=4 y con cap producción; `clear()`.
 - **`RefSelect`** — el caso clave con velocidad variable (lento 2 m/s → rápido 10 m/s, pendiente constante 7 %): `byDistance(20 m)` y `byTime(10 s)` eligen índices DISTINTOS (prueba que grade usa distancia y VAM tiempo); borde inclusivo; ventana más grande que el buffer → índice 0; `size<2` → −1.
 - **`EngineState`** — tabla completa de transiciones (§5.4); `shouldPush` solo ON.
-- **`Units`** — ×3,281 con signo preservado; `gradeString`: `+7`, `-8` (half away from zero), `0` sin signo, `--` para null; `vamString` métrico/statute.
+- **`Units`** — `roundHalf` (half away from zero); `gradeIntString`: `7`/`-8`/`0`/`--` (SIN `+`; el `%` lo dibuja la View); `holdGrade` (histéresis §5.2: dentro de ±1,0 del entero actual mantiene, fuera salta a `round(raw)`; `null` resetea; primer valor muestra ya); `vamString` siempre m/h (sin ft/h).
 - **`GradeVamEngine`** (integración) — cold start (0 y 1 muestras → null); guardas independientes (2 muestras a 2 m: grade null pero VAM 360); input null → no push; PAUSED nunca pushea; **el asesino de picos post-resume** (pausa larga con deriva de h → al reanudar NO hay pico, buffer limpio); salida sintética de 7 % constante → grade estable en 7±1.
+
+  > **Nota de implementación (2026-07-19):** el caso "2 muestras → VAM 360" pasa por el pipeline COMPLETO, y el EMA (α=0,4) atenúa el primer escalón de altitud (1,0 m crudo → ~0,4 m suavizado con solo 2 muestras) → el valor exacto NO es 360. Por eso el test de integración afirma la **independencia de las guardas** (grade `null` porque Δd<5, y VAM **no-null y positiva** porque su guarda no dispara), no un número clavado. El **360 exacto vive en `VamMathTest`** (módulo puro, sin EMA), que es donde corresponde. El caso "7 % constante → 7±1" sí converge exacto: con entrada lineal, la salida del EMA es lineal con la misma pendiente, así que la diferencia sobre la ventana se conserva.
+  >
+  > **Verificado corriendo la suite en el simulador (2026-07-19): 40 tests, 40 PASS, 0 fallos.** Dos gotchas que solo aparecen al EJECUTAR (compilan bien, fallan en runtime), corregidos:
+  > 1. **`Test.assertEqualMessage(x, null, …)` explota** ("Failed invoking `<symbol>`"): al comparar contra `null` la API invoca `.equals()` sobre el actual, y si el actual es `null` revienta. Para chequear null usar **`Test.assertMessage(x == null, …)`** (el operador `==` no invoca método).
+  > 2. **Los helpers de los `*Test.mc` son funciones planas (SIN `(:test)`)** — el runner ejecuta toda función `(:test)` como caso (la llama con `logger`, espera `Boolean`), así que `assertNear`/`assertIsNumber` anotados `(:test)` daban error de aridad. El snippet de esta misma sección que los mostraba `(:test)` estaba mal. Como funciones planas se compilan igual en el build de test y el optimizador `-r` las descarta del release (sus únicos llamadores son `(:test)`, ausentes en release) — verificado: el build de release compila limpio.
 
 ## 11. Presupuesto y rendimiento
 
