@@ -13,6 +13,7 @@
     <setting propertyKey="@Properties.gradeWindowM" title="@Strings.SetGradeWindow">
         <settingConfig type="list">
             <listEntry value="10">@Strings.Met10</listEntry>
+            <listEntry value="15">@Strings.Met15</listEntry>
             <listEntry value="20">@Strings.Met20</listEntry>
             <listEntry value="30">@Strings.Met30</listEntry>
         </settingConfig>

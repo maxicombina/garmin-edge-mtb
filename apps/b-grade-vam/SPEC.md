@@ -121,7 +121,7 @@ Pipeline de `GradeVamEngine.update(timerState, tMs, dM, hM)`, en orden:
 grade = 100 × (h_now − h_ref) / (d_now − d_ref)
 ```
 
-- **Ventana híbrida** (por distancia con piso temporal): referencia = muestra más antigua que cumpla `(d_now − d) ≤ W_grade` **Y** con un span mínimo de **3 muestras**. El piso evita que en descenso rápido (40 km/h ⇒ 11 m entre muestras) la ventana degenere a una diferencia de 1 s llena de ruido. `W_grade` default **20 m** (setting 10/20/30).
+- **Ventana híbrida** (por distancia con piso temporal): referencia = muestra más antigua que cumpla `(d_now − d) ≤ W_grade` **Y** con un span mínimo de **3 muestras**. El piso evita que en descenso rápido (40 km/h ⇒ 11 m entre muestras) la ventana degenere a una diferencia de 1 s llena de ruido. `W_grade` default **15 m** (setting 10/15/20/30). **Nota (2026-07-21):** el default bajó de 20 a 15 m tras comparar con el nativo en device — a 15 m es ~25 % más reactivo con solo ~1,4× el ruido de 20 m (10 m era demasiado: ~2× el ruido, el EMA+histéresis no lo doman). El ruido de la pendiente lo domina el **barómetro** (numerador Δh, ~±0,4 m), no el GPS; el multi‑GNSS mejora Δd (denominador) y permite ventanas algo más cortas, pero no elimina el jitter del baro.
 - **Fallback de buffer corto:** si el buffer no abarca `W_grade`, usar la muestra más vieja disponible (ventana efectiva = `min(W_grade, span del buffer)`), siempre que pase la guarda de parado. Documentado: la ventana elegida es un máximo, no una promesa.
 - **Guarda de parado:** si `(d_now − d_ref) < 5 m` → no calcular → `--`.
 - **Fuera de rango = error de datos:** si `|grade| > 40 %` → mostrar **`--`** (NO el valor clavado en ±40: un valor fuera de rango es error de datos, y mostrarlo clavado presenta un error como lectura real).
@@ -185,6 +185,7 @@ Re-validar los umbrales en las 6 resoluciones en el simulador (como se hizo con 
 - **Labels: `FONT_GLANCE`, texto en MAYÚSCULAS**, reservando solo el `ascent` + margen (~4 px). ⚠️ **Salvedad verificada 2026-07-19:** la constante existe desde 3.1.8 y compila, pero el device profile del **edge830 no tiene glance font** (el 840 sí) → en el 830 cae a un fallback no documentado. **Verificar el render con el perfil edge830 en el simulador**; si se ve mal, fallback explícito a `FONT_XTINY`/`FONT_TINY` para el label en ese device.
 - **Centrado vertical (OBLIGATORIO — regla dura del repo, ver spec maestra §3.4):** las fuentes numéricas reservan descendente que los dígitos no usan → al centrar el valor, `cY += getFontDescent(font)/2`; a los labels reservarles **solo el `ascent` + margen** (~4 px); nudge fino de ~2 px validado a ojo contra campos nativos (en el 840 real). **Implementado en la View 2026-07-20** (FULL/HALF/SMALL; en HALF el valor se centra en la banda debajo del label). NO re-descubrir: ya estaba resuelto en la Opción A §6.7.
 - **Selección con caché (patrón A):** fuentes por slot elegidas midiendo **plantillas de ancho estable** (grade: `-88`; VAM: `-8888` métrico / `-88888` statute; par SMALL: `-88/-8888` o `-88/-88888`), recalculadas SOLO cuando cambia `(w, h, unidades)` — cero medición en el tick normal (SMALL mide sus 3 segmentos cortos por tick para centrar el `/`, despreciable).
+- **Pendiente y VAM en la MISMA fuente (2026-07-21, tras comparar con el nativo en device):** en FULL/HALF grade y VAM comparten UNA sola fuente (`selectSharedValueFont`) para que se vean del mismo tamaño; como el VAM tiene más dígitos, en HALF se le da la columna más ancha (`HALF_GRADE_PCT=44` → VAM 56 %) y la fuente compartida es la mayor que entra en ambas columnas. El **`%`** ya NO es `FONT_XTINY` fijo: se dibuja en una **fuente de TEXTO proporcional** al número (`PCT_NUM/PCT_DEN` = 2/3 de su altura, `mTextLadder`), así acompaña el tamaño del valor. A validar a ojo en device.
 
 ### 6.3 Zonas de color de pendiente
 
@@ -212,7 +213,7 @@ Mecanismo re-verificado 2026-07-19 para `datafield` en 3.3: `resources/settings/
 | Key | Tipo | Default | Valores | Por qué existe |
 |---|---|---|---|---|
 | `vamWindowSec` | number (list) | 10 | 5 / 10 / 30 | EL diferenciador vs la VAM nativa fija de 30 s |
-| `gradeWindowM` | number (list) | 20 | 10 / 20 / 30 | responsividad vs estabilidad en MTB |
+| `gradeWindowM` | number (list) | 15 | 10 / 15 / 20 / 30 | responsividad vs estabilidad en MTB (default bajado 20→15 el 2026-07-21) |
 | `primaryMetric` | number (list) | 0 | 0 = pendiente primero, 1 = VAM primero | orden del par `X/Y` en SMALL (repropuesto 2026-07-19: SMALL ahora muestra ambas) |
 | `colorZones` | boolean | true | on/off | gustos/contraste |
 

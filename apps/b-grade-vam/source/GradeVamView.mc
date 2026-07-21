@@ -35,6 +35,10 @@ class GradeVamView extends WatchUi.DataField {
     // tweak (validate on device). Labels reserve only their ascent + LABEL_MARGIN.
     private const VALUE_NUDGE = 2;       // px: raise the value a touch after the descent/2 drop
     private const GRADE_HYST_MARGIN = 0.5; // grade display hysteresis margin % (SPEC 5.2); tunable
+    private const PCT_NUM = 2;           // "%" suffix height ~= PCT_NUM/PCT_DEN of the value font
+    private const PCT_DEN = 3;
+    private const HALF_GRADE_PCT = 44;   // HALF: grade gets this % of the width, VAM the rest (wider,
+                                         // since VAM has more digits) so a shared font comes out equal
 
     private const BUFFER_CAPACITY = 64;  // ring buffer size (SPEC 5.1)
 
@@ -54,7 +58,7 @@ class GradeVamView extends WatchUi.DataField {
 
     // Non-null inline default (see the same pattern in GradeVamEngine); initialize() reconfigures
     // its windows from the stored settings via reloadSettings().
-    private var mEngine as GradeVamEngine = new GradeVamEngine(64, 20, 10);
+    private var mEngine as GradeVamEngine = new GradeVamEngine(64, 15, 10);
 
     // Cached settings (SPEC 7): read once in initialize(), reloaded in reloadSettings().
     // primaryMetric = which metric leads in the compact SMALL view: 0 = grade first, 1 = VAM first.
@@ -77,6 +81,8 @@ class GradeVamView extends WatchUi.DataField {
 
     // --- Number-font ladder, largest -> smallest (SPEC 6.2). System number fonts first. ---
     private var mLadder as Array<Graphics.FontType> = [];
+    // Text-font ladder for the "%" suffix (the number fonts have no "%" glyph). Largest -> smallest.
+    private var mTextLadder as Array<Graphics.FontType> = [];
 
     // --- Font selection cache: re-run only when the cell size or unit system changes. ---
     private var mCacheW as Number = -1;
@@ -98,7 +104,7 @@ class GradeVamView extends WatchUi.DataField {
     //     call site resolving. Flip to true + run a DEBUG build to drive the field without a
     //     FIT: a varied profile of climbs/descents up to +/-20 % (see nextSynthetic), with baro
     //     noise, to see all render modes and color zones. ---
-    private const TEST_MODE = false;
+    private const TEST_MODE = true;
     (:debug) private var mSynTick as Number = 0;
     (:debug) private var mSynT as Number = 0;
     (:debug) private var mSynD as Float = 0.0;
@@ -128,10 +134,18 @@ class GradeVamView extends WatchUi.DataField {
             Graphics.FONT_XTINY
         ];
 
+        mTextLadder = [
+            Graphics.FONT_LARGE,
+            Graphics.FONT_MEDIUM,
+            Graphics.FONT_SMALL,
+            Graphics.FONT_TINY,
+            Graphics.FONT_XTINY
+        ];
+
         mGradeLabel = (WatchUi.loadResource(Rez.Strings.GradeLabel) as String).toUpper();
         mVamLabelBase = (WatchUi.loadResource(Rez.Strings.VamLabel) as String).toUpper();
 
-        mEngine = new GradeVamEngine(BUFFER_CAPACITY, 20, 10);
+        mEngine = new GradeVamEngine(BUFFER_CAPACITY, 15, 10);
         reloadSettings();
     }
 
@@ -139,7 +153,7 @@ class GradeVamView extends WatchUi.DataField {
     // GradeVamApp.onSettingsChanged()). Never called per-tick (SPEC 7).
     function reloadSettings() as Void {
         var vamWindowSec = readNumber("vamWindowSec", 10);
-        var gradeWindowM = readNumber("gradeWindowM", 20);
+        var gradeWindowM = readNumber("gradeWindowM", 15);
         mGradeFirst = (readNumber("primaryMetric", 0) == 0);
         mColorZones = readBoolean("colorZones", true);
         mEngine.setWindows(gradeWindowM, vamWindowSec);
@@ -262,18 +276,17 @@ class GradeVamView extends WatchUi.DataField {
 
         if (h >= FULL_MIN_H) {
             mMode = MODE_FULL;
-            mPctFont = Graphics.FONT_TINY;
-            var pctWf = dc.getTextWidthInPixels("%", mPctFont) + PCT_GAP;
-            mGradeFont = fit(dc, GRADE_TPL, usableW - pctWf, (h * 40) / 100);
-            mVamFont   = fit(dc, vamTpl,    usableW, (h * 26) / 100);
-            mAuxFont   = Graphics.FONT_XTINY;
+            // Grade and VAM share one font so they render the SAME size (the wider VAM template is
+            // the binding constraint); the "%" is sized proportionally to it.
+            selectSharedValueFont(dc, usableW, usableW, vamTpl, (h * 32) / 100);
+            mAuxFont = Graphics.FONT_XTINY;
         } else if (h >= HALF_MIN_H) {
             mMode = MODE_HALF;
-            mPctFont = Graphics.FONT_XTINY;
-            var colW = w / 2 - 2 * PAD;
-            var pctWh = dc.getTextWidthInPixels("%", mPctFont) + PCT_GAP;
-            mGradeFont = fit(dc, GRADE_TPL, colW - pctWh, (h * 55) / 100);
-            mVamFont   = fit(dc, vamTpl,    colW, (h * 55) / 100);
+            // VAM gets the wider column (more digits), grade the narrower one; one shared font that
+            // fits BOTH -> equal size, as large as the columns allow.
+            var gradeColW = (w * HALF_GRADE_PCT) / 100 - 2 * PAD;
+            var vamColW   = (w * (100 - HALF_GRADE_PCT)) / 100 - 2 * PAD;
+            selectSharedValueFont(dc, gradeColW, vamColW, vamTpl, (h * 60) / 100);
         } else {
             mMode = MODE_SMALL;
             mPctFont = Graphics.FONT_XTINY;
@@ -308,6 +321,40 @@ class GradeVamView extends WatchUi.DataField {
         return Graphics.FONT_XTINY;
     }
 
+    // Picks ONE font for both the grade number and the VAM number so they render at the SAME size.
+    // A candidate passes only if the grade block (number + "%") fits gradeColW, the VAM template
+    // fits vamColW, and the height fits. The "%" font is chosen proportionally per candidate.
+    private function selectSharedValueFont(dc as Graphics.Dc, gradeColW as Number, vamColW as Number,
+                                           vamTpl as String, maxH as Number) as Void {
+        for (var i = 0; i < mLadder.size(); i++) {
+            var f = mLadder[i];
+            if (dc.getFontHeight(f) > maxH) { continue; }
+            var pf = pctFontFor(dc, dc.getFontHeight(f));
+            var gradeW = dc.getTextWidthInPixels(GRADE_TPL, f) + PCT_GAP + dc.getTextWidthInPixels("%", pf);
+            if (gradeW <= gradeColW && dc.getTextWidthInPixels(vamTpl, f) <= vamColW) {
+                mGradeFont = f;
+                mVamFont = f;
+                mPctFont = pf;
+                return;
+            }
+        }
+        mGradeFont = Graphics.FONT_XTINY;
+        mVamFont = Graphics.FONT_XTINY;
+        mPctFont = Graphics.FONT_XTINY;
+    }
+
+    // Largest text-ladder font no taller than PCT_NUM/PCT_DEN of the value-font height. Text fonts
+    // (not number fonts) because the number fonts lack the "%" glyph.
+    private function pctFontFor(dc as Graphics.Dc, valueH as Number) as Graphics.FontType {
+        var target = (valueH * PCT_NUM) / PCT_DEN;
+        for (var i = 0; i < mTextLadder.size(); i++) {
+            if (dc.getFontHeight(mTextLadder[i]) <= target) {
+                return mTextLadder[i];
+            }
+        }
+        return Graphics.FONT_XTINY;
+    }
+
     // --- Draw helpers. FULL/HALF values are CENTER|VCENTER justified so no per-tick width
     //     measuring is needed (the Dc centres internally). SMALL measures its short segments to
     //     place the "/" and colour the two numbers separately -- negligible, and only in SMALL.
@@ -330,20 +377,21 @@ class GradeVamView extends WatchUi.DataField {
     }
 
     private function drawHalf(dc as Graphics.Dc, w as Number, h as Number, fg as Number, gradeCol as Number) as Void {
-        var leftX = w / 4;
-        var rightX = (w * 3) / 4;
+        // Column centres: grade in the narrow left column, VAM in the wider right column.
+        var gradeCx = (w * HALF_GRADE_PCT) / 200;
+        var vamCx = (w * (100 + HALF_GRADE_PCT)) / 200;
         // Centre the value in the band BELOW the label (uses the bottom space instead of leaving
         // a gap), then nudge down by the font's descent/2 so the digits optically centre.
         var labelBandH = LABEL_MARGIN + Graphics.getFontAscent(Graphics.FONT_GLANCE);
         var baseCy = labelBandH + (h - labelBandH) / 2 - VALUE_NUDGE;
         dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(leftX, LABEL_MARGIN, Graphics.FONT_GLANCE, mGradeLabel, Graphics.TEXT_JUSTIFY_CENTER);
-        drawGradeBlock(dc, leftX - gradeBlockWidth(dc) / 2,
+        dc.drawText(gradeCx, LABEL_MARGIN, Graphics.FONT_GLANCE, mGradeLabel, Graphics.TEXT_JUSTIFY_CENTER);
+        drawGradeBlock(dc, gradeCx - gradeBlockWidth(dc) / 2,
                        baseCy + Graphics.getFontDescent(mGradeFont) / 2, gradeCol);
         dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(rightX, LABEL_MARGIN, Graphics.FONT_GLANCE, mVamLabelBase + " " + mVamUnit,
+        dc.drawText(vamCx, LABEL_MARGIN, Graphics.FONT_GLANCE, mVamLabelBase + " " + mVamUnit,
                     Graphics.TEXT_JUSTIFY_CENTER);
-        dc.drawText(rightX, baseCy + Graphics.getFontDescent(mVamFont) / 2, mVamFont, mVamStr,
+        dc.drawText(vamCx, baseCy + Graphics.getFontDescent(mVamFont) / 2, mVamFont, mVamStr,
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
