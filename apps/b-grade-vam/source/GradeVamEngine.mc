@@ -28,7 +28,8 @@ class GradeVamEngine {
     private const EMA_ALPHA = 0.4;
     private const MIN_SPAN_SAMPLES = 3;    // distance-window span floor (SPEC 5.2)
     private const VAM_STOP_MIN_D_M = 2.0;  // horizontal span below this in the VAM window -> 0
-    private const STOP_SPEED_MPS = 0.5;    // sustained speed below this -> VAM 0 (SPEC 5.3)
+    private const STOP_SPEED_MPS = 0.5;    // speed below this, SUSTAINED, -> VAM 0 (SPEC 5.3)
+    private const STOP_PERSIST_TICKS = 3;  // "sustained" = this many consecutive slow ticks (~3 s)
     private const VAM_MIN_DT_FLOOR_MS = 2000;
 
     // Non-null inline default (matches Option A's "always initialise members" discipline so it
@@ -48,6 +49,10 @@ class GradeVamEngine {
     private var mRaw2 as Float or Null = null;   // raw h before that  (t-2)
 
     private var mPrevState as Activity.TimerState or Null = null;
+
+    // Consecutive running ticks with speed < STOP_SPEED_MPS (the VAM stop guard's persistence
+    // state -- see the "sostenida" decision, SPEC 5.3 / 2026-07-21).
+    private var mSlowTicks as Number = 0;
 
     // Latest outputs (see freeze contract above).
     private var mGrade as Float or Null = null;
@@ -91,6 +96,18 @@ class GradeVamEngine {
             return;                     // frozen; keep last grade/VAM
         }
 
+        // 2b. Stop-speed persistence (SPEC 5.3 "sostenida", decided 2026-07-21): the VAM stop
+        //     guard fires only after STOP_PERSIST_TICKS consecutive slow ticks -- a single
+        //     one-second dip (trackstand over an obstacle, a speed glitch) must not flash the
+        //     VAM to 0 and back. A null speed cannot claim "slow" and resets the count.
+        if (speedMps != null && speedMps < STOP_SPEED_MPS) {
+            if (mSlowTicks < STOP_PERSIST_TICKS) {
+                mSlowTicks++;           // capped: no unbounded growth on a long stop
+            }
+        } else {
+            mSlowTicks = 0;
+        }
+
         // 3. Need a full, valid sample to push.
         if (tMs == null || dM == null || hM == null) {
             return;
@@ -130,12 +147,12 @@ class GradeVamEngine {
         mBuffer.push(tMs, dM, mEmaPrev);
 
         // 7. Recompute outputs.
-        recompute(speedMps);
+        recompute();
     }
 
     // Grade over the distance window, VAM over the time window. Only runs with >= 2 samples;
     // below that, the freeze contract leaves the last values untouched (see class header).
-    private function recompute(speedMps as Float or Null) as Void {
+    private function recompute() as Void {
         var n = mBuffer.size();
         if (n < 2) {
             return;
@@ -160,7 +177,7 @@ class GradeVamEngine {
             var dtT = tNow - mBuffer.tAt(vi);                 // Number (ms)
             var ddT = dNow - mBuffer.dAt(vi);
             var stopped = (ddT < VAM_STOP_MIN_D_M)
-                          || (speedMps != null && speedMps < STOP_SPEED_MPS);
+                          || (mSlowTicks >= STOP_PERSIST_TICKS);
             if (stopped && dtT > 0) {
                 mVam = 0.0;                                   // "stopped, not climbing" is valid
             } else {
@@ -180,6 +197,7 @@ class GradeVamEngine {
         mEmaPrev = null;
         mRaw1 = null;
         mRaw2 = null;
+        mSlowTicks = 0;   // stale pre-pause speed state must not zero the first fresh VAM
     }
 
     // Reset/OFF: everything above, plus the outputs return to null (display -> --).

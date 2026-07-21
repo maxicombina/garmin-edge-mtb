@@ -28,6 +28,7 @@ class GradeVamView extends WatchUi.DataField {
     private const FULL_MIN_H = 200;      // >= this: FULL (grade XL + VAM + ascent)
     private const HALF_MIN_H = 90;       // >= this: HALF (grade | VAM side by side); else SMALL
     private const LABEL_MARGIN = 4;      // px above a label
+    private const GRADE_ICON_GAP = 4;    // px between the grade ramp glyph and its label (FULL/HALF)
     private const SMALL_LABEL_MIN_H = 46; // in SMALL, show the "PEND/VAM" header only if this tall
     private const PCT_GAP = 1;           // px between the grade number and its "%" suffix
     // Vertical-centering trick (master spec 3.4, Option A 6.7): number fonts reserve descent the
@@ -104,11 +105,12 @@ class GradeVamView extends WatchUi.DataField {
     //     call site resolving. Flip to true + run a DEBUG build to drive the field without a
     //     FIT: a varied profile of climbs/descents up to +/-20 % (see nextSynthetic), with baro
     //     noise, to see all render modes and color zones. ---
-    private const TEST_MODE = true;
+    private const TEST_MODE = false;
     (:debug) private var mSynTick as Number = 0;
     (:debug) private var mSynT as Number = 0;
     (:debug) private var mSynD as Float = 0.0;
     (:debug) private var mSynH as Float = 1000.0;
+    (:debug) private var mSynAscent as Float = 0.0;   // true cumulative ascent (only climbs add)
 
     // --- Simulator measurement hook (SPEC 9, same as Option A §11.1/§13). Flip DEBUG_MEASURE to
     //     true + run a DEBUG build to print each distinct cell size, the chosen render mode, and
@@ -196,7 +198,7 @@ class GradeVamView extends WatchUi.DataField {
             d = syn[2];
             h = syn[3];
             speed = syn[4];
-            ascent = syn[5];   // fake cumulative gain, for the aux line
+            ascent = syn[5];   // synthetic cumulative ascent (monotonic), for the aux line
         } else {
             state = (info has :timerState) ? info.timerState : null;
             t = (info has :timerTime) ? info.timerTime : null;
@@ -272,14 +274,13 @@ class GradeVamView extends WatchUi.DataField {
     private function selectFonts(dc as Graphics.Dc, w as Number, h as Number) as Void {
         var usableW = w - 2 * PAD;
         var vamTpl = mIsStatute ? VAM_TPL_STATUTE : VAM_TPL_METRIC;
-        var smallTpl = GRADE_TPL + SMALL_SEP + vamTpl;   // "-88/-8888" or "-88/-88888"
 
         if (h >= FULL_MIN_H) {
             mMode = MODE_FULL;
             // Grade and VAM share one font so they render the SAME size (the wider VAM template is
             // the binding constraint); the "%" is sized proportionally to it.
             selectSharedValueFont(dc, usableW, usableW, vamTpl, (h * 32) / 100);
-            mAuxFont = Graphics.FONT_XTINY;
+            mAuxFont = auxFontFor(dc, usableW, h);
         } else if (h >= HALF_MIN_H) {
             mMode = MODE_HALF;
             // VAM gets the wider column (more digits), grade the narrower one; one shared font that
@@ -289,7 +290,6 @@ class GradeVamView extends WatchUi.DataField {
             selectSharedValueFont(dc, gradeColW, vamColW, vamTpl, (h * 60) / 100);
         } else {
             mMode = MODE_SMALL;
-            mPctFont = Graphics.FONT_XTINY;
             // Both metrics as "grade/VAM". Show a small header (order-aware: "PEND/VAM" or
             // "VAM/PEND") only if the cell is tall enough AND the header fits the width -- so it
             // appears on roomier small cells and is dropped on the very short/dense ones. The
@@ -303,10 +303,30 @@ class GradeVamView extends WatchUi.DataField {
             // Reserve LABEL_MARGIN (top gap, like A's 4 px) + ascent + a little breathing room,
             // so the header is NOT glued to the ceiling and the value clears it below.
             mSmallLabelH = mSmallLabelShow ? (LABEL_MARGIN + hdrAscent + 2) : 0;
-            var valueH = h - mSmallLabelH;
-            var pctWs = dc.getTextWidthInPixels("%", mPctFont) + PCT_GAP;
-            mGradeFont = fit(dc, smallTpl, usableW - pctWs, (valueH * 88) / 100);
-            mVamFont = mGradeFont;
+            var maxH = ((h - mSmallLabelH) * 88) / 100;
+            // Pick the largest value font whose WHOLE group fits usableW: "-88" + "%" + "/" +
+            // VAM template. The "%" is PROPORTIONAL to the value font (2/3, like FULL/HALF) --
+            // NOT a fixed XTINY, which looked tiny beside a big number in wide SMALL cells. Same
+            // iterate-the-ladder shape as selectSharedValueFont. (The ramp is a LABEL glyph: it
+            // rides on the "PEND/VAM" header, NOT in this value group.)
+            mGradeFont = Graphics.FONT_XTINY;
+            mVamFont = Graphics.FONT_XTINY;
+            mPctFont = Graphics.FONT_XTINY;
+            for (var i = 0; i < mLadder.size(); i++) {
+                var f = mLadder[i];
+                if (dc.getFontHeight(f) > maxH) { continue; }
+                var pf = pctFontFor(dc, dc.getFontHeight(f));
+                var groupW = dc.getTextWidthInPixels(GRADE_TPL, f)
+                             + PCT_GAP + dc.getTextWidthInPixels("%", pf)
+                             + dc.getTextWidthInPixels(SMALL_SEP, f)
+                             + dc.getTextWidthInPixels(vamTpl, f);
+                if (groupW <= usableW) {
+                    mGradeFont = f;
+                    mVamFont = f;
+                    mPctFont = pf;
+                    break;
+                }
+            }
         }
     }
 
@@ -343,6 +363,25 @@ class GradeVamView extends WatchUi.DataField {
         mPctFont = Graphics.FONT_XTINY;
     }
 
+    // FULL-mode aux-line font. It was a fixed FONT_XTINY, which was near-unreadable on a
+    // full-screen cell (and the primitive up-arrow, sized off its ascent, degenerated). Pick the
+    // largest text font that fits the band left BELOW the VAM value -- the VAM stays put at 70% h,
+    // so growing the aux line never moves the other two metrics. Width check includes the arrow.
+    private function auxFontFor(dc as Graphics.Dc, usableW as Number, h as Number) as Graphics.FontType {
+        var vamBottom = (h * 70) / 100 + dc.getFontHeight(mVamFont) / 2;
+        var bandH = h - vamBottom;
+        var tpl = mIsStatute ? "88888 ft" : "8888 m";
+        for (var i = 0; i < mTextLadder.size(); i++) {
+            var f = mTextLadder[i];
+            var ah = (Graphics.getFontAscent(f) * 4) / 5;   // arrow height, as drawAscentAux sizes it
+            var groupW = (ah * 3) / 5 + GRADE_ICON_GAP + dc.getTextWidthInPixels(tpl, f);
+            if (dc.getFontHeight(f) <= (bandH * 85) / 100 && groupW <= usableW) {
+                return f;
+            }
+        }
+        return Graphics.FONT_XTINY;
+    }
+
     // Largest text-ladder font no taller than PCT_NUM/PCT_DEN of the value-font height. Text fonts
     // (not number fonts) because the number fonts lack the "%" glyph.
     private function pctFontFor(dc as Graphics.Dc, valueH as Number) as Graphics.FontType {
@@ -363,8 +402,7 @@ class GradeVamView extends WatchUi.DataField {
         var cx = w / 2;
         // Number fonts reserve descent the digits don't use -> nudge each value DOWN by
         // descent/2 so the digits optically centre instead of floating high (SPEC 6.2, like A).
-        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, LABEL_MARGIN, Graphics.FONT_GLANCE, mGradeLabel, Graphics.TEXT_JUSTIFY_CENTER);
+        drawLabelWithRamp(dc, cx, w - 2 * PAD, fg, mGradeLabel, Graphics.FONT_GLANCE);
         drawGradeBlock(dc, cx - gradeBlockWidth(dc) / 2,
                        (h * 28) / 100 + Graphics.getFontDescent(mGradeFont) / 2 - VALUE_NUDGE, gradeCol);
         dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
@@ -372,8 +410,10 @@ class GradeVamView extends WatchUi.DataField {
                     Graphics.TEXT_JUSTIFY_CENTER);
         dc.drawText(cx, (h * 70) / 100 + Graphics.getFontDescent(mVamFont) / 2 - VALUE_NUDGE, mVamFont, mVamStr,
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(cx, (h * 92) / 100 + Graphics.getFontDescent(mAuxFont) / 2, mAuxFont, mAuxStr,
-                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        // Aux line: centred in the band left below the VAM value (not a fixed 92% -- its font now
+        // grows to fill this band, see auxFontFor, so centre within it to neither clip nor overlap).
+        var auxTop = (h * 70) / 100 + dc.getFontHeight(mVamFont) / 2;
+        drawAscentAux(dc, cx, auxTop + (h - auxTop) / 2 + Graphics.getFontDescent(mAuxFont) / 2, fg);
     }
 
     private function drawHalf(dc as Graphics.Dc, w as Number, h as Number, fg as Number, gradeCol as Number) as Void {
@@ -384,8 +424,7 @@ class GradeVamView extends WatchUi.DataField {
         // a gap), then nudge down by the font's descent/2 so the digits optically centre.
         var labelBandH = LABEL_MARGIN + Graphics.getFontAscent(Graphics.FONT_GLANCE);
         var baseCy = labelBandH + (h - labelBandH) / 2 - VALUE_NUDGE;
-        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(gradeCx, LABEL_MARGIN, Graphics.FONT_GLANCE, mGradeLabel, Graphics.TEXT_JUSTIFY_CENTER);
+        drawLabelWithRamp(dc, gradeCx, (w * HALF_GRADE_PCT) / 100 - 2 * PAD, fg, mGradeLabel, Graphics.FONT_GLANCE);
         drawGradeBlock(dc, gradeCx - gradeBlockWidth(dc) / 2,
                        baseCy + Graphics.getFontDescent(mGradeFont) / 2, gradeCol);
         dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
@@ -400,15 +439,18 @@ class GradeVamView extends WatchUi.DataField {
     private function drawSmall(dc as Graphics.Dc, w as Number, h as Number, fg as Number, gradeCol as Number) as Void {
         // Optional header on top; the value is centred in whatever height is left below it.
         // Drawn at LABEL_MARGIN (not 0) so it leaves air above, matching Option A.
+        // The ramp is a LABEL decoration -> it rides with the header (never the value). When the
+        // header is shown it gets the ramp; on cells too short for a header there is no ramp
+        // (there is no label to attach it to).
         if (mSmallLabelShow) {
-            dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(w / 2, LABEL_MARGIN, Graphics.FONT_XTINY, mSmallLabel, Graphics.TEXT_JUSTIFY_CENTER);
+            drawLabelWithRamp(dc, w / 2, w - 2 * PAD, fg, mSmallLabel, Graphics.FONT_XTINY);
         }
         // Centre in the band below the (optional) header, nudged by descent/2 to optically
         // centre the digits (both numbers share mGradeFont in SMALL).
         var cy = mSmallLabelH + (h - mSmallLabelH) / 2 + Graphics.getFontDescent(mGradeFont) / 2 - VALUE_NUDGE;
         var f = mGradeFont;
-        // The grade block carries its own "%"; VAM is a plain number. Center the whole group.
+        // Group = gradeBlock("-88%") + "/" + VAM, centred. NO ramp here -- the ramp is a label
+        // glyph and lives on the header only (drawn above).
         var wGrade = gradeBlockWidth(dc);
         var wSep = dc.getTextWidthInPixels(SMALL_SEP, f);
         var wVam = dc.getTextWidthInPixels(mVamStr, f);
@@ -426,6 +468,79 @@ class GradeVamView extends WatchUi.DataField {
             dc.drawText(x + wVam, cy, f, SMALL_SEP, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
             drawGradeBlock(dc, x + wVam + wSep, cy, gradeCol);
         }
+    }
+
+    // Draws the grade label with a small uphill-ramp glyph to its left, like the native PENDIENTE
+    // field. The whole [ramp + gap + label] group is centred at cx; if it would overflow availW
+    // (a narrow column) the ramp is dropped and the label is centred alone (same graceful fallback
+    // as Option A's inline icon, SPEC 8). Colour is the current foreground the caller set (dimmed
+    // on pause): the ramp is a label decoration, not data, so it does NOT carry the zone colour.
+    // Draws `labelText` in `font` with a small uphill-ramp glyph ("◢", the native grade marker) to
+    // its LEFT, the whole [ramp + gap + label] group centred at cx. If it would overflow availW
+    // (a narrow column) the ramp is dropped and the label is centred alone (graceful fallback,
+    // like Option A's inline icon, SPEC 8). Colour is the current foreground the caller set (dimmed
+    // on pause): the ramp is a LABEL decoration, not data -- it never carries the zone colour and
+    // NEVER sits next to the value, only next to a label (the grade label in FULL/HALF, the
+    // "PEND/VAM" header in SMALL). Ramp size scales with `font` (4/5 of its ascent). Geometry is
+    // cheap and recomputed per draw; unlike A there is no per-second churn worth caching (one label).
+    private function drawLabelWithRamp(dc as Graphics.Dc, cx as Number, availW as Number, fg as Number,
+                                       labelText as String, font as Graphics.FontType) as Void {
+        var ascent = Graphics.getFontAscent(font);
+        var iconD = (ascent * 4) / 5;   // ramp bounding-box side, a touch under the text height (like A)
+        var labelW = dc.getTextWidthInPixels(labelText, font);
+        var groupW = iconD + GRADE_ICON_GAP + labelW;
+        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
+        if (iconD >= 5 && groupW <= availW) {
+            var leftX = cx - groupW / 2;
+            drawGradeRamp(dc, leftX, LABEL_MARGIN + ascent / 2, iconD);
+            dc.drawText(leftX + iconD + GRADE_ICON_GAP, LABEL_MARGIN, font, labelText,
+                        Graphics.TEXT_JUSTIFY_LEFT);
+        } else {
+            dc.drawText(cx, LABEL_MARGIN, font, labelText, Graphics.TEXT_JUSTIFY_CENTER);
+        }
+    }
+
+    // Small filled uphill ramp (lower-right triangle "◢", like the native grade glyph): flat
+    // bottom, vertical right side, hypotenuse rising left->right = "climb". (x0, cyMid) is the
+    // group's left edge and vertical centre; d is the bounding-box side. Paints in the colour the
+    // caller already set. fillPolygon ignores pen width, so nothing to restore for later text.
+    private function drawGradeRamp(dc as Graphics.Dc, x0 as Number, cyMid as Number, d as Number) as Void {
+        var top = cyMid - d / 2;
+        var bot = cyMid + d / 2;
+        dc.fillPolygon([[x0, bot], [x0 + d, bot], [x0 + d, top]]);
+    }
+
+    // FULL-mode aux line: the total activity ascent with an up-arrow to its left, like the native
+    // ascent field ("^ 321 m"). Group [arrow + gap + "NNN m"] centred at cx, vertically centred on
+    // cy. The arrow is drawn from primitives (filled head + stem), NOT a font glyph -- the text
+    // fonts' arrow-glyph coverage is not guaranteed across the 13 devices (same caution as the "%"
+    // not existing in the number fonts). Colour = the foreground the caller set (dimmed on pause).
+    private function drawAscentAux(dc as Graphics.Dc, cx as Number, cy as Number, fg as Number) as Void {
+        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
+        var ah = (Graphics.getFontAscent(mAuxFont) * 4) / 5;   // arrow height, a touch under the text
+        var aw = (ah * 3) / 5;                                 // footprint (an arrow is taller than wide)
+        var textW = dc.getTextWidthInPixels(mAuxStr, mAuxFont);
+        var leftX = cx - (aw + GRADE_ICON_GAP + textW) / 2;
+        // The text is VCENTREd on its full box, whose descent the glyphs don't use -> the VISIBLE
+        // text sits descent/2 above cy. Centre the arrow on the visible glyphs, not the box, then
+        // give 2 px back down -- the raw descent/2 overshot a touch (both tweaks validated by eye
+        // against the "m", author feedback 2026-07-21; same fine-nudge idiom as VALUE_NUDGE).
+        drawUpArrow(dc, leftX, cy - Graphics.getFontDescent(mAuxFont) / 2 + 2, aw, ah);
+        dc.drawText(leftX + aw + GRADE_ICON_GAP, cy, mAuxFont, mAuxStr,
+                    Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
+    // Small solid up-arrow (filled triangular head + rectangular stem), occupying [x0, x0+w]
+    // horizontally and centred vertically on cyMid with height h. Paints in the colour the caller
+    // set; fill ops ignore pen width, so there is nothing to restore for later text.
+    private function drawUpArrow(dc as Graphics.Dc, x0 as Number, cyMid as Number, w as Number, h as Number) as Void {
+        var top = cyMid - h / 2;
+        var headH = (h * 55) / 100;
+        var headBase = top + headH;
+        dc.fillPolygon([[x0 + w / 2, top], [x0, headBase], [x0 + w, headBase]]);
+        var stemW = w / 3;
+        if (stemW < 2) { stemW = 2; }
+        dc.fillRectangle(x0 + w / 2 - stemW / 2, headBase, stemW, h - headH);
     }
 
     // Width of the grade "number%" block in the current fonts (for centring). No "%" for "--".
@@ -499,8 +614,12 @@ class GradeVamView extends WatchUi.DataField {
         mSynT += 1000;
         mSynD += speedMps;
         mSynH += dh + noise;
+        // True cumulative ascent (monotonic): only positive climb steps add, like the device's
+        // totalAscent -- never the net altitude delta, which would dip negative on descents and
+        // make the "^" aux line nonsensical. Ignores baro noise (deterministic climb only).
+        if (dh > 0) { mSynAscent += dh; }
         mSynTick++;
-        return [Activity.TIMER_STATE_ON, mSynT, mSynD, mSynH, speedMps, mSynH - 1000.0];
+        return [Activity.TIMER_STATE_ON, mSynT, mSynD, mSynH, speedMps, mSynAscent];
     }
 
     // Release stub: never called (TEST_MODE is const false -> the call site is eliminated).

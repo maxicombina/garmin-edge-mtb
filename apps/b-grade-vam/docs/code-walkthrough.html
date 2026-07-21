@@ -167,8 +167,8 @@
     </div>
     <div class="screen" aria-hidden="true">
       <div class="cell">
-        <span class="lbl">Grade</span>
-        <span class="val grade">7%</span>
+        <span class="lbl">◢ Grade</span>
+        <span class="val grade">7<span style="font-size:60%">%</span></span>
       </div>
       <div class="cell">
         <span class="lbl">VAM m/h</span>
@@ -196,9 +196,10 @@
           <p>Pendiente + VAM en un solo campo. En nativo son dos celdas separadas.</p>
         </div>
         <div class="card">
-          <h3>Ventana configurable</h3>
+          <h3>Ventanas configurables</h3>
           <p>La VAM nativa es una media fija de 30&nbsp;s. Acá elegís 5&nbsp;/&nbsp;10&nbsp;/&nbsp;30&nbsp;s
-             según lo reactiva que la quieras.</p>
+             para la VAM y 10&nbsp;/&nbsp;15&nbsp;/&nbsp;20&nbsp;/&nbsp;30&nbsp;m para la pendiente,
+             según lo reactivas que las quieras.</p>
         </div>
         <div class="card">
           <h3>Zonas de color</h3>
@@ -236,7 +237,8 @@
         <div class="mod"><span class="name">EngineState</span><span class="pure">puro</span>
           <div class="role">Transiciones del timer → acción; gate de muestreo.</div></div>
         <div class="mod"><span class="name">Units</span><span class="pure">puro</span>
-          <div class="role">Conversión ft/h + strings (signo, redondeo, <code>--</code>).</div></div>
+          <div class="role">Conversión ft/h, strings (signo, redondeo, <code>--</code>) y la
+          histéresis <code>holdGrade</code>.</div></div>
         <div class="mod"><span class="name">GradeVamEngine</span><span class="pure">puro</span>
           <div class="role">Orquestador: junta todo lo anterior en un <code>update()</code>.</div></div>
         <div class="mod"><span class="name">GradeVamView</span>
@@ -291,14 +293,17 @@
         <div class="card">
           <span class="tag">RefSelect</span>
           <h3>Ventana de pendiente híbrida</h3>
-          <p>Por distancia (20&nbsp;m), pero con piso de 3 muestras. En un descenso a 40&nbsp;km/h,
-             una ventana pura de distancia degeneraría a una diferencia de 1&nbsp;segundo, pura ruido.</p>
+          <p>Por distancia (15&nbsp;m por defecto; 10/15/20/30 en el setting), pero con piso de
+             3 muestras. En un descenso a 40&nbsp;km/h, una ventana pura de distancia degeneraría
+             a una diferencia de 1&nbsp;segundo, pura ruido.</p>
         </div>
         <div class="card">
           <span class="tag">VamMath</span>
           <h3>Guardas antes de dividir</h3>
           <p>Monkey&nbsp;C tira error de runtime al dividir por cero. Se exige Δt&nbsp;≥&nbsp;max(2&nbsp;s, W/2)
-             y ≥&nbsp;2 muestras <em>antes</em> de la división. Parado → <code>0</code> (dato válido), no ruido.</p>
+             y ≥&nbsp;2 muestras <em>antes</em> de la división. Parado → <code>0</code> (dato válido), no ruido —
+             y el 0 por velocidad exige <strong>3 ticks seguidos</strong> por debajo de 0,5&nbsp;m/s: una
+             trabada de 1&nbsp;s sobre un obstáculo no parpadea la VAM.</p>
         </div>
         <div class="card">
           <span class="tag">GradeMath</span>
@@ -341,12 +346,72 @@
       </p>
       <p style="margin-top:14px">
         Y en un campo <strong>chico</strong>, en vez de elegir una sola métrica, se muestran las dos
-        juntas y compactas — <code>7%/560</code> — con la pendiente en su color de zona. Si la celda
-        tiene alto suficiente, aparece además un rótulo <code>PEND/VAM</code> arriba; si es muy chata,
-        se omite y el número usa todo el espacio (el campo lo decide midiendo, no se asume). La VAM
-        sigue las unidades del device — <strong>m/h</strong> en métrico, <strong>ft/h</strong> en
-        imperial — igual que el campo VAM nativo de Garmin.
+        juntas y compactas — <code>7%/560</code> — con la pendiente en su color de zona. El setting
+        <code>primaryMetric</code> ya no elige "cuál mostrar" sino <strong>cuál va primero</strong>
+        en el par. Si la celda tiene alto suficiente (≥&nbsp;46&nbsp;px y el rótulo entra a lo ancho),
+        aparece además un header <code>PEND/VAM</code> (o <code>VAM/PEND</code>, según el orden) arriba,
+        con la rampa ◢ al lado; si es muy chata, se omite y el número usa todo el espacio (el campo lo
+        decide midiendo, no se asume). La VAM sigue las unidades del device — <strong>m/h</strong> en
+        métrico, <strong>ft/h</strong> en imperial — igual que el campo VAM nativo de Garmin.
       </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>El render: tres modos, una sola fuente</h2>
+      <p>
+        La View elige el modo midiendo la celda: <strong>FULL</strong> (alto ≥&nbsp;200&nbsp;px:
+        pendiente XL + VAM + ascenso total), <strong>HALF</strong> (≥&nbsp;90&nbsp;px: pendiente y
+        VAM lado a lado) o <strong>SMALL</strong> (el par compacto <code>7%/560</code>). Y la fuente
+        no se elige midiendo el valor de turno sino <strong>plantillas de ancho estable</strong>
+        (<code>"-88"</code> para la pendiente; <code>"-8888"</code> para la VAM en m/h,
+        <code>"-88888"</code> — 6 glifos — en ft/h). La selección está <strong>cacheada</strong>: solo
+        se re-mide si cambia el tamaño de la celda o el sistema de unidades — que se relee cada
+        segundo, porque cambiar las unidades del device <em>no</em> dispara <code>onSettingsChanged</code>.
+      </p>
+      <div class="cards">
+        <div class="card">
+          <span class="tag">selectSharedValueFont</span>
+          <h3>Una fuente para las dos</h3>
+          <p>Pendiente y VAM comparten <strong>una</strong> fuente → mismo tamaño (antes la VAM salía
+             más chica porque su plantilla es más ancha). En HALF la VAM se lleva la columna ancha
+             (<code>HALF_GRADE_PCT=44</code> → 44/56) para que la fuente compartida salga grande.</p>
+        </div>
+        <div class="card">
+          <span class="tag">pctFontFor</span>
+          <h3>El <code>%</code> es otro dibujo</h3>
+          <p>Las fuentes numéricas del sistema <strong>no tienen el glifo <code>%</code></strong>: se
+             dibuja aparte, en fuente de TEXTO, como sufijo del número — y <strong>proporcional</strong>
+             (≈&nbsp;2/3 del alto del valor, sobre <code>mTextLadder</code>), no un XTINY fijo que
+             quedaba diminuto al lado de un número grande.</p>
+        </div>
+        <div class="card">
+          <span class="tag">drawLabelWithRamp</span>
+          <h3>La rampa ◢ vive en el label</h3>
+          <p>Un triángulo relleno con primitivas <code>dc</code> (como el glifo del campo nativo),
+             junto al label de pendiente en FULL/HALF y al header <code>PEND/VAM</code> en SMALL.
+             <strong>Nunca junto al valor</strong>, nunca con color de zona; si no entra en el ancho,
+             se omite con gracia.</p>
+        </div>
+        <div class="card">
+          <span class="tag">drawAscentAux</span>
+          <h3>Ascenso con flecha</h3>
+          <p>La línea auxiliar de FULL es el <code>totalAscent</code> con una flecha ↑ de primitivas
+             (cabeza + tallo) — estilo <code>^ 321 m</code> — porque la cobertura del glifo de flecha
+             no está garantizada en los 13 devices. En imperial se convierte a ft. Su fuente
+             <strong>crece hasta llenar la banda libre debajo de la VAM</strong> (<code>auxFontFor</code>;
+             la VAM no se mueve del 70&nbsp;% del alto), y la flecha se alinea con los glifos
+             <em>visibles</em> del texto: <code>cy − descent/2 + 2&nbsp;px</code>, afinado a ojo.</p>
+        </div>
+        <div class="card">
+          <span class="tag">descent/2</span>
+          <h3>Centrado óptico</h3>
+          <p>Las fuentes numéricas reservan un descendente que los dígitos no usan: cada valor baja
+             <code>getFontDescent(font)/2</code> (menos un nudge de 2&nbsp;px) y los labels reservan
+             solo su <code>ascent</code> + margen. Regla dura heredada de la Opción A.</p>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -357,7 +422,7 @@
         Criterio de aceptación del repo: <strong>los unit tests en verde antes de la validación visual</strong>.
         Cada módulo puro tiene su <code>*Test.mc</code> con <code>(:test)</code> de <code>Toybox.Test</code>,
         que el compilador saca del release (costo cero contra los 128&nbsp;KB). Se corren con
-        “Monkey&nbsp;C: Run Tests”, perfil edge840 — <strong>y ya corrieron: 41&nbsp;tests, 41&nbsp;PASS,
+        “Monkey&nbsp;C: Run Tests”, perfil edge840 — <strong>y ya corrieron: 43&nbsp;tests, 43&nbsp;PASS,
         0&nbsp;fallos</strong> (compilando y ejecutando en el simulador, no solo revisando el código).
       </p>
       <div class="tblwrap">
@@ -366,12 +431,12 @@
           <tbody>
             <tr><td><code>GradeMath</code></td><td>subida/descenso; guarda &lt;5&nbsp;m (5,0 exacto calcula); 40,0 exacto no se descarta; Δd≤0 → null sin dividir.</td></tr>
             <tr><td><code>VamMath</code></td><td>1&nbsp;m/10&nbsp;s → 360; Δt=0 → null (nunca Infinity); usa el Δt real; llano → 0 (no null); clamp 5000.</td></tr>
-            <tr><td><code>AltFilter</code></td><td>4,9 acepta, 5,0 acepta, 5,1 rechaza; el pico se compara contra la última <em>buena</em>; 3 rechazos → reseed.</td></tr>
+            <tr><td><code>AltFilter</code></td><td>4,9 acepta, 5,0 acepta, 5,1 rechaza; el pico se compara contra la última <em>buena</em>; 3 rechazos → reseed; mediana-3 y EMA.</td></tr>
             <tr><td><code>SampleBuffer</code></td><td>integridad de la terna t/d/h; wraparound con cap 4 y con cap 64; <code>clear()</code>.</td></tr>
             <tr><td><code>RefSelect</code></td><td>con velocidad variable, distancia y tiempo eligen índices <em>distintos</em>; piso de span; borde inclusivo.</td></tr>
             <tr><td><code>EngineState</code></td><td>tabla completa de transiciones; <code>shouldPush</code> solo en <code>ON</code>.</td></tr>
             <tr><td><code>Units</code></td><td>VAM sigue el device (m/h · ft/h ×3,281); grade sin <code>+</code> (<code>7</code>, <code>-8</code>, <code>0</code>, <code>--</code>, half-away-from-zero); histéresis <code>holdGrade</code>; el <code>%</code> lo dibuja la View aparte.</td></tr>
-            <tr><td><code>GradeVamEngine</code></td><td>cold start; guardas independientes; input null; PAUSED no pushea; <em>el asesino de picos</em>; 7% constante → 7±1.</td></tr>
+            <tr><td><code>GradeVamEngine</code></td><td>cold start; guardas independientes; input null; PAUSED no pushea; el resume <em>vacía</em> el buffer (mata el pico fabricado de la pausa); el 0 de parado exige <em>3 ticks</em> de velocidad baja (1–2 no parpadean); reset limpia todo; 7% constante → 7±1.</td></tr>
           </tbody>
         </table>
       </div>
@@ -390,14 +455,20 @@
       <h2>Depurar sin salir a andar</h2>
       <p>
         Con <code>TEST_MODE = true</code> en un build de debug, <code>compute()</code> ignora el sensor y
-        consume un generador sintético: subida 7% → descenso −10% → llano, con ruido barométrico. Alcanza
-        para ver los 3 modos de render, las zonas de color, la VAM negativa y el warm-up sin FIT ni device.
+        consume un generador sintético que camina una <strong>tabla de tramos</strong> — llanos, subidas
+        hasta +20&nbsp;% y descensos hasta −20&nbsp;%, barriendo todas las zonas de color — con ruido
+        barométrico uniforme de ±0,4&nbsp;m. El ascenso acumulado sintético (<code>mSynAscent</code>) es
+        <strong>monotónico</strong>: solo suman los pasos que suben, como el <code>totalAscent</code> real
+        (el delta neto de altitud bajaría en los descensos y la línea <code>^</code> no tendría sentido).
+        Alcanza para ver los 3 modos de render, las zonas, la VAM negativa y el warm-up sin FIT ni device.
+        (En el repo el flag vive en <code>false</code>; se pone en <code>true</code> solo mientras
+        se depura, y nunca llega a un release.)
       </p>
       <p>
         La clave está en que <strong>no deje rastro en el release</strong> — el mismo esquema que la Opción A:
       </p>
-      <pre class="code"><span class="cm">// const PLANO false: el optimizador -r elimina el bloque entero, llamada incluida.</span>
-<span class="k">private const</span> TEST_MODE = <span class="k">false</span>;
+      <pre class="code"><span class="cm">// const PLANO: con false, el optimizador -r elimina el bloque entero, llamada incluida.</span>
+<span class="k">private const</span> TEST_MODE = <span class="k">false</span>;   <span class="cm">// true solo mientras depurás; false en el repo</span>
 
 <span class="k">if</span> (TEST_MODE) {           <span class="cm">// se borra en release</span>
     <span class="k">var</span> syn = nextSynthetic();   <span class="cm">// (:debug) real / (:release) stub vacío</span>
@@ -415,23 +486,20 @@
   <section>
     <div class="wrap">
       <h2>Qué falta</h2>
+      <p>Los unit tests ya están en verde (42/42) y los builds de test y release compilan limpios. Queda:</p>
       <div class="cards">
         <div class="card">
-          <h3>1 · Tests en verde</h3>
-          <p>“Monkey&nbsp;C: Run Tests” (edge840). Los §10 deben pasar antes de mirar nada en pantalla.</p>
+          <h3>1 · Render en simulador — en curso</h3>
+          <p>F5 con <code>TEST_MODE = true</code>; afinar los 3 modos en las 6 resoluciones usando el
+             hook <code>DEBUG_MEASURE</code>, como se hizo con la A.</p>
         </div>
         <div class="card">
-          <h3>2 · Render en simulador</h3>
-          <p>F5 con <code>TEST_MODE</code>; afinar los umbrales de los 3 modos en las 6 resoluciones,
-             como se hizo con la A.</p>
-        </div>
-        <div class="card">
-          <h3>3 · Íconos reales</h3>
+          <h3>2 · Íconos reales</h3>
           <p>Los launcher actuales son placeholder (el cronómetro de la A). Rediseñar con motivo de
              pendiente/VAM en Pillow.</p>
         </div>
         <div class="card">
-          <h3>4 · Validación en device</h3>
+          <h3>3 · Validación en device</h3>
           <p>FIT real con subida/bajada conocidas; cruzar contra la “30s&nbsp;VAM” nativa; probar el escalón
              de presión y una salida &gt;5&nbsp;h.</p>
         </div>

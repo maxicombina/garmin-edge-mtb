@@ -111,6 +111,43 @@ function testEngineResetClears(logger as Test.Logger) as Boolean {
     return true;
 }
 
+// --- VAM stop guard persistence (SPEC 5.3 "sostenida", decided 2026-07-21): a 1-2 tick speed
+//     dip (trackstand, glitch) must NOT flash the VAM to 0; the 3rd consecutive slow tick zeroes
+//     it; a fast tick resets the count. Distance keeps advancing throughout so the ddT < 2 m
+//     branch never fires and the speed branch is exercised in isolation. ---
+(:test)
+function testEngineSpeedStopPersistence(logger as Test.Logger) as Boolean {
+    var e = makeEngine();
+    // Warm-up: 12 s climbing at 2 m/s (+0.14 m/s), well past the 5000 ms minDt.
+    var i = 0;
+    for (i = 0; i <= 12; i++) {
+        e.update(Activity.TIMER_STATE_ON, i * 1000, i * 2.0, 100.0 + i * 0.14, 2.0);
+    }
+    var v = e.vamMh();
+    Test.assertMessage(v != null && v > 0, "VAM positive after warm-up");
+
+    // Slow ticks 1 and 2 (speed 0.2 < 0.5, distance still advancing): VAM must NOT drop to 0.
+    for (var k = 0; k < 2; k++) {
+        e.update(Activity.TIMER_STATE_ON, i * 1000, i * 2.0, 100.0 + i * 0.14, 0.2);
+        i++;
+        v = e.vamMh();
+        Test.assertMessage(v != null && v > 0, "slow tick " + (k + 1) + " of 2: VAM still positive");
+    }
+
+    // 3rd consecutive slow tick: now it is "sustained" -> VAM 0.
+    e.update(Activity.TIMER_STATE_ON, i * 1000, i * 2.0, 100.0 + i * 0.14, 0.2);
+    i++;
+    v = e.vamMh();
+    Test.assertMessage(v != null, "sustained stop: VAM is 0, not null");
+    TestUtil.assertNear(v, 0.0, 0.001, "sustained stop -> VAM 0");
+
+    // Fast tick: counter resets, VAM comes back.
+    e.update(Activity.TIMER_STATE_ON, i * 1000, i * 2.0, 100.0 + i * 0.14, 2.0);
+    v = e.vamMh();
+    Test.assertMessage(v != null && v > 0, "speed back -> VAM positive again");
+    return true;
+}
+
 // --- Steady 7% climb -> grade converges to 7 (+/- 1). Constant slope + linear EMA => the
 //     smoothed altitude difference over a window equals the true difference once converged. ---
 (:test)

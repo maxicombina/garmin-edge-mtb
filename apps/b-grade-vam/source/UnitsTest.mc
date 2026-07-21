@@ -2,8 +2,8 @@ import Toybox.Lang;
 import Toybox.Test;
 
 //
-// Unit tests for Units (SPEC 10): grade string (sign + half-away-from-zero + bare zero + --)
-// and VAM string (always metric m/h -- no ft/h).
+// Unit tests for Units (SPEC 10): grade string (sign + half-away-from-zero + bare zero + --),
+// VAM string (follows device units: m/h metric, ft/h statute), feetPerHour, and holdGrade.
 //
 
 // --- roundHalf: away from zero ---
