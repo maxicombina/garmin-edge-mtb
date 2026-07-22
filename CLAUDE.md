@@ -57,6 +57,17 @@ Toda decisión tomada en conversación se escribe **en el mismo turno** en que s
   - ⚠️ **No tocar el `id` con el editor visual del manifest** (reescribe/reformatea el XML — ya borró `spa` una vez); editarlo **a mano**, o el merge `main→release` dará conflicto.
 - **Por qué Opción A:** durabilidad del id + cero swapping por release. Descartadas: (0) un solo id en `main` (se quiere conservar el canal beta-store); (B) branch descartable al releasear (el id "se sentía perdido", aunque igual se anota acá).
 
+### Versionado por app (DECIDIDO 2026-07-22 — reemplaza los tags planos)
+
+**La versión NO vive en el paquete.** El `version="3"` del `manifest.xml` es la versión del *formato* del manifest, no de la app; la versión de la app se **tipea a mano en el portal** al subir el `.iq`. Por eso el versionado en el repo es puro apunte del autor: saber qué número tipear y poder reproducir el build.
+
+- **Fuente de verdad: un `apps/<app>/store/RELEASES.md` por app** (cada app su propio stream de versión, así no chocan entre apps — el error del esquema viejo de tags planos). Formato: entradas *más nueva primero*, encabezado `## vX.Y.Z — YYYY-MM-DD — beta|prod` + changelog de 1-N líneas. Se mantiene en **`main`** (fluye a `release` por el merge; nunca se edita del lado de `release`). Numeración **monótona única por app** (beta y prod comparten stream, como hizo la A: beta 0.1.0–0.1.6, prod 0.1.7).
+- **Tags: namespaced por app, `<app>/vX.Y.Z`, SOLO en releases de PRODUCCIÓN** (el tag sobre `release` es el ancla reproducible dura). Los **beta NO se taguean** (solo se loguean en `RELEASES.md`). Los tags planos `v0.1.0`–`v0.1.7` son **legacy** (todos de la App A, anteriores a esta regla): no se borran, no se reusan; el esquema nuevo es namespaced.
+- **Regla dura para el asistente — hacerlo AUTOMÁTICAMENTE cuando el autor pida un release:**
+  - **beta:** en `main`, bump del número + append de la entrada `beta` en `apps/<app>/store/RELEASES.md`. Sin tag.
+  - **prod:** en `main`, bump + append de la entrada `prod`; luego el flujo de `release` (merge `main→release` → "Export Project" lo hace el autor) y, sobre el commit de `release`, crear el tag `git tag <app>/vX.Y.Z`. El asistente mantiene `RELEASES.md` + el tag; **el autor** hace el upload al portal y tipea el número de versión (que sale de `RELEASES.md`).
+  - Siempre confirmar el número nuevo con el autor antes de bumpear (no adivinar el salto major/minor/patch).
+
 ## Modo de trabajo con el usuario
 
 - **El usuario ejecuta, el asistente guía.** Para todo lo que sea setup, tooling, configuración de su máquina o cuentas (instalaciones, keys, settings de apps, movimientos de archivos fuera del repo): dar instrucciones claras paso a paso y **no ejecutarlo por él** — el objetivo es que aprenda. Verificar el resultado (lectura) está bien. Las ediciones de archivos *dentro del repo* y los commits que él pida siguen igual que siempre.
