@@ -42,10 +42,11 @@ class TrendArrowView extends WatchUi.DataField {
     private const VALUE_NUDGE = 2;       // px: raise the value a touch after the descent/2 drop
     private const ARROW_NUDGE = 2;       // px: align the arrow with the visible glyphs (B's idiom)
     private const VALUE_TPL = "888.8";   // width-stable template: 3 int digits + "." + 1 decimal
-    // EXPERIMENTAL wide-cell mode (SPEC 6, to trial in the sim): a full-width field (w >= 80% of the
-    // device screen width) shows BOTH values inline on one line as "[arrow] cur / avg" (e.g.
-    // "24.1 / 15.0"), with the label reading "SPEED / AVG KM/H". Narrower cells keep the stacked
-    // layout (big current+arrow, optional AVG line below).
+    // Wide-cell mode (SPEC 6.8): a full-width field (w >= 80% of the device screen width) that is
+    // ALSO SHORT (no room to stack) shows BOTH values inline on one line as "[arrow] cur / avg"
+    // (e.g. "24.1 / 15.0"), label "SPEED / AVG". A full-width field that is TALL falls through to the
+    // stacked layout instead (big current + arrow, average on its own line) -- a one-line inline can
+    // only grow as wide as the cell, so a tall wide cell gets a much bigger number when stacked.
     private const WIDE_NUM = 8;          // wide iff w * WIDE_DEN >= screenWidth * WIDE_NUM ...
     private const WIDE_DEN = 10;         // ... i.e. cell width >= 80% of the screen width
     private const INLINE_SEP = " / ";    // separator between current and average in wide mode
@@ -289,11 +290,16 @@ class TrendArrowView extends WatchUi.DataField {
         mLabelH = labelShow ? (LABEL_MARGIN + Graphics.getFontAscent(Graphics.FONT_GLANCE) + 2) : 0;
 
         // Full-width cell? Compare against the device screen width (screenWidth is always present).
+        // Inline "cur / avg" is used ONLY when the cell is also SHORT (h < AVG_MIN_H -> no room to
+        // stack a second line). A full-width cell that IS tall falls through to the stacked layout
+        // below, where the current value gets a BIG font (bounded by height, not by the long inline
+        // string) and the average sits on its own line -- the author's choice for the large wide cell.
         var screenW = System.getDeviceSettings().screenWidth;
-        mIsWide = (screenW != null) && (w * WIDE_DEN >= screenW * WIDE_NUM);
+        var fullWidth = (screenW != null) && (w * WIDE_DEN >= screenW * WIDE_NUM);
+        mIsWide = fullWidth && (h < AVG_MIN_H);
         if (mIsWide) {
             // One line: no separate stacked average band. Pick the largest font whose
-            // [arrow + gap + "888.8 / 888.8"] fits the width, height-capped to the post-label band.
+            // [arrow + gap + "888.8 / 888.8" + unit] fits the width, height-capped to the band.
             mShowAvg = false;
             mPrimaryBandH = h - mLabelH;
             mAvgBandH = 0;
