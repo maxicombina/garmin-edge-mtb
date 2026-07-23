@@ -1,0 +1,8 @@
+<strings>
+    <!-- Spanish (spa) overrides. Any id not listed here falls back to resources/strings.
+         AppName is repeated so the packager does not warn about an untranslated resource. -->
+    <string id="AppName">Tendencia Vel.</string>
+
+    <string id="SpeedLabel">Vel</string>
+    <string id="AvgLabel">Prom</string>
+</strings>

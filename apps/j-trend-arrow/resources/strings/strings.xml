@@ -1,0 +1,11 @@
+<strings>
+    <!-- English is the base / fallback language (like A and B). -->
+    <string id="AppName">Speed Trend</string>
+
+    <!-- Field label drawn above the current value (uppercased at runtime); the unit
+         (KM/H / MPH) is appended to it at draw time, like B's "VAM M/H". -->
+    <string id="SpeedLabel">Speed</string>
+
+    <!-- Prefix drawn before the average value on the secondary line (uppercased). -->
+    <string id="AvgLabel">Avg</string>
+</strings>
