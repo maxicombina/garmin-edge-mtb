@@ -32,6 +32,11 @@ class TrendArrowView extends WatchUi.DataField {
     private const AVG_BAND_PCT = 35;     // % of the post-label height reserved to the average line
     private const ARROW_GAP = 4;         // px between the arrow and the current value
     private const AVG_LABEL_GAP = 4;     // px between the "AVG"/"PROM" prefix and the average number
+    // Native-style unit: a small "km/h" drawn to the upper-right of the number as "km" over "h"
+    // (like the native VELOCIDAD field), NOT baked into the label. Drawn in FONT_XTINY.
+    private const UNIT_GAP = 3;          // px between the number and the stacked unit block
+    private const UNIT_BOTTOM_NUDGE = 0; // px: fine vertical tweak of the unit (positive pushes DOWN);
+                                         // the unit is baseline-aligned to the number (native look)
     // Vertical-centering trick (master spec 3.4, A 6.7, B 6.2): number fonts reserve descent the
     // digits don't use -> center then push DOWN by descent/2; VALUE_NUDGE is A's fine 2px-up tweak.
     private const VALUE_NUDGE = 2;       // px: raise the value a touch after the descent/2 drop
@@ -60,7 +65,8 @@ class TrendArrowView extends WatchUi.DataField {
     private var mArrowState as Number = 0;   // TrendArrow.UP / NONE / DOWN
     private var mRunning as Boolean = false;
     private var mIsStatute as Boolean = false;   // device paceUnits == statute (re-read each tick)
-    private var mUnitLabel as String = "KM/H";   // "KM/H" or "MPH", follows mIsStatute
+    private var mUnitTop as String = "km";       // native stacked unit, top line ("km"/"mph")
+    private var mUnitBottom as String = "h";     // native stacked unit, bottom line ("h"/"" for statute)
 
     // --- Layout cache: re-run selectFonts only when the cell size or the unit system changes. ---
     private var mCacheW as Number = -1;
@@ -116,7 +122,8 @@ class TrendArrowView extends WatchUi.DataField {
     function compute(info as Activity.Info) as Void {
         // Device pace units can change without firing onSettingsChanged -> re-read each tick.
         mIsStatute = (System.getDeviceSettings().paceUnits == System.UNIT_STATUTE);
-        mUnitLabel = SpeedFormat.unitLabel(mIsStatute);
+        mUnitTop = SpeedFormat.unitTop(mIsStatute);
+        mUnitBottom = SpeedFormat.unitBottom(mIsStatute);
 
         var state = null;
         var curMps = null;
@@ -176,62 +183,102 @@ class TrendArrowView extends WatchUi.DataField {
             debugMeasure(dc, w, h);
         }
 
-        // Label (unit embedded, like B's "VAM M/H"). Wide mode names both columns: "SPEED / AVG KM/H".
+        // Label = metric name only (the unit is now drawn next to the number, native style).
+        // Wide mode names both columns: "SPEED / AVG".
         if (mLabelH > 0) {
             dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-            var labelText = mIsWide
-                ? (mLabel + INLINE_SEP + mAvgPrefix + " " + mUnitLabel)
-                : (mLabel + " " + mUnitLabel);
+            var labelText = mIsWide ? (mLabel + INLINE_SEP + mAvgPrefix) : mLabel;
             dc.drawText(w / 2, LABEL_MARGIN, Graphics.FONT_GLANCE, labelText,
                         Graphics.TEXT_JUSTIFY_CENTER);
         }
 
-        // Wide (full-width) cell: both values inline on one line, "[arrow] cur / avg".
+        // Wide (full-width) cell: both values inline on one line, "[arrow] cur / avg [unit]".
         if (mIsWide) {
-            drawInline(dc, w, fg);
+            var cyW = mLabelH + mPrimaryBandH / 2 + Graphics.getFontDescent(mInlineFont) / 2 - VALUE_NUDGE;
+            var showArrowW = mInlineArrowFits && (mArrowState != TrendArrow.NONE) && !mCurStr.equals("--");
+            drawTrendValue(dc, w, fg, mInlineFont, mBothStr, cyW, showArrowW);
             return;
         }
 
-        // --- Current value + arrow, centred in the primary band ---
+        // --- Current value + arrow + native stacked unit, centred in the primary band ---
         var primaryCy = mLabelH + mPrimaryBandH / 2 + Graphics.getFontDescent(mValueFont) / 2 - VALUE_NUDGE;
-        var wValue = dc.getTextWidthInPixels(mCurStr, mValueFont);
         var showArrow = mArrowFits && (mArrowState != TrendArrow.NONE) && !mCurStr.equals("--");
-        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-        if (showArrow) {
-            var ah = (Graphics.getFontAscent(mValueFont) * 4) / 5;
-            var aw = (ah * 3) / 5;
-            var totalW = aw + ARROW_GAP + wValue;
-            var x = w / 2 - totalW / 2;
-            // The value is VCENTREd on its box, whose descent the digits don't use -> centre the
-            // arrow on the visible glyphs (cy - descent/2), then a fine +ARROW_NUDGE (B's idiom).
-            var arrowCy = primaryCy - Graphics.getFontDescent(mValueFont) / 2 + ARROW_NUDGE;
-            if (mArrowState == TrendArrow.UP) {
-                drawUpArrow(dc, x, arrowCy, aw, ah);
-            } else {
-                drawDownArrow(dc, x, arrowCy, aw, ah);
-            }
-            dc.drawText(x + aw + ARROW_GAP, primaryCy, mValueFont, mCurStr,
-                        Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-        } else {
-            // No arrow (NONE, no data, or it did not fit): centre the value alone, no reserved gap
-            // (SPEC: "sin flecha = no se dibuja nada"; the number shifts a bit when the arrow
-            // appears/disappears -- Cateye behaviour, accepted).
-            dc.drawText(w / 2, primaryCy, mValueFont, mCurStr,
-                        Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        }
+        drawTrendValue(dc, w, fg, mValueFont, mCurStr, primaryCy, showArrow);
 
-        // --- Average line (only if the cell is tall enough) ---
+        // --- Average line (only if the cell is tall enough): "AVG 21.7 [unit]" ---
         if (mShowAvg) {
             var avgCy = mLabelH + mPrimaryBandH + mAvgBandH / 2 + Graphics.getFontDescent(mAvgFont) / 2 - VALUE_NUDGE;
             var wAvg = dc.getTextWidthInPixels(mAvgStr, mAvgFont);
             var prefixW = dc.getTextWidthInPixels(mAvgPrefix, Graphics.FONT_XTINY);
-            var totalAvgW = prefixW + AVG_LABEL_GAP + wAvg;
+            var uW = unitBlockWidth(dc, Graphics.FONT_XTINY);
+            var totalAvgW = prefixW + AVG_LABEL_GAP + wAvg + UNIT_GAP + uW;
             var ax = w / 2 - totalAvgW / 2;
             dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
             dc.drawText(ax, avgCy, Graphics.FONT_XTINY, mAvgPrefix,
                         Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-            dc.drawText(ax + prefixW + AVG_LABEL_GAP, avgCy, mAvgFont, mAvgStr,
+            var numX = ax + prefixW + AVG_LABEL_GAP;
+            dc.drawText(numX, avgCy, mAvgFont, mAvgStr,
                         Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+            var avgBaseY = avgCy + (Graphics.getFontAscent(mAvgFont) - Graphics.getFontDescent(mAvgFont)) / 2 + UNIT_BOTTOM_NUDGE;
+            drawStackedUnit(dc, numX + wAvg + UNIT_GAP, avgBaseY, Graphics.FONT_XTINY);
+        }
+    }
+
+    // Draws "[arrow] value [stacked unit]" as one horizontally-centred group, the value VCENTREd on
+    // cy. Used by both the stacked primary line and the wide inline line (value = "cur / avg" there).
+    // The arrow (trend of current vs average) precedes the value; the native km/h unit follows it.
+    private function drawTrendValue(dc as Graphics.Dc, w as Number, fg as Graphics.ColorType,
+                                    valueFont as Graphics.FontType, valueStr as String,
+                                    cy as Number, showArrow as Boolean) as Void {
+        var unitFont = Graphics.FONT_XTINY;
+        var vW = dc.getTextWidthInPixels(valueStr, valueFont);
+        var uW = unitBlockWidth(dc, unitFont);
+        var aW = 0;
+        var aH = 0;
+        if (showArrow) {
+            aH = (Graphics.getFontAscent(valueFont) * 4) / 5;
+            aW = (aH * 3) / 5;
+        }
+        var lead = showArrow ? (aW + ARROW_GAP) : 0;
+        var totalW = lead + vW + UNIT_GAP + uW;
+        var x = w / 2 - totalW / 2;
+        var vx = x + lead;
+        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
+        if (showArrow) {
+            // Value is VCENTREd on its box, whose descent the digits don't use -> centre the arrow on
+            // the visible glyphs (cy - descent/2), then a fine +ARROW_NUDGE (B's idiom).
+            var arrowCy = cy - Graphics.getFontDescent(valueFont) / 2 + ARROW_NUDGE;
+            if (mArrowState == TrendArrow.UP) {
+                drawUpArrow(dc, x, arrowCy, aW, aH);
+            } else {
+                drawDownArrow(dc, x, arrowCy, aW, aH);
+            }
+        }
+        dc.drawText(vx, cy, valueFont, valueStr, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        // Unit is baseline-aligned to the number's baseline (native look: the "h" sits on the same
+        // line as the digits' feet). numberBaseline for a VCENTREd value = cy + (ascent - descent)/2.
+        var baseY = cy + (Graphics.getFontAscent(valueFont) - Graphics.getFontDescent(valueFont)) / 2 + UNIT_BOTTOM_NUDGE;
+        drawStackedUnit(dc, vx + vW + UNIT_GAP, baseY, unitFont);
+    }
+
+    // Width of the stacked unit block = max width of its two lines (bottom may be empty -> width 0).
+    private function unitBlockWidth(dc as Graphics.Dc, unitFont as Graphics.FontType) as Number {
+        var wt = dc.getTextWidthInPixels(mUnitTop, unitFont);
+        var wb = (mUnitBottom.length() > 0) ? dc.getTextWidthInPixels(mUnitBottom, unitFont) : 0;
+        return (wt > wb) ? wt : wb;
+    }
+
+    // Draws the native stacked unit ("km" over "h"), BOTTOM-aligned: the bottom line's baseline sits
+    // at baseY (= the number's baseline), so "h" rests on the digits' feet like the native field. The
+    // top line sits one ascent above (tight). A single line (empty bottom, e.g. "mph") is placed with
+    // its own baseline at baseY. drawText's y is the TOP of the glyph box; baseline = y + ascent.
+    private function drawStackedUnit(dc as Graphics.Dc, xLeft as Number, baseY as Number, unitFont as Graphics.FontType) as Void {
+        var uAsc = Graphics.getFontAscent(unitFont);
+        if (mUnitBottom.length() > 0) {
+            dc.drawText(xLeft, baseY - 2 * uAsc, unitFont, mUnitTop, Graphics.TEXT_JUSTIFY_LEFT);
+            dc.drawText(xLeft, baseY - uAsc, unitFont, mUnitBottom, Graphics.TEXT_JUSTIFY_LEFT);
+        } else {
+            dc.drawText(xLeft, baseY - uAsc, unitFont, mUnitTop, Graphics.TEXT_JUSTIFY_LEFT);
         }
     }
 
@@ -265,7 +312,10 @@ class TrendArrowView extends WatchUi.DataField {
             mAvgBandH = 0;
         }
 
-        // --- Current value + arrow font: largest whose [arrow + gap + "888.8"] fits. ---
+        // Native stacked unit width (fixed FONT_XTINY) reserved in every group below.
+        var unitW = unitBlockWidth(dc, Graphics.FONT_XTINY);
+
+        // --- Current value font: largest whose [arrow + gap + "888.8" + gap + unit] fits. ---
         mValueFont = Graphics.FONT_XTINY;
         mArrowFits = false;
         for (var i = 0; i < mLadder.size(); i++) {
@@ -273,7 +323,7 @@ class TrendArrowView extends WatchUi.DataField {
             if (dc.getFontHeight(f) > (mPrimaryBandH * 9) / 10) { continue; }
             var ah = (Graphics.getFontAscent(f) * 4) / 5;
             var aw = (ah * 3) / 5;
-            var groupW = aw + ARROW_GAP + dc.getTextWidthInPixels(VALUE_TPL, f);
+            var groupW = aw + ARROW_GAP + dc.getTextWidthInPixels(VALUE_TPL, f) + UNIT_GAP + unitW;
             if (groupW <= usableW) {
                 mValueFont = f;
                 mArrowFits = true;
@@ -282,24 +332,25 @@ class TrendArrowView extends WatchUi.DataField {
         }
         if (!mArrowFits) {
             // Arrow fits at no size (very narrow cell) -> graceful fallback: drop the arrow, pick
-            // the largest font the value alone fits (same idiom as B's ramp fallback).
+            // the largest font the [value + unit] fits (same idiom as B's ramp fallback).
             for (var i = 0; i < mLadder.size(); i++) {
                 var f = mLadder[i];
-                if (dc.getTextWidthInPixels(VALUE_TPL, f) <= usableW && dc.getFontHeight(f) <= (mPrimaryBandH * 9) / 10) {
+                var groupW = dc.getTextWidthInPixels(VALUE_TPL, f) + UNIT_GAP + unitW;
+                if (groupW <= usableW && dc.getFontHeight(f) <= (mPrimaryBandH * 9) / 10) {
                     mValueFont = f;
                     break;
                 }
             }
         }
 
-        // --- Average font (no arrow; its own fixed-size prefix). ---
+        // --- Average font (no arrow; its own fixed-size prefix + the stacked unit). ---
         mAvgFont = Graphics.FONT_XTINY;
         if (mShowAvg) {
             var prefixW = dc.getTextWidthInPixels(mAvgPrefix, Graphics.FONT_XTINY);
             for (var i = 0; i < mLadder.size(); i++) {
                 var f = mLadder[i];
                 if (dc.getFontHeight(f) > (mAvgBandH * 85) / 100) { continue; }
-                var groupW = prefixW + AVG_LABEL_GAP + dc.getTextWidthInPixels(VALUE_TPL, f);
+                var groupW = prefixW + AVG_LABEL_GAP + dc.getTextWidthInPixels(VALUE_TPL, f) + UNIT_GAP + unitW;
                 if (groupW <= usableW) {
                     mAvgFont = f;
                     break;
@@ -308,8 +359,10 @@ class TrendArrowView extends WatchUi.DataField {
         }
     }
 
-    // --- Wide-mode font: largest whose [arrow + gap + "888.8 / 888.8"] fits; else drop the arrow.
+    // --- Wide-mode font: largest whose [arrow + gap + "888.8 / 888.8" + gap + unit] fits; else drop
+    //     the arrow. One stacked unit follows the whole "cur / avg" pair.
     private function selectInlineFont(dc as Graphics.Dc, usableW as Number) as Void {
+        var unitW = unitBlockWidth(dc, Graphics.FONT_XTINY);
         mInlineFont = Graphics.FONT_XTINY;
         mInlineArrowFits = false;
         for (var i = 0; i < mLadder.size(); i++) {
@@ -317,7 +370,7 @@ class TrendArrowView extends WatchUi.DataField {
             if (dc.getFontHeight(f) > (mPrimaryBandH * 9) / 10) { continue; }
             var ah = (Graphics.getFontAscent(f) * 4) / 5;
             var aw = (ah * 3) / 5;
-            var groupW = aw + ARROW_GAP + dc.getTextWidthInPixels(INLINE_TPL, f);
+            var groupW = aw + ARROW_GAP + dc.getTextWidthInPixels(INLINE_TPL, f) + UNIT_GAP + unitW;
             if (groupW <= usableW) {
                 mInlineFont = f;
                 mInlineArrowFits = true;
@@ -325,10 +378,11 @@ class TrendArrowView extends WatchUi.DataField {
             }
         }
         if (!mInlineArrowFits) {
-            // Arrow fits at no size -> graceful fallback: fit the pair alone (same idiom as above).
+            // Arrow fits at no size -> graceful fallback: fit the [pair + unit] alone.
             for (var i = 0; i < mLadder.size(); i++) {
                 var f = mLadder[i];
-                if (dc.getTextWidthInPixels(INLINE_TPL, f) <= usableW && dc.getFontHeight(f) <= (mPrimaryBandH * 9) / 10) {
+                var groupW = dc.getTextWidthInPixels(INLINE_TPL, f) + UNIT_GAP + unitW;
+                if (groupW <= usableW && dc.getFontHeight(f) <= (mPrimaryBandH * 9) / 10) {
                     mInlineFont = f;
                     break;
                 }
@@ -336,32 +390,6 @@ class TrendArrowView extends WatchUi.DataField {
         }
     }
 
-    // --- Wide mode draw: "[arrow] cur / avg" on one line, centred in the primary band. The arrow is
-    //     the trend of the CURRENT speed vs the average (same classify() result as the stacked mode);
-    //     it precedes the whole pair. Same descent/2 + nudge centring idiom as the stacked value. ---
-    private function drawInline(dc as Graphics.Dc, w as Number, fg as Graphics.ColorType) as Void {
-        var cy = mLabelH + mPrimaryBandH / 2 + Graphics.getFontDescent(mInlineFont) / 2 - VALUE_NUDGE;
-        var wBoth = dc.getTextWidthInPixels(mBothStr, mInlineFont);
-        var showArrow = mInlineArrowFits && (mArrowState != TrendArrow.NONE) && !mCurStr.equals("--");
-        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-        if (showArrow) {
-            var ah = (Graphics.getFontAscent(mInlineFont) * 4) / 5;
-            var aw = (ah * 3) / 5;
-            var totalW = aw + ARROW_GAP + wBoth;
-            var x = w / 2 - totalW / 2;
-            var arrowCy = cy - Graphics.getFontDescent(mInlineFont) / 2 + ARROW_NUDGE;
-            if (mArrowState == TrendArrow.UP) {
-                drawUpArrow(dc, x, arrowCy, aw, ah);
-            } else {
-                drawDownArrow(dc, x, arrowCy, aw, ah);
-            }
-            dc.drawText(x + aw + ARROW_GAP, cy, mInlineFont, mBothStr,
-                        Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-        } else {
-            dc.drawText(w / 2, cy, mInlineFont, mBothStr,
-                        Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        }
-    }
 
     // Small solid up-arrow (filled triangular head + rectangular stem), occupying [x0, x0+w]
     // horizontally and centred vertically on cyMid with height h. COPY of Option B's drawUpArrow
@@ -396,7 +424,7 @@ class TrendArrowView extends WatchUi.DataField {
     (:debug)
     private function nextSynthetic() as Array {
         var speedsKmh = [10.4, 25.7, 10.1, 30.2, 15.6, 20.3, 8.5, 28.9];
-        var segSec = 15;                              // each segment lasts 15 s
+        var segSec = 4;                               // each segment lasts 4 s (faster sim cycling)
         var total = speedsKmh.size() * segSec;
         var phase = mSynTick % total;
         var idx = phase / segSec;                     // integer division -> segment index 0..7

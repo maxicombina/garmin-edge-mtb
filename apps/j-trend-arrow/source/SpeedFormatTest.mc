@@ -51,3 +51,13 @@ function testUnitLabel(logger as Test.Logger) as Boolean {
     Test.assertEqualMessage(SpeedFormat.unitLabel(true), "MPH", "statute");
     return true;
 }
+
+(:test)
+function testUnitParts(logger as Test.Logger) as Boolean {
+    // Native stacked unit: metric splits into "km" over "h"; statute is single-line "mph".
+    Test.assertEqualMessage(SpeedFormat.unitTop(false), "km", "metric top line");
+    Test.assertEqualMessage(SpeedFormat.unitBottom(false), "h", "metric bottom line");
+    Test.assertEqualMessage(SpeedFormat.unitTop(true), "mph", "statute top line");
+    Test.assertMessage(SpeedFormat.unitBottom(true).equals(""), "statute has no bottom line");
+    return true;
+}

@@ -62,4 +62,16 @@ module SpeedFormat {
     function unitLabel(statute as Boolean) as String {
         return statute ? "MPH" : "KM/H";
     }
+
+    // Native-style unit split into up to two STACKED lines: the native speed field draws a small
+    // "km/h" to the upper-right of the number as "km" over "h". Lowercase, like the native. Metric
+    // -> ["km","h"]; statute -> ["mph",""] (single line, empty bottom). unitTop is never empty;
+    // an empty unitBottom means "draw one line only".
+    function unitTop(statute as Boolean) as String {
+        return statute ? "mph" : "km";
+    }
+
+    function unitBottom(statute as Boolean) as String {
+        return statute ? "" : "h";
+    }
 }

@@ -377,7 +377,19 @@ Además del layout apilado de §6.1 (actual grande + flecha, promedio en línea 
 - **Flecha:** es la tendencia del **actual vs promedio** (misma `classify()` que el modo apilado), precede a TODO el par. Mismo centrado `descent/2 + ARROW_NUDGE` que el valor apilado (§6.7).
 - **La flecha sigue siendo DATO** (va con el valor, no con el label) — la regla de arquitectura no cambia; solo cambia que en fila ancha el "valor" es el par actual/promedio en vez del actual solo.
 - El modo apilado (no-ancho) queda **idéntico**; `mShowAvg` se fuerza a `false` en modo ancho (el promedio ya está inline).
-- Constantes nuevas: `WIDE_NUM=8`, `WIDE_DEN=10`, `INLINE_SEP=" / "`, `INLINE_TPL="888.8 / 888.8"`. Implementado en `TrendArrowView.mc` (`selectInlineFont` + `drawInline`, branch en `selectFonts`/`onUpdate`). Compila limpio (release 840+830, `-w`) y 9/9 tests verdes (los módulos puros no cambian). **PENDIENTE:** validación visual del autor en el sim (afinar si el umbral 80 % y los tamaños se ven bien en las 6 resoluciones).
+- Constantes nuevas: `WIDE_NUM=8`, `WIDE_DEN=10`, `INLINE_SEP=" / "`, `INLINE_TPL="888.8 / 888.8"`. Implementado en `TrendArrowView.mc` (`selectInlineFont` + `drawTrendValue`, branch en `selectFonts`/`onUpdate`). Compila limpio (release 840+830, `-w`) y tests verdes (los módulos puros no cambian). **PENDIENTE:** validación visual del autor en el sim (afinar si el umbral 80 % y los tamaños se ven bien en las 6 resoluciones).
+
+### 6.9 Unidad estilo NATIVO (apilada a la derecha del número — 2026-07-23)
+
+Tras comparar contra el campo nativo del Edge (capturas `b-grade-vam/screenshots/2026-07-20-21-04-51.BMP` = "VELOCIDAD 13.3 km/h" y `…22-37-12.BMP` = "VELOCIDAD MEDIA 13.8 km/h"), el autor pidió **hacerlo como el nativo**: la unidad **NO va en el label**, sino como un **`km/h` chiquito apilado en dos líneas (`km` sobre `h`) a la derecha del número**, arriba (como superíndice). El label pasa a ser solo el nombre de la métrica.
+
+- **`SpeedFormat` (puro):** nuevas `unitTop(statute)`/`unitBottom(statute)` → métrico `["km","h"]`, statute `["mph",""]` (bottom vacío = una sola línea). Minúsculas, como el nativo. `unitLabel` (mayúsculas) queda pero **ya no se usa en el render** (sí en su test). Test `testUnitParts` (10 tests en total ahora).
+- **Label:** apilado → solo `mLabel` (p.ej. `SPEED`/`VEL`); ancho → `mLabel / mAvgPrefix` (p.ej. `SPEED / AVG`). Se quitó el `" " + unidad` del label en ambos.
+- **Dibujo:** helper único `drawTrendValue(dc,w,fg,font,str,cy,showArrow)` dibuja `[flecha] valor [unidad apilada]` como un grupo centrado (lo usan el valor primario apilado Y la línea ancha). Helpers `unitBlockWidth` (ancho = máx de las dos líneas) y `drawStackedUnit`. La línea de promedio también lleva su unidad chica.
+- **Alineación vertical de la unidad — a la BASE del número (2026-07-23, tras captura nativa):** el nativo apoya el `km/h` **abajo**: la `h` se sienta sobre la misma línea base que los pies de los dígitos (NO como superíndice arriba). `drawStackedUnit(dc, x, baseY, font)` recibe la **baseline objetivo** y coloca la línea de abajo con su baseline en `baseY` y la de arriba un `ascent` por encima (juntas). Para un valor dibujado con `VCENTER` en `cy`, la baseline del número es `baseY = cy + (ascent − descent)/2 + UNIT_BOTTOM_NUDGE`. (Para statute, una sola línea `mph` con su baseline en `baseY`.)
+- **Selección de fuentes:** todas las plantillas de ancho ahora reservan `+ UNIT_GAP + unitBlockWidth(FONT_XTINY)` (primario, fallback sin flecha, promedio y ancho) para que número+unidad no desborden.
+- **Constantes nuevas:** `UNIT_GAP=3`, `UNIT_BOTTOM_NUDGE=0` (positivo empuja la unidad HACIA ABAJO; nudge fino a afinar en el sim — mismo idioma que `VALUE_NUDGE`/`ARROW_NUDGE`). Unidad en `FONT_XTINY` fija.
+- Compila limpio (release 840+830, `-w`) + **10/10 tests verdes**. **PENDIENTE (autor):** afinar en el sim el `UNIT_BOTTOM_NUDGE` (alto exacto de la unidad respecto de los dígitos) y confirmar que `km`/`h` no pisa el número ni se sale de la celda en las resoluciones chicas.
 
 ## 7. Extender a otras métricas Tier 1 (documentado, NO implementar en v1)
 
