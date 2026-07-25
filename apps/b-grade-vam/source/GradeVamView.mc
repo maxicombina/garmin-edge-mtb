@@ -30,14 +30,11 @@ class GradeVamView extends WatchUi.DataField {
     private const LABEL_MARGIN = 4;      // px above a label
     private const GRADE_ICON_GAP = 4;    // px between the grade ramp glyph and its label (FULL/HALF)
     private const SMALL_LABEL_MIN_H = 46; // in SMALL, show the "PEND/VAM" header only if this tall
-    private const PCT_GAP = 1;           // px between the grade number and its "%" suffix
     // Vertical-centering trick (master spec 3.4, Option A 6.7): number fonts reserve descent the
     // digits don't use, so center then push DOWN by descent/2; VALUE_NUDGE is A's fine 2px-up
     // tweak (validate on device). Labels reserve only their ascent + LABEL_MARGIN.
     private const VALUE_NUDGE = 2;       // px: raise the value a touch after the descent/2 drop
     private const GRADE_HYST_MARGIN = 0.5; // grade display hysteresis margin % (SPEC 5.2); tunable
-    private const PCT_NUM = 2;           // "%" suffix height ~= PCT_NUM/PCT_DEN of the value font
-    private const PCT_DEN = 3;
     private const HALF_GRADE_PCT = 44;   // HALF: grade gets this % of the width, VAM the rest (wider,
                                          // since VAM has more digits) so a shared font comes out equal
 
@@ -93,7 +90,6 @@ class GradeVamView extends WatchUi.DataField {
     private var mGradeFont as Graphics.FontType = Graphics.FONT_MEDIUM;
     private var mVamFont as Graphics.FontType = Graphics.FONT_MEDIUM;
     private var mAuxFont as Graphics.FontType = Graphics.FONT_XTINY;
-    private var mPctFont as Graphics.FontType = Graphics.FONT_XTINY;   // text font for the "%" suffix
     // SMALL-mode header ("PEND/VAM"), shown only when the tiny cell has room (set in selectFonts).
     private var mSmallLabelShow as Boolean = false;
     private var mSmallLabel as String = "";
@@ -304,26 +300,22 @@ class GradeVamView extends WatchUi.DataField {
             // so the header is NOT glued to the ceiling and the value clears it below.
             mSmallLabelH = mSmallLabelShow ? (LABEL_MARGIN + hdrAscent + 2) : 0;
             var maxH = ((h - mSmallLabelH) * 88) / 100;
-            // Pick the largest value font whose WHOLE group fits usableW: "-88" + "%" + "/" +
-            // VAM template. The "%" is PROPORTIONAL to the value font (2/3, like FULL/HALF) --
-            // NOT a fixed XTINY, which looked tiny beside a big number in wide SMALL cells. Same
+            // Pick the largest value font whose WHOLE group fits usableW: "-88%" + "/" + VAM
+            // template. The "%" now rides in the SAME number font as the digits (the glyph is
+            // present in FONT_SYSTEM_NUMBER_*), so it is part of the grade string. Same
             // iterate-the-ladder shape as selectSharedValueFont. (The ramp is a LABEL glyph: it
             // rides on the "PEND/VAM" header, NOT in this value group.)
             mGradeFont = Graphics.FONT_XTINY;
             mVamFont = Graphics.FONT_XTINY;
-            mPctFont = Graphics.FONT_XTINY;
             for (var i = 0; i < mLadder.size(); i++) {
                 var f = mLadder[i];
                 if (dc.getFontHeight(f) > maxH) { continue; }
-                var pf = pctFontFor(dc, dc.getFontHeight(f));
-                var groupW = dc.getTextWidthInPixels(GRADE_TPL, f)
-                             + PCT_GAP + dc.getTextWidthInPixels("%", pf)
+                var groupW = dc.getTextWidthInPixels(GRADE_TPL + "%", f)
                              + dc.getTextWidthInPixels(SMALL_SEP, f)
                              + dc.getTextWidthInPixels(vamTpl, f);
                 if (groupW <= usableW) {
                     mGradeFont = f;
                     mVamFont = f;
-                    mPctFont = pf;
                     break;
                 }
             }
@@ -342,25 +334,22 @@ class GradeVamView extends WatchUi.DataField {
     }
 
     // Picks ONE font for both the grade number and the VAM number so they render at the SAME size.
-    // A candidate passes only if the grade block (number + "%") fits gradeColW, the VAM template
-    // fits vamColW, and the height fits. The "%" font is chosen proportionally per candidate.
+    // A candidate passes only if the grade block ("number%") fits gradeColW, the VAM template fits
+    // vamColW, and the height fits. The "%" rides in the same number font as the digits.
     private function selectSharedValueFont(dc as Graphics.Dc, gradeColW as Number, vamColW as Number,
                                            vamTpl as String, maxH as Number) as Void {
         for (var i = 0; i < mLadder.size(); i++) {
             var f = mLadder[i];
             if (dc.getFontHeight(f) > maxH) { continue; }
-            var pf = pctFontFor(dc, dc.getFontHeight(f));
-            var gradeW = dc.getTextWidthInPixels(GRADE_TPL, f) + PCT_GAP + dc.getTextWidthInPixels("%", pf);
+            var gradeW = dc.getTextWidthInPixels(GRADE_TPL + "%", f);
             if (gradeW <= gradeColW && dc.getTextWidthInPixels(vamTpl, f) <= vamColW) {
                 mGradeFont = f;
                 mVamFont = f;
-                mPctFont = pf;
                 return;
             }
         }
         mGradeFont = Graphics.FONT_XTINY;
         mVamFont = Graphics.FONT_XTINY;
-        mPctFont = Graphics.FONT_XTINY;
     }
 
     // FULL-mode aux-line font. It was a fixed FONT_XTINY, which was near-unreadable on a
@@ -377,18 +366,6 @@ class GradeVamView extends WatchUi.DataField {
             var groupW = (ah * 3) / 5 + GRADE_ICON_GAP + dc.getTextWidthInPixels(tpl, f);
             if (dc.getFontHeight(f) <= (bandH * 85) / 100 && groupW <= usableW) {
                 return f;
-            }
-        }
-        return Graphics.FONT_XTINY;
-    }
-
-    // Largest text-ladder font no taller than PCT_NUM/PCT_DEN of the value-font height. Text fonts
-    // (not number fonts) because the number fonts lack the "%" glyph.
-    private function pctFontFor(dc as Graphics.Dc, valueH as Number) as Graphics.FontType {
-        var target = (valueH * PCT_NUM) / PCT_DEN;
-        for (var i = 0; i < mTextLadder.size(); i++) {
-            if (dc.getFontHeight(mTextLadder[i]) <= target) {
-                return mTextLadder[i];
             }
         }
         return Graphics.FONT_XTINY;
@@ -543,26 +520,24 @@ class GradeVamView extends WatchUi.DataField {
         dc.fillRectangle(x0 + w / 2 - stemW / 2, headBase, stemW, h - headH);
     }
 
-    // Width of the grade "number%" block in the current fonts (for centring). No "%" for "--".
+    // Width of the grade "number%" block in the current font (for centring). No "%" for "--". The
+    // "%" now rides in the SAME number font as the digits (glyph confirmed present), so it is just
+    // part of the string.
     private function gradeBlockWidth(dc as Graphics.Dc) as Number {
-        var wNum = dc.getTextWidthInPixels(mGradeStr, mGradeFont);
-        if (mGradeStr.equals("--")) {
-            return wNum;
-        }
-        return wNum + PCT_GAP + dc.getTextWidthInPixels("%", mPctFont);
+        return dc.getTextWidthInPixels(gradeText(), mGradeFont);
     }
 
-    // Draws the grade number (number font) + a smaller "%" suffix (text font, since number fonts
-    // lack the glyph) starting at left x, vertically centred on cy, in `color`. "--" gets no "%".
+    // The grade string as drawn: "number%" (e.g. "7%"), or "--" (no "%") when there is no value.
+    private function gradeText() as String {
+        return mGradeStr.equals("--") ? mGradeStr : mGradeStr + "%";
+    }
+
+    // Draws the grade number + "%" as ONE string in the number font (the "%" glyph is present in
+    // FONT_SYSTEM_NUMBER_*), starting at left x, vertically centred on cy, in `color`.
     private function drawGradeBlock(dc as Graphics.Dc, x as Number, cy as Number, color as Number) as Void {
         dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(x, cy, mGradeFont, mGradeStr,
+        dc.drawText(x, cy, mGradeFont, gradeText(),
                     Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-        if (!mGradeStr.equals("--")) {
-            var wNum = dc.getTextWidthInPixels(mGradeStr, mGradeFont);
-            dc.drawText(x + wNum + PCT_GAP, cy, mPctFont, "%",
-                        Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-        }
     }
 
     // Grade colour by zone (SPEC 6.3). Banded on the DISPLAYED integer (roundHalf of the raw %),
