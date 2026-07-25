@@ -61,14 +61,69 @@ j-trend-arrow/
 │   │                           # el TestUtil.mc de la B.
 │   └── (ningún módulo de buffer/filtro/EMA — no hace falta para Tier 1, ver §3.1)
 ├── resources/
-│   ├── strings/strings.xml     # AppName, SpeedLabel, AvgLabel (§6.4) — SIN settings/ (v1 no tiene, §9)
+│   ├── strings/strings.xml     # AppName, SpeedLabel (+ SpeedLabelShort, §6.10), AvgLabel — SIN settings/ (v1 no tiene, §9)
 ├── resources-spa/strings/      # español
-└── resources-<device>/drawables/  # ícono launcher, PLACEHOLDER al empezar (copiar el de A/B; rediseñar después)
+├── resources-<device>/drawables/  # ícono launcher, uno por device (35/36/40/56/68 px) — ya NO placeholder (§3.3)
+└── store/                      # assets de la ficha del store + el generador del ícono (§3.3)
 ```
 
 **Nota dura del repo (CLAUDE.md):** "Nada compartido entre apps salvo documentación. Si surge código común, decidir explícitamente." `TestUtil.mc` se **copia**, no se importa desde B. Si en el futuro se decide extraer algo común de verdad, esa es una decisión aparte, explícita, no implícita por comodidad.
 
 Reglas de la clase (idénticas a A/B, no re-derivar): `compute(info)` ~1×/s, no dibuja; `onUpdate(dc)` dibuja, no calcula; sin orden garantizado entre ambos → todo miembro inicializado en `initialize()`.
+
+### 3.3 Ícono — CERRADO (2026-07-25). Híbrido: aro de un modelo de imagen + geometría dibujada por código
+
+**Motivo final:** aro cobalto `#0070F0` **liso** con volumen y brillo, cara azul muy oscuro `#0E1A38`; dentro, una **raya ámbar `#FFC400` horizontal a dos tercios de la altura = el PROMEDIO de la actividad**, y una **flecha blanca gorda que la CRUZA y la deja continua por detrás = el valor actual está por encima de tu media**. Sin texto, sin números, sin aguja.
+
+**Reparto de trabajo, y por qué es híbrido.** Ninguna de las dos técnicas alcanzaba sola:
+
+- **El modelo de imagen (`gpt-image-2`) aporta el ARO:** volumen, degradado y brillo que un dibujo plano por código no iguala. Lo que **no** sabe hacer es geometría exacta: en tres intentos no acertó **una sola** de las proporciones pedidas, y cada iteración arreglaba una cosa rompiendo otra — flecha ancho/alto 0,38 → 0,51 → 0,40 (se pedía 0,60); raya ámbar 4 % → 6 % → **2 %** (se pedía 8 %); tacos cuadrados → redondeados → cuadrados otra vez.
+- **El código aporta la GEOMETRÍA:** la flecha de `3.png` tenía la cabeza al 39 % del diámetro de la cara y la cola pegada al borde; se le **transplantó** la del generador (cabeza 49 %, astil 25 %, punta al 2,6 % y cola al 91 % desde el techo de la cara) y se **redibujó la franja ámbar** con antialias propio.
+
+Ese resultado está **bakeado** en `store/3-flecha-arreglada.png` (1254×1254, fondo magenta), que es el **único insumo versionado**: los PNG crudos del modelo ya no hacen falta y se sacaron del repo.
+
+| archivo en `store/` | qué es |
+|---|---|
+| `3-flecha-arreglada.png` | la fuente: imagen del modelo + flecha y franja corregidas, fondo magenta plano |
+| `gen_master.py` | recorta los tacos, saca el magenta (tolerancia + despill), recentra → escribe los dos de abajo |
+| `icon-master-1024.png` | 1024×1024 RGBA con **alpha real** (46 % transparente, 2202 px de borde suave) |
+| `store-icon-500.png` | 500×500 RGB **opaco** sobre gris `#E6E6E6`, igual que el de la Opción A |
+| `gen_icon.py` | dibuja SOLO los 13 launchers (35/36/40/56/68 px), planos, con la MISMA geometría de flecha |
+| `ICON_PROMPT.md` | los prompts; hoy solo sigue vigente el del **hero 1440×720** |
+
+**Regla dura heredada de A: cada tamaño se DIBUJA a su tamaño, nunca se reduce el master** (el master ilustrativo reducido a 35 px quedaba una mancha borrosa). Por eso los launchers son dibujo propio y no un downscale, y por eso `gen_icon.py` y `gen_master.py` escriben a archivos distintos: ninguno puede pisar al otro.
+
+#### Prueba a ciegas (2026-07-25): qué comunica el ícono de verdad
+
+Se testearon el master y el launcher de 35 px con **7 observadores independientes sin contexto** + 2 jueces con contexto (workflow de 10 agentes; ver la limitación al final). Resultado, contra la intención del diseño:
+
+| pregunta | respuesta |
+|---|---|
+| ¿se entiende que es un neumático? | **NO** — 0 de 7. **7 de 7** leyeron engranaje / tuerca / bisel |
+| ¿se entiende que la raya es el promedio? | **NO** — 0 de 7 dijo "promedio"; 7 de 7 sí llegaron a "línea de referencia / umbral que la flecha cruza" |
+| qué sí comunica | unánime: "arriba / más / subiendo / superar un nivel" |
+
+Riesgos repetidos: **ajustes/configuración 7 de 7** (el peor falso amigo en una lista de apps), upload/firmware 7/7, eject 6/7. Además 4 de 7 vieron la franja partida como **dos marcas sueltas** en vez de una línea ocluida.
+
+**Consecuencia aplicada — se sacaron los tacos.** No comunicaban neumático (0/7) y sí comunicaban ajustes (7/7): costo puro. `gen_master.py` los recorta detectando el radio exterior del aro (el mayor radio cuyo perímetro está cubierto >95 %; más afuera solo hay lóbulos, en pocos ángulos) y `gen_icon.py` dibuja los launchers con `nubs_mode='none'`. **La franja quedó continua** por detrás de la flecha (hueco = silueta exacta, sin dilatar). Lo que ningún dibujo arregla es "la raya = tu promedio": eso lo explican el nombre de la app, la ficha y el propio campo en pantalla; al ícono le alcanza con diferenciar y no mentir.
+
+*Limitación de la prueba: son observadores de IA, no un estudio con usuarios humanos. Sirven para detectar lecturas erróneas evidentes (el "ajustes" 7/7 lo es), no para medir preferencia ni recordación.*
+
+#### Tres artefactos de la franja ámbar, y por qué aparecieron (patrón reutilizable)
+
+Al transplantar la flecha hubo que borrar la vieja y reconstruir lo que tapaba. Parchear **por clasificación de color** dejó tres residuos, los tres visibles solo al ampliar:
+
+1. **Píxeles huérfanos** justo antes de la flecha (p. ej. `(126,100,44)`): eran el **antialias del ámbar viejo contra la flecha vieja**, que no clasifica ni como ámbar ni como flecha. → Se dejó de parchear: ahora se **borra la franja entera y se redibuja** con antialias propio, así el problema no puede existir.
+2. **Costura horizontal** en el borde superior: la fila de antialias original (`(46,41,68)`) quedaba fuera del rango borrado y hacía escalón contra el borde nuevo. → Se borran **3 px de más** a cada lado.
+3. **Hilo oscuro siguiendo el aro** en los extremos exteriores: el relleno y el recorte iban a `0,995·rf` y entre el ámbar y el filete interior quedaba una tirita de navy. → Recorte del ámbar a `rf` exacto (se comparó `1,000` contra `1,006` contra el original antes de elegir).
+
+Queda, y es correcto, **una columna de 1 px** más oscura en un encuentro del master: es antialias legítimo (al bajar de 1254 a 1024 ese borde cae a mitad de píxel y la mezcla navy+ámbar da un oliva turbio). Invisible al tamaño real.
+
+**Sobre el magenta:** el fondo **no** se compara por igualdad. Desde el 2026-05-19 toda imagen de OpenAI lleva **SynthID**, que corre los píxeles unos puntos (medido: el fondo es `(239,3,232)`, no `(255,0,255)`), y además los bordes tienen antialias. Se keyea con umbral suave + **despill** (des-componer `color = fg·α + magenta·(1−α)`), o quedaría fleco rosa. Control: magenta-idad máxima dentro del dibujo = 60/255.
+
+**Dato del research REFUTADO con evidencia (no repetirlo):** que los launchers de los MIP haya que dibujarlos en una paleta de 64 colores (canales `00/55/AA/FF`, y por eso usar `#0055FF`). El launcher de la Opción A —validado en el Edge 840 real del autor— tiene **282 colores distintos y solo 2 caen en esa grilla**. Se usa el `#0070F0` del proyecto.
+
+Compila limpio (release `-w`) en un device por cada tamaño de launcher: edge840, edge830, edgemtb, edge1040, edge850, edge1050.
 
 ## 4. Entradas — `Activity.Info` (verificado 2026-07-22 por doc oficial + compile-probe contra el SDK)
 
@@ -90,27 +145,33 @@ module TrendArrow {
     const NONE = 0;
     const DOWN = -1;
 
-    // Ambos argumentos son los ENTEROS YA REDONDEADOS que el usuario ve en pantalla (el mismo
-    // valor que se usó para construir el string de display) -- NO los floats crudos. Comparar
-    // sobre lo redondeado ES la banda muerta: nunca puede haber una flecha que contradiga al
-    // número (si el número muestra el mismo entero, no hay flecha). null en cualquiera -> NONE.
+    // Los dos primeros argumentos son los ENTEROS YA REDONDEADOS que el usuario ve en pantalla (el
+    // mismo valor que se usó para construir el string de display) -- NO los floats crudos. El
+    // tercero, `deadBand`, es la SEMI-anchura de la banda muerta en las MISMAS unidades enteras (con
+    // velocidad: décimas, así `deadBand=1` == +/-0,1 km/h). La flecha aparece solo si la diferencia
+    // SUPERA la banda; dentro de la banda la lectura es neutra ("va a la media"). null en cualquiera
+    // de los dos valores -> NONE.
     //
     // Nota (SPEC 5.2): con velocidad a 1 decimal, "el entero redondeado" son en realidad DÉCIMAS
-    // (p. ej. 24,3 km/h -> el entero 243) -- a este módulo le da igual la escala, solo compara.
-    function classify(shownCurrent as Number or Null, shownAverage as Number or Null) as Number {
+    // (p. ej. 24,3 km/h -> el entero 243), así que `deadBand` también va en décimas -- a este
+    // módulo le da igual la escala, solo compara.
+    function classify(shownCurrent as Number or Null, shownAverage as Number or Null, deadBand as Number) as Number {
         if (shownCurrent == null || shownAverage == null) {
             return NONE;
         }
-        if (shownCurrent > shownAverage) { return UP; }
-        if (shownCurrent < shownAverage) { return DOWN; }
+        var diff = shownCurrent - shownAverage;
+        if (diff > deadBand)  { return UP; }
+        if (diff < -deadBand) { return DOWN; }
         return NONE;
     }
 }
 ```
 
-**Por qué esto YA es la banda muerta (simplificación consciente respecto de la spec maestra):** la spec maestra describe la banda muerta como "sin flecha si `round(actual) == round(promedio)`". En vez de pasarle floats crudos + un parámetro de paso de redondeo a `TrendArrow`, la **View redondea una sola vez** (con la misma función que usa para el string de pantalla, `SpeedFormat.shownTenths`, §5.2) y le pasa a `classify` los dos ENTEROS ya redondeados. Resultado idéntico, una función más simple, y **imposible que el número y la flecha se contradigan** (comparten la misma fuente de redondeo). Documentado acá para que quien lea la spec maestra y compare con el código no piense que hay una discrepancia — es un refinamiento de diseño, no una desviación.
+**Banda muerta SEMÁNTICA de ±0,1 km/h (`DEAD_BAND_TENTHS = 1` en la View, decisión del autor 2026-07-24):** el arma no es anti-titileo — el titileo se ve bien como estaba. Es una decisión de **significado**: para el autor, una diferencia de ≤ 0,1 km/h entre actual y promedio significa *"realmente vas a la velocidad media"*, así que "por encima / por debajo" solo tiene sentido cuando la diferencia **supera** 0,1. Con décimas: `diff ∈ {−1, 0, +1}` (o sea |Δ| ≤ 0,1) → **NONE**; recién `|diff| ≥ 2` (≥ 0,2) muestra flecha. Es conceptualmente la banda muerta "de 1 dígito" del Cateye (no verificado como fuente dura). La View define la constante (el conocimiento "una décima = 0,1 km/h" es específico de velocidad) y se la pasa a `classify`, que sigue **genérico** (la banda va en las unidades enteras que le pasa el llamador; §8 Tier 2 podría darle a cada métrica su propia banda).
 
-**Consecuencia de mostrar 1 decimal (leer antes de sorprenderse con el comportamiento):** al comparar sobre **décimas** de km/h (paso de display 0,1) en vez de km/h enteros (paso 1), la banda muerta es **10 veces más fina** → la flecha reacciona a diferencias mucho más chicas. Con **sensor de rueda** (el del autor) esto es aceptable porque la lectura es limpia. Si en el futuro se prueba con GPS solo y la flecha titila cerca del cruce, ver la nota de histéresis abajo.
+**Refinamiento de arquitectura respecto de la spec maestra:** la spec maestra describe la banda muerta como "sin flecha si `round(actual) == round(promedio)`". Acá la **View redondea una sola vez** (con `SpeedFormat.shownTenths`, §5.2) y le pasa a `classify` los enteros ya redondeados **más** el ancho de banda; no hace falta pasarle floats crudos ni un paso de redondeo aparte. Documentado para que quien compare la spec maestra con el código no piense que hay discrepancia.
+
+**Consecuencia (leer antes de sorprenderse): con `deadBand > 0`, el número y la flecha PUEDEN "no coincidir" a propósito** — p. ej. `24,3` actual / `24,2` promedio muestra los dos números distintos pero **sin flecha** (la diferencia de 0,1 cae en la banda = "va a la media"). Esto RELAJA a propósito la invariante anterior "la flecha nunca contradice al número" (que valía con `deadBand=0`): para una flecha de tendencia es lo esperado y correcto. Con **sensor de rueda** (el del autor) la lectura es limpia, y el promedio (`Activity.Info.averageSpeed`, cociente distancia/tiempo acumulado) es una referencia casi inmóvil, así que la banda fija se comporta de forma estable.
 
 **Nota de diseño (SECUNDARIO — no implementar salvo que se pida):** la spec maestra deja abierta una histéresis/persistencia opcional si la flecha parpadea cerca del cruce. **No implementar en v1.** Si hiciera falta, el patrón ya existe en la B: `STOP_PERSIST_TICKS` en `GradeVamEngine.mc` (contador de N ticks consecutivos antes de cambiar de estado) — mismo idioma, aplicado a `TrendArrow` en vez de al guard de VAM.
 
@@ -164,6 +225,9 @@ module SpeedFormat {
         }
         var sign = (tenths < 0) ? "-" : "";
         var absT = (tenths < 0) ? -tenths : tenths;
+        if (absT >= 1000) {
+            return sign + ((absT + 5) / 10).toString();   // >= 100.0 -> entero (ver nota abajo)
+        }
         var whole = absT / 10;      // división entera
         var dec = absT % 10;
         return sign + whole.toString() + "." + dec.toString();
@@ -175,6 +239,8 @@ module SpeedFormat {
 }
 ```
 
+**Sin decimal a partir de 100 (2026-07-25, §6.10):** arriba de 99,9 el string pasa a entero (`"104"`). No es capricho de formato, es lo que **permite que el número se dibuje grande**: la fuente se elige contra la plantilla `VALUE_TPL = "88.8"`, y como `w("888") < w("88.8")` en todas las fuentes numéricas, ningún valor real puede desbordar esa plantilla. Reservar `"888.8"` costaba un escalón entero de fuente en las celdas de media pantalla por una velocidad que en bici no existe. Consecuencia aceptada: por encima de 100 la flecha puede indicar una tendencia que los dos enteros mostrados ya no revelan (misma relajación que la banda muerta de §5.1).
+
 ### 5.3 `compute()` de la View — casi trivial (sin pipeline, a diferencia de la B)
 
 ```
@@ -184,7 +250,7 @@ module SpeedFormat {
 4. avgTenths = SpeedFormat.shownTenths(info.averageSpeed, mIsStatute)
 5. mCurStr = SpeedFormat.displayString(curTenths)
 6. mAvgStr = SpeedFormat.displayString(avgTenths)
-7. mArrowState = TrendArrow.classify(curTenths, avgTenths)
+7. mArrowState = TrendArrow.classify(curTenths, avgTenths, DEAD_BAND_TENTHS)   // banda ±0,1 km/h (§5.1)
 8. mUnitLabel = SpeedFormat.unitLabel(mIsStatute)
 ```
 
@@ -217,6 +283,8 @@ const VALUE_TPL = "888.8";  // plantilla de ancho estable: 3 dígitos enteros + 
                              // (cubre 0.0-999.9; la velocidad no lleva signo en la práctica)
 ```
 
+> ⚠️ **§6.10 (2026-07-25) supersede parte de esta tabla:** `VALUE_TPL = "88.8"` (2 dígitos enteros; ≥100 va sin decimal) y se agregan `BAND_SLACK`, `UNIT_LINE_GAP`, `UNIT_NUM`/`UNIT_DEN`, `UNIT_SHRINK_STEPS`.
+
 ### 6.3 Fuentes (herencia directa de A/B — reusar tal cual, sin reinventar)
 
 - **Escalera numérica, idéntica a A/B** (mismo array, mismo orden, ya validado en device) — se usa TANTO para el valor actual como para el promedio (cada uno elige su propio tamaño dentro de su banda, ver §6.4). **Ya no hace falta una escalera de fuente de texto** (`mTextLadder` de la B): con el `.` confirmado en la fuente numérica (§2), todo el string `"24.3"` se dibuja en UNA sola fuente de esta escalera:
@@ -227,9 +295,13 @@ const VALUE_TPL = "888.8";  // plantilla de ancho estable: 3 dígitos enteros + 
 - **Label: `FONT_GLANCE`, en MAYÚSCULAS**, reservando solo `ascent` + margen — mismo patrón A/B, misma salvedad del edge830 sin glance font (B §6.2) a verificar en el simulador con ese perfil.
 - **Prefijo "AVG"/"PROM": `FONT_XTINY` FIJO** (no ladder) — mismo patrón que el header `"PEND/VAM"` de B en modo SMALL: es una etiqueta chica de apoyo, no necesita escalar.
 - La unidad va en el label del valor actual (`"SPEED KM/H"`, igual que B con `"VAM M/H"`) — no se repite en la línea de promedio (ya está implícita: mismo campo, misma unidad).
+
+> ⚠️ **Superseded dos veces:** §6.9 (2026-07-23) saca la unidad del label y la dibuja apilada junto al número; §6.10 (2026-07-25) **repone `mTextLadder`** (`[MEDIUM, SMALL, TINY, XTINY]`) porque la unidad y el prefijo `AVG`/`PROM` pasan a ser **proporcionales al número** (ya no `FONT_XTINY` fijo), y el label usa la misma escalera como fallback cuando el nombre largo no entra.
 - **Selección con caché**, igual patrón que A/B: recalcular SOLO cuando cambia `(w, h, mIsStatute)`. (Nota: `VALUE_TPL` en sí no cambia de ancho entre km/h y mph — a diferencia del template de VAM en B, que sí pasa de 5 a 6 glifos entre m/h y ft/h — así que `mIsStatute` no es estrictamente necesario en la clave de fuente; se incluye igual porque el LABEL sí cambia de texto con la unidad, y mantiene la caché con el mismo criterio conservador que el resto del repo.)
 
 ### 6.4 Selección de fuentes (algoritmo completo)
+
+> ⚠️ **§6.10 (2026-07-25) supersede el pseudocódigo de abajo en tres puntos:** (a) el gate de alto es `getFontAscent(f) <= bandH - BAND_SLACK`, **no** `getFontHeight(f) > bandH*0,9`; (b) la unidad se elige por cada fuente candidata (`fitUnitFont`, proporcional y con hasta 2 escalones de encogimiento) en vez de reservar un ancho fijo de `FONT_XTINY`; (c) el prefijo `AVG`/`PROM` se mide en la fuente de la unidad. La ESTRUCTURA (escalera de mayor a menor, plantilla de ancho estable, fallback sin flecha) no cambia.
 
 ```
 selectFonts(dc, usableW, h, labelH):
@@ -389,6 +461,32 @@ Tras comparar contra el campo nativo del Edge (capturas `b-grade-vam/screenshots
 - **Constantes nuevas:** `UNIT_GAP=3`, `UNIT_BOTTOM_NUDGE=0` (positivo empuja la unidad HACIA ABAJO; nudge fino a afinar en el sim — mismo idioma que `VALUE_NUDGE`/`ARROW_NUDGE`). Unidad en `FONT_XTINY` fija.
 - Compila limpio (release 840+830, `-w`) + **10/10 tests verdes**. **PENDIENTE (autor):** afinar en el sim el `UNIT_BOTTOM_NUDGE` (alto exacto de la unidad respecto de los dígitos) y confirmar que `km`/`h` no pisa el número ni se sale de la celda en las resoluciones chicas.
 
+### 6.10 Paridad con el campo nativo: número GRANDE, unidad proporcional, label largo (2026-07-25)
+
+Screenshot del autor (`screenshots/2026-07-25-11-08-23.BMP`, edge840 en el sim, página de mapa con 2 campos abajo: **izquierda = velocidad NATIVA, derecha = la nuestra**) → nuestro campo se veía **más chico en todo**. Medido pixel a pixel sobre el BMP (celda de **122×62 px** en ambos casos, divisor en x=122–123):
+
+| | nativo | nuestro (antes) |
+|---|---|---|
+| dígitos `9.3` (tinta) | **27 px de alto**, 51 de ancho → `FONT_SYSTEM_NUMBER_MEDIUM` | 22 × 35 → `…_MILD` (un escalón menos) |
+| unidad `km`/`h` (tinta) | **11 px por línea**, bloque 20 de ancho (~`FONT_SMALL`) | 8 px, bloque 12 (`FONT_XTINY`) |
+| `h` respecto de `km` | **centrada** debajo | pegada a la izquierda |
+| label | `VELOCIDAD` | `VEL` |
+| baselines de la unidad | 14 px de separación; la `h` apoya en los pies de los dígitos | ascent exacto (12) |
+
+**Métricas reales de fuente del edge840** (obtenidas headless, ver §11.1): `NUMBER_MEDIUM` h=42 a=33 d=9, w("88.8")=73, w("888.8")=94; `NUMBER_MILD` h=35 a=28; `FONT_SMALL` a=12 w("km")=19; `FONT_GLANCE` a=15 w("VELOCIDAD")=85.
+
+Tres causas, tres arreglos:
+
+1. **El gate de alto usaba `getFontHeight` (REGLA NUEVA: usar `getFontAscent`).** Con label, la banda del valor es `62 − 21 = 41` px. `getFontHeight(NUMBER_MEDIUM) = 42 > 41·0,9 = 36` → se descartaba, aunque **sus dígitos solo pintan 27 px**: la altura de una fuente numérica incluye un descendente que los dígitos NUNCA usan (la misma regla dura de centrado de §6.7, aplicada ahora a la SELECCIÓN). El nativo mete una fuente de 42 px de alto en una banda de 41 justamente por eso. Ahora: `getFontAscent(f) <= bandH - BAND_SLACK` (`BAND_SLACK = 2`) → elige `NUMBER_MEDIUM`, **igual que el nativo**.
+2. **`VALUE_TPL` pasó de `"888.8"` a `"88.8"`** (y `INLINE_TPL` a `"88.8 / 88.8"`): reservar 3 dígitos enteros + decimal costaba 21 px de ancho por una velocidad que en bici no existe. Para que la plantilla siga siendo una cota REAL, `SpeedFormat.displayString` **suelta el decimal a partir de 100** (`"104"`), y `w("888") < w("88.8")` en todas las fuentes numéricas → ningún valor posible desborda la plantilla (§5.2). Consecuencia aceptada: por encima de 100 la flecha puede indicar una tendencia que los dos enteros ya no revelan (la misma relajación que ya hace la banda muerta de §5.1).
+3. **Unidad PROPORCIONAL al número, no `FONT_XTINY` fija.** Ratio del nativo: ascent de unidad 12 sobre ascent de número 33 ≈ **2/5** → `UNIT_NUM/UNIT_DEN = 2/5`; se elige la mayor fuente de texto con `ascent <= ascentNúmero·2/5`. Si el grupo no entra a lo ancho, **primero se encoge la UNIDAD** (hasta `UNIT_SHRINK_STEPS = 2` escalones) y solo después se baja un tamaño el **NÚMERO** (el número es el dato; la unidad es una pista). Vuelve `mTextLadder` (`[MEDIUM, SMALL, TINY, XTINY]`), que §6.3 había eliminado. `drawStackedUnit` ahora **centra las dos líneas** entre sí (`TEXT_JUSTIFY_CENTER` sobre el centro del bloque) y separa las baselines `ascent + UNIT_LINE_GAP` (`=2`, que es exactamente los 14 px medidos en el nativo con `FONT_SMALL`). La línea de promedio comparte esa fuente para su unidad **y para el prefijo `AVG`/`PROM`** (ya no `FONT_XTINY` fijo), así toda la línea secundaria escala junta.
+
+**Label largo con degradación (como el nativo, que abrevia en celdas angostas):** dos strings por idioma — `SpeedLabel` (largo: `Velocidad`/`Speed`) y `SpeedLabelShort` (`Vel`/`Speed`). `selectLabel` usa el largo si entra en `FONT_GLANCE`, si no el corto, y si tampoco entra baja el corto por `mTextLadder`. El alto del label (`mLabelH`) usa el `ascent` de la fuente elegida.
+
+**Verificado headless en las 6 celdas típicas** (§11.1). En la celda del screenshot (122×62, métrico): valor `NUMBER_MEDIUM` (a=33) + unidad `FONT_SMALL` (a=12, bloque 19 px) + label `VELOCIDAD` + flecha → **tinta de dígitos calculada en y 28..55 vs. 28..54 del nativo, `km` en 30..41 vs. 30..40, `h` en 45..55 vs. 44..54** (≤1 px de diferencia en todo). Celda ancha corta (246×62) también sube a `NUMBER_MEDIUM` inline. Celda de 3 columnas (82×62) sigue cayendo a fuente de texto: el grupo `[flecha + "88.8" + unidad]` no entra ni con la unidad en `XTINY` — **no es una regresión** (el comportamiento anterior era idéntico) y se acepta: se prefiere flecha + número chico a número grande sin flecha (la flecha ES la app). En el edge830 (sin glance font, label a=10) el valor también sube a `NUMBER_MEDIUM`.
+
+Compila limpio (release 840+830, `-w`) + **11/11 tests verdes**. **PENDIENTE (autor):** validación visual en el sim contra el nativo (afinar `UNIT_LINE_GAP`/`UNIT_BOTTOM_NUDGE` y el `BAND_SLACK` si el número roza el label).
+
 ## 7. Extender a otras métricas Tier 1 (documentado, NO implementar en v1)
 
 Sumar FC o cadencia más adelante es, literalmente:
@@ -419,32 +517,45 @@ Patrón exacto de A/B: módulos puros + funciones `(:test)` de `Toybox.Test`, un
 
 **`TrendArrowTest.mc` — casos concretos:**
 ```monkeyc
+// deadBand=0 = comparación estricta (cualquier diferencia redondeada muestra flecha).
 (:test)
 function testTrendArrowUp(logger as Test.Logger) as Boolean {
-    Test.assertEqualMessage(TrendArrow.classify(253, 240), TrendArrow.UP, "25.3 > 24.0 -> UP");
-    Test.assertEqualMessage(TrendArrow.classify(-50, -100), TrendArrow.UP, "-5.0 > -10.0 -> UP");
+    Test.assertEqualMessage(TrendArrow.classify(253, 240, 0), TrendArrow.UP, "25.3 > 24.0 -> UP");
+    Test.assertEqualMessage(TrendArrow.classify(-50, -100, 0), TrendArrow.UP, "-5.0 > -10.0 -> UP");
     return true;
 }
 
 (:test)
 function testTrendArrowDown(logger as Test.Logger) as Boolean {
-    Test.assertEqualMessage(TrendArrow.classify(150, 200), TrendArrow.DOWN, "15.0 < 20.0 -> DOWN");
-    Test.assertEqualMessage(TrendArrow.classify(-100, -50), TrendArrow.DOWN, "-10.0 < -5.0 -> DOWN");
+    Test.assertEqualMessage(TrendArrow.classify(150, 200, 0), TrendArrow.DOWN, "15.0 < 20.0 -> DOWN");
+    Test.assertEqualMessage(TrendArrow.classify(-100, -50, 0), TrendArrow.DOWN, "-10.0 < -5.0 -> DOWN");
     return true;
 }
 
 (:test)
 function testTrendArrowNone(logger as Test.Logger) as Boolean {
-    Test.assertEqualMessage(TrendArrow.classify(200, 200), TrendArrow.NONE, "equal -> NONE");
-    Test.assertEqualMessage(TrendArrow.classify(0, 0), TrendArrow.NONE, "zero == zero -> NONE");
+    Test.assertEqualMessage(TrendArrow.classify(200, 200, 0), TrendArrow.NONE, "equal -> NONE");
+    Test.assertEqualMessage(TrendArrow.classify(0, 0, 0), TrendArrow.NONE, "zero == zero -> NONE");
     return true;
 }
 
 (:test)
 function testTrendArrowNullSafety(logger as Test.Logger) as Boolean {
-    Test.assertEqualMessage(TrendArrow.classify(null, 200), TrendArrow.NONE, "null current -> NONE");
-    Test.assertEqualMessage(TrendArrow.classify(200, null), TrendArrow.NONE, "null average -> NONE");
-    Test.assertEqualMessage(TrendArrow.classify(null, null), TrendArrow.NONE, "both null -> NONE");
+    Test.assertEqualMessage(TrendArrow.classify(null, 200, 1), TrendArrow.NONE, "null current -> NONE");
+    Test.assertEqualMessage(TrendArrow.classify(200, null, 1), TrendArrow.NONE, "null average -> NONE");
+    Test.assertEqualMessage(TrendArrow.classify(null, null, 1), TrendArrow.NONE, "both null -> NONE");
+    return true;
+}
+
+// Banda muerta semántica de ±0,1 km/h (deadBand = 1 décima): |Δ| <= 0,1 -> NONE ("va a la media");
+// solo |Δ| > 0,1 (o sea >= 0,2) muestra flecha.
+(:test)
+function testTrendArrowDeadBand(logger as Test.Logger) as Boolean {
+    Test.assertEqualMessage(TrendArrow.classify(240, 240, 1), TrendArrow.NONE, "24.0 vs 24.0 -> NONE");
+    Test.assertEqualMessage(TrendArrow.classify(241, 240, 1), TrendArrow.NONE, "+0.1 gap -> NONE (at avg)");
+    Test.assertEqualMessage(TrendArrow.classify(239, 240, 1), TrendArrow.NONE, "-0.1 gap -> NONE (at avg)");
+    Test.assertEqualMessage(TrendArrow.classify(242, 240, 1), TrendArrow.UP, "+0.2 gap -> UP");
+    Test.assertEqualMessage(TrendArrow.classify(238, 240, 1), TrendArrow.DOWN, "-0.2 gap -> DOWN");
     return true;
 }
 ```
@@ -483,6 +594,8 @@ function testDisplayString(logger as Test.Logger) as Boolean {
     Test.assertEqualMessage(SpeedFormat.displayString(-13), "-1.3", "-13 tenths -> \"-1.3\" (sign kept)");
     Test.assertEqualMessage(SpeedFormat.displayString(0), "0.0", "zero -> \"0.0\"");
     Test.assertMessage(SpeedFormat.displayString(null).equals("--"), "null -> --");
+    // >= 100 sin decimal (2026-07-25, §5.2/§6.10): 999 -> "99.9", 1000 -> "100", 1006 -> "101",
+    // -1023 -> "-102" (redondea a la unidad, mantiene el signo).
     return true;
 }
 
@@ -504,6 +617,19 @@ function testUnitLabel(logger as Test.Logger) as Boolean {
   El generador acumula **su propia distancia y tiempo** y calcula el promedio **exactamente como Garmin** (`distanciaAcumulada / tiempoAcumulado`, la misma fórmula de tasa vista en §8) — así el promedio converge de forma realista a lo largo del ciclo y la demo muestra las 3 flechas (arriba en los tramos rápidos, abajo en los lentos, sin flecha cerca del cruce) **y a la vez deja ver el número de promedio evolucionando** en la línea secundaria (§6), que es exactamente lo que el autor quiere validar de un vistazo.
 - **`DEBUG_MEASURE`** (`const false` plano, patrón A/B): imprime a la consola cada tamaño de celda distinto + las fuentes elegidas (valor/promedio, alto/ascent/descent) + si la flecha entró (`mArrowFits`) + si se muestra el promedio (`mShowAvg`). Misma utilidad que en A/B: es la data para afinar el layout en las 6 resoluciones.
 - **Esquema de exclusión del release:** idéntico a A/B — `const false` plano (el optimizador `-r` elimina el bloque) + `(:debug)`/`(:release)` pares para las funciones llamadas desde el guard. Volver ambos flags a `false` antes de todo build de release.
+
+### 11.1 Medir el layout SIN abrir la GUI del simulador (técnica nueva, 2026-07-25)
+
+Hallazgo importante: **se puede verificar la selección de fuentes de una celda de cualquier tamaño sin ver la pantalla**, desde un test `(:test)` corrido con `monkeydo -t` (que sí anda headless). Con esto se caza en minutos lo que antes requería F5 + ojo del autor, y se puede barrer las 6 resoluciones de una.
+
+Receta (fue un archivo **temporal**, `source/FontProbeTest.mc`, borrado después de usarlo — no queda en el repo):
+
+1. Un `Dc` offscreen del tamaño exacto de la celda: `new Graphics.BufferedBitmap({:width=>w, :height=>h}).getDc()`. ⚠️ **La API cambió entre devices:** en el **edge830** (CIQ 3.3) funciona el constructor `new Graphics.BufferedBitmap(...)` y NO existe `Graphics.createBufferedBitmap`; en el **edge840** es al revés (el constructor tira `Symbol Not Found`). Un probe permanente tendría que ramificar con `Graphics has :createBufferedBitmap`.
+2. `var view = new TrendArrowView(); view.onUpdate(dc);` — la View se instancia y dibuja **fuera del ciclo de vida del data field sin problema** (`getBackgroundColor()`, `WatchUi.loadResource` y `getDeviceSettings()` responden bien en el test).
+3. Con `DEBUG_MEASURE = true`, cada `onUpdate` imprime la celda + las fuentes elegidas → la decisión REAL del código, no una re-derivación a mano. (Al hacerlo se descubrió que `debugMeasure` no reportaba la rama inline de §6.8; ahora imprime también `mInlineFont`/`mInlineUnitFont`/`mInlineArrowFits`.)
+4. Para medir métricas crudas de fuente (`getFontAscent/Descent`, `getFontHeight`, `getTextWidthInPixels` de plantillas y labels) alcanza el mismo `Dc` offscreen sin la View — así se armó la tabla de §6.10.
+
+Lo que la técnica **NO** reemplaza: ver los píxeles. No hay lectura de píxeles desde Monkey C (`Dc` no tiene `getPixel`), así que la validación estética final (¿se ve bien?) sigue siendo del autor con F5. Lo que sí da: certeza de QUÉ fuente/tamaño se elige en cada celda de cada device, que es donde estaban los bugs.
 
 ## 12. Presupuesto y rendimiento
 

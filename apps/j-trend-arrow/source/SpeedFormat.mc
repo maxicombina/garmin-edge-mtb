@@ -48,12 +48,22 @@ module SpeedFormat {
     // Final string "24.3" / "-1.3" / "0.0" / "--" from an ALREADY-ROUNDED tenths count (what
     // shownTenths returns). Built by INTEGER arithmetic (whole = |tenths|/10, dec = |tenths|%10) to
     // avoid dragging float noise -- do NOT use tenths/10.0 + toString() directly.
+    //
+    // At 100 or more the DECIMAL IS DROPPED ("104"): that keeps the widest possible string no wider
+    // than the "88.8" template the View reserves when it picks the number font (w("888") < w("88.8")
+    // in every system number font), so the number can be drawn as big as the native field instead of
+    // sizing every cell for a 3-digit-plus-decimal value nobody ever sees on a bike (SPEC 5.2).
+    // Consequence, accepted: above 100 the arrow can show a trend the two rounded integers no longer
+    // reveal -- same relaxation the semantic dead band already makes (SPEC 5.1).
     function displayString(tenths as Number or Null) as String {
         if (tenths == null) {
             return "--";
         }
         var sign = (tenths < 0) ? "-" : "";
         var absT = (tenths < 0) ? -tenths : tenths;
+        if (absT >= 1000) {
+            return sign + ((absT + 5) / 10).toString();   // >= 100.0 -> integer, nearest
+        }
         var whole = absT / 10;      // integer division
         var dec = absT % 10;
         return sign + whole.toString() + "." + dec.toString();

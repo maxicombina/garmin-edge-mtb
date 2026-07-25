@@ -41,6 +41,12 @@ function testDisplayString(logger as Test.Logger) as Boolean {
     Test.assertEqualMessage(SpeedFormat.displayString(-13), "-1.3", "-13 tenths -> \"-1.3\" (sign kept)");
     Test.assertEqualMessage(SpeedFormat.displayString(0), "0.0", "zero -> \"0.0\"");
     Test.assertEqualMessage(SpeedFormat.displayString(50), "5.0", "50 tenths -> \"5.0\"");
+    Test.assertEqualMessage(SpeedFormat.displayString(999), "99.9", "999 tenths -> \"99.9\" (last value with a decimal)");
+    // >= 100.0 drops the decimal so the string never outgrows the "88.8" font template (SPEC 5.2).
+    Test.assertEqualMessage(SpeedFormat.displayString(1000), "100", "1000 tenths -> \"100\" (no decimal)");
+    Test.assertEqualMessage(SpeedFormat.displayString(1004), "100", "1004 tenths -> \"100\" (rounds down)");
+    Test.assertEqualMessage(SpeedFormat.displayString(1006), "101", "1006 tenths -> \"101\" (rounds up)");
+    Test.assertEqualMessage(SpeedFormat.displayString(-1023), "-102", "-1023 tenths -> \"-102\" (sign kept)");
     Test.assertMessage(SpeedFormat.displayString(null).equals("--"), "null -> --");
     return true;
 }
