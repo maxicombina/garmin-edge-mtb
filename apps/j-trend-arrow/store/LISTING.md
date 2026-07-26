@@ -8,6 +8,14 @@ Para copiar y pegar en el portal de Connect IQ al subir el `.iq`. Decisiones tom
 - **Contacto:** `el.soldador.garmin@gmail.com` (el dedicado, NO el personal).
 - **Versión a tipear:** `0.1.0` (sale de `RELEASES.md`).
 
+⚠️ **ESTOS TEXTOS DESCRIBEN LA v0.1.0 (lo que está publicado en prod) Y TIENEN UNA LÍNEA QUE YA ES
+FALSA.** Desde la v0.2.x la app **sí tiene ajustes** (referencia configurable: promedio de la salida u
+objetivo fijo, `SPEC.md` §9), así que la última viñeta de las dos descripciones —*"Nothing to
+configure - there are no settings"* / *"No hay nada que configurar: no tiene ajustes"*— hay que
+reescribirla **antes de promover los settings a producción**. Se dejan tal cual a propósito: siguen
+siendo el texto correcto de la ficha que está arriba ahora. Lo que se sube al canal **beta** no usa
+esta ficha.
+
 ⚠️ **El formulario del portal NO acepta markdown** (verificado por el autor, 2026-07-26): los textos
 de abajo van en **texto plano**, sin `**`, sin `#` y sin comillas invertidas. Están dentro de bloques
 de código para que se copien tal cual; lo que va en el formulario es el contenido, no las tres tildes.
