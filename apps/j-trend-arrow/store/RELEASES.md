@@ -12,7 +12,7 @@ portal de Connect IQ al subir el `.iq`. Este archivo dice qué número tipear y 
 
 Entradas, más nueva primero.
 
-## v0.1.0 — 2026-07-26
+## v0.1.0 — 2026-07-26 — prod
 
 Primera subida. Campo de datos que muestra la **velocidad actual** en grande con una **flecha ↑/↓
 al lado**, comparándola contra la **velocidad promedio de la actividad** (estilo Cateye), y el
