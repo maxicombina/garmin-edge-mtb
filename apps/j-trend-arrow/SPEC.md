@@ -143,6 +143,22 @@ Cómo se recortaron, y los dos errores que costó (el script quedó en el scratc
 - **Error 1:** el primer recorte incluía la línea de borde de la pantalla y las **esquinas redondeadas del bisel** → marco negro alrededor. Solución: meter el recorte 6 px hacia dentro y repintar las esquinas con el color de fondo.
 - **Error 2:** el color de fondo se detectaba mirando el **centro** de la imagen, que en el tema oscuro cae sobre texto blanco → rellenó las esquinas de blanco sobre negro. Solución: color **dominante** de todo el recorte (moda sobre histograma grueso).
 
+**Límite de peso del portal: 150 KB por captura (verificado por el autor al subir, 2026-07-26).** Las
+capturas llegaban pesando 664-1050 KB y entraron **sin bajar un solo píxel**, porque el peso no estaba
+en la resolución sino en el **ruido de color**: eran imágenes de texto negro sobre blanco con más de
+6000 colores distintos, ruido del pipeline que las generó (desvío de gris máximo 6 sobre 255, media
+0,16). Receta, en orden de rendimiento:
+
+1. **A escala de grises** — visualmente idéntico, y pasa de 3 canales a 1.
+2. **Pegar al blanco y al negro puros** los valores casi puros (≥249 → 255, ≤6 → 0): convierte los
+   fondos planos en tiradas largas del mismo byte.
+3. **Filtro PNG por fila**, eligiendo entre `none`/`sub`/`up`/`average` el de menor suma absoluta (la
+   heurística estándar): sobre un fondo plano, `up` da ceros.
+
+Con eso solo: 664-1050 KB → **48-75 KB a resolución completa**. Después, con el lado mayor llevado a
+1000 px, quedan en **24-34 KB**, y una comparación ampliada del mismo dígito no distingue una de otra.
+Lección reutilizable: antes de sacrificar resolución, mirar cuántos colores tiene la imagen.
+
 **Atajo para la próxima:** el simulador tiene su propia función de captura y guarda directamente la pantalla en 246×322 (son los `.BMP` de `screenshots/`, que está gitignoreado). Esos no necesitan recorte ninguno.
 
 ## 4. Entradas — `Activity.Info` (verificado 2026-07-22 por doc oficial + compile-probe contra el SDK)
