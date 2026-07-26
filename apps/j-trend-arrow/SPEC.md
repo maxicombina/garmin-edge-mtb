@@ -564,9 +564,50 @@ Esto no es una promesa de v1.1, es solo la prueba de que la arquitectura cumple 
 - **Setting de métrica objetivo, ancho de banda muerta, promedio global vs. ventana móvil:** dejados fuera del v1 a propósito (ver §7 de la spec maestra) — el v1 es 100 % hardcodeado a velocidad + promedio global de la actividad, **cero settings**, para minimizar superficie de implementación (ver §9).
 - **Temperatura:** de valor dudoso para esta feature (no es miembro de `Activity.Info`, sesgada por el calor del propio equipo) — descartada, no solo pospuesta.
 
-## 9. Settings: NINGUNO en v1 (decisión de producto — como la Opción A)
+## 9. Settings: NINGUNO en v1 (decisión de producto — como la Opción A). Cambia en la próxima iteración, §9.1
 
 A diferencia de la B (4 settings), esta app **no tiene ningún setting en v1**: métrica fija = velocidad, promedio = global de la actividad, banda muerta = implícita en el redondeo a décimas (§5.1). Mismo patrón que A §7 ("No hay — decisión de producto: sin opciones"). Esto significa: **sin `resources/settings/`, sin `properties.xml`, sin `settings.xml`, sin `onSettingsChanged` en `TrendArrowApp.mc`** — el `AppBase` es literalmente `initialize()` + `getInitialView()`, nada más.
+
+### 9.1 PRÓXIMA ITERACIÓN — referencia configurable: promedio real u objetivo del usuario (pedido 2026-07-26)
+
+**Pedido del autor:** poder elegir contra qué se compara la velocidad actual. Dos modos:
+
+1. **Promedio de la actividad** (lo de hoy): `Activity.Info.averageSpeed`, la referencia se mueve sola.
+2. **Velocidad objetivo fija**, definida por el usuario en los settings: la flecha pasa a significar
+   "vas por encima / por debajo de tu objetivo". Cambia el sentido del campo, de *informativo* a
+   *entrenamiento con ritmo pautado* — para mantener un ritmo en un tramo llano, por ejemplo.
+
+**La buena noticia: la arquitectura ya lo soporta sin tocar la lógica.** `TrendArrow.classify` recibe
+**dos enteros** y no sabe qué comparan (§5.1) — el motivo por el que se diseñó genérico. `SpeedFormat`
+tampoco cambia. Lo único que se toca es de dónde sale el segundo número en `compute()`, más el render
+del rótulo de la segunda línea.
+
+**Lo que sí hay que construir, y no existe hoy:**
+
+- `resources/settings/properties.xml` + `settings.xml`, y **`onSettingsChanged` en `TrendArrowApp.mc`**
+  reenviando a la View — hoy el `AppBase` es deliberadamente `initialize()` + `getInitialView()` y nada
+  más (§9). Esto rompe esa decisión a propósito: **la app deja de ser "sin settings"**. Patrón a copiar:
+  la Opción B, que ya tiene las cuatro y el forwarding hecho.
+- Un **modo** (lista de dos valores o booleano) y un **número** para el objetivo.
+
+**Preguntas de diseño a resolver ANTES de escribir código (ninguna es obvia):**
+
+- **¿En qué unidad se tipea el objetivo?** Los settings se editan en el teléfono, que no conoce el
+  `paceUnits` del device. Si el usuario métrico escribe `25` y el imperial también, hay que decidir si
+  el número se interpreta en la unidad del device (simple, pero el mismo valor significa distinto en
+  cada uno) o si se guarda en una unidad canónica y se convierte. Ojo con el caso de cambiar las
+  unidades del device después de haber fijado el objetivo.
+- **Qué muestra la segunda línea** en modo objetivo: hoy dice `PROM 20.4`. Debería decir el objetivo
+  (¿`OBJ 25.0`?), lo que obliga a un string nuevo en los dos idiomas. Y conviene que se distinga de un
+  vistazo del modo promedio, para que no haya duda de contra qué está comparando.
+- **La banda muerta de ±0,1 km/h (§5.1) ¿sigue teniendo sentido?** Contra un promedio que se mueve
+  despacio, sí. Contra un objetivo fijo, un ciclista puede quedarse oscilando en el borde: quizás ahí
+  convenga una banda más ancha, y `classify` **ya acepta el parámetro** para dárselo distinto.
+- **Qué pasa con un objetivo en cero o vacío** (el usuario no lo configuró): degradar al promedio real
+  en silencio, o mostrar `--`. Preferible lo primero, para que la app nunca quede inservible por un
+  setting sin tocar.
+
+**No implementado. No empezar sin resolver las cuatro preguntas de arriba con el autor.**
 
 ## 10. Unit tests (obligatorio — convención del repo desde 2026-07-19)
 
