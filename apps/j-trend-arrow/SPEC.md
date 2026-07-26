@@ -47,7 +47,7 @@ j-trend-arrow/
 ├── manifest.xml               # type=datafield; 13 products; minApiLevel 3.3.0; launcherIcon
 ├── monkey.jungle               # mínimo (auto-discovery), igual que A y B
 ├── source/
-│   ├── TrendArrowApp.mc        # AppBase: getInitialView() → [view]. SIN settings en v1 (§9) →
+│   ├── TrendArrowApp.mc        # AppBase: getInitialView() → [view] + onSettingsChanged (§9.4) →
 │   │                           # no hace falta onSettingsChanged (a diferencia de B).
 │   ├── TrendArrowView.mc       # DataField: compute() (wrapper fino) + onUpdate() (render, §6).
 │   │                           # NO testeable, lo más chico posible (mismo principio que A/B).
@@ -61,7 +61,7 @@ j-trend-arrow/
 │   │                           # el TestUtil.mc de la B.
 │   └── (ningún módulo de buffer/filtro/EMA — no hace falta para Tier 1, ver §3.1)
 ├── resources/
-│   ├── strings/strings.xml     # AppName, SpeedLabel (+ SpeedLabelShort, §6.10), AvgLabel — SIN settings/ (v1 no tiene, §9)
+│   ├── strings/strings.xml     # AppName, SpeedLabel (+ SpeedLabelShort, §6.10), AvgLabel — settings/ desde §9 (v1 no tenía)
 ├── resources-spa/strings/      # español
 ├── resources-<device>/drawables/  # ícono launcher, uno por device (35/36/40/56/68 px) — ya NO placeholder (§3.3)
 └── store/                      # assets de la ficha del store + el generador del ícono (§3.3)
@@ -564,50 +564,220 @@ Esto no es una promesa de v1.1, es solo la prueba de que la arquitectura cumple 
 - **Setting de métrica objetivo, ancho de banda muerta, promedio global vs. ventana móvil:** dejados fuera del v1 a propósito (ver §7 de la spec maestra) — el v1 es 100 % hardcodeado a velocidad + promedio global de la actividad, **cero settings**, para minimizar superficie de implementación (ver §9).
 - **Temperatura:** de valor dudoso para esta feature (no es miembro de `Activity.Info`, sesgada por el calor del propio equipo) — descartada, no solo pospuesta.
 
-## 9. Settings: NINGUNO en v1 (decisión de producto — como la Opción A). Cambia en la próxima iteración, §9.1
+## 9. Settings — la referencia configurable (DECIDIDO 2026-07-26; v1 no tenía ninguno)
 
-A diferencia de la B (4 settings), esta app **no tiene ningún setting en v1**: métrica fija = velocidad, promedio = global de la actividad, banda muerta = implícita en el redondeo a décimas (§5.1). Mismo patrón que A §7 ("No hay — decisión de producto: sin opciones"). Esto significa: **sin `resources/settings/`, sin `properties.xml`, sin `settings.xml`, sin `onSettingsChanged` en `TrendArrowApp.mc`** — el `AppBase` es literalmente `initialize()` + `getInitialView()`, nada más.
+**Historia:** v1 salió sin settings a propósito (patrón de la A: métrica fija, promedio global, banda muerta implícita — el `AppBase` era `initialize()` + `getInitialView()` y nada más). Esta sección especifica la **primera iteración con settings**, pedida por el autor: elegir contra qué se compara la velocidad actual. Las cuatro preguntas de diseño que esta sección dejaba abiertas quedaron **resueltas con el autor el 2026-07-26**; sus respuestas están integradas abajo y marcadas con «(decisión)».
 
-### 9.1 PRÓXIMA ITERACIÓN — referencia configurable: promedio real u objetivo del usuario (pedido 2026-07-26)
+### 9.1 Producto
 
-**Pedido del autor:** poder elegir contra qué se compara la velocidad actual. Dos modos:
+Dos referencias posibles:
 
-1. **Promedio de la actividad** (lo de hoy): `Activity.Info.averageSpeed`, la referencia se mueve sola.
-2. **Velocidad objetivo fija**, definida por el usuario en los settings: la flecha pasa a significar
-   "vas por encima / por debajo de tu objetivo". Cambia el sentido del campo, de *informativo* a
-   *entrenamiento con ritmo pautado* — para mantener un ritmo en un tramo llano, por ejemplo.
+| modo | referencia | la flecha significa | segunda línea |
+|---|---|---|---|
+| **0 — Promedio de la salida** (default) | `Activity.Info.averageSpeed`, se mueve sola | «vas más rápido/lento que tu media» | `PROM 20.4` / `AVG 20.4` |
+| **1 — Objetivo fijo** | número que el usuario tipea en los settings | «vas por encima/debajo de tu objetivo» (ritmo pautado) | `META 25.0` / `GOAL 25.0` |
 
-**La buena noticia: la arquitectura ya lo soporta sin tocar la lógica.** `TrendArrow.classify` recibe
-**dos enteros** y no sabe qué comparan (§5.1) — el motivo por el que se diseñó genérico. `SpeedFormat`
-tampoco cambia. Lo único que se toca es de dónde sale el segundo número en `compute()`, más el render
-del rótulo de la segunda línea.
+- **Dos settings** (decisión): una lista con los dos modos + el número del objetivo. El estado inconsistente que esto habilita (modo objetivo con número en 0/vacío) **degrada en silencio al promedio** — un setting sin tocar jamás deja el campo inservible.
+- **El número se interpreta en la unidad del device** (`paceUnits`: km/h métrico, mph imperial) (decisión). Sin conversión. Consecuencia documentada en el rótulo del setting: si el usuario cambia las unidades del device DESPUÉS, el mismo número pasa a significar la otra unidad. Aceptado.
+- **Prefijo de la segunda línea en modo objetivo: `Meta`/`Goal`** (decisión), en MAYÚSCULAS al dibujar, mismo tratamiento que `Prom`/`Avg`.
+- **Banda muerta: la MISMA ±0,1 (`DEAD_BAND_TENTHS = 1`) en los dos modos** (decisión). Cero constantes nuevas; si en la calle la flecha resulta inquieta contra un objetivo fijo, se ensancha después (`classify` ya recibe el parámetro).
+- **Dónde se configura (verificado 2026-07-26, y B ya lo tenía anotado):** desde el TELÉFONO — Garmin Connect Mobile (device → Activities & App Management → Data Fields) o la app Connect IQ Store — o Garmin Express. **En el propio Edge NO se puede** (límite de plataforma para data fields). Al guardar, al device le llega `onSettingsChanged()` en caliente, sin reiniciar la actividad.
 
-**Lo que sí hay que construir, y no existe hoy:**
+### 9.2 Archivos nuevos (copiar el patrón de B, que ya funciona en producción)
 
-- `resources/settings/properties.xml` + `settings.xml`, y **`onSettingsChanged` en `TrendArrowApp.mc`**
-  reenviando a la View — hoy el `AppBase` es deliberadamente `initialize()` + `getInitialView()` y nada
-  más (§9). Esto rompe esa decisión a propósito: **la app deja de ser "sin settings"**. Patrón a copiar:
-  la Opción B, que ya tiene las cuatro y el forwarding hecho.
-- Un **modo** (lista de dos valores o booleano) y un **número** para el objetivo.
+**`resources/settings/properties.xml`** — literal:
 
-**Preguntas de diseño a resolver ANTES de escribir código (ninguna es obvia):**
+```xml
+<properties>
+    <!-- Reference the arrow compares against (SPEC 9). Stored values are magnitudes, not
+         list indices. targetSpeed is in the DEVICE's speed unit (paceUnits) by decision:
+         no conversion anywhere. -->
+    <property id="referenceMode" type="number">0</property>   <!-- 0 = ride average, 1 = fixed target -->
+    <property id="targetSpeed" type="float">0.0</property>    <!-- 0/negative = not configured -->
+</properties>
+```
 
-- **¿En qué unidad se tipea el objetivo?** Los settings se editan en el teléfono, que no conoce el
-  `paceUnits` del device. Si el usuario métrico escribe `25` y el imperial también, hay que decidir si
-  el número se interpreta en la unidad del device (simple, pero el mismo valor significa distinto en
-  cada uno) o si se guarda en una unidad canónica y se convierte. Ojo con el caso de cambiar las
-  unidades del device después de haber fijado el objetivo.
-- **Qué muestra la segunda línea** en modo objetivo: hoy dice `PROM 20.4`. Debería decir el objetivo
-  (¿`OBJ 25.0`?), lo que obliga a un string nuevo en los dos idiomas. Y conviene que se distinga de un
-  vistazo del modo promedio, para que no haya duda de contra qué está comparando.
-- **La banda muerta de ±0,1 km/h (§5.1) ¿sigue teniendo sentido?** Contra un promedio que se mueve
-  despacio, sí. Contra un objetivo fijo, un ciclista puede quedarse oscilando en el borde: quizás ahí
-  convenga una banda más ancha, y `classify` **ya acepta el parámetro** para dárselo distinto.
-- **Qué pasa con un objetivo en cero o vacío** (el usuario no lo configuró): degradar al promedio real
-  en silencio, o mostrar `--`. Preferible lo primero, para que la app nunca quede inservible por un
-  setting sin tocar.
+**`resources/settings/settings.xml`** — literal:
 
-**No implementado. No empezar sin resolver las cuatro preguntas de arriba con el autor.**
+```xml
+<settings>
+    <!-- Edited from the phone (Garmin Connect Mobile / Connect IQ Store app) or Garmin
+         Express. Data fields cannot be configured on-device (platform limit; same note
+         as b-grade-vam). -->
+    <setting propertyKey="@Properties.referenceMode" title="@Strings.SetReference">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.RefAverage</listEntry>
+            <listEntry value="1">@Strings.RefTarget</listEntry>
+        </settingConfig>
+    </setting>
+    <setting propertyKey="@Properties.targetSpeed" title="@Strings.SetTargetSpeed">
+        <settingConfig type="numeric" min="0" max="99.9" />
+    </setting>
+</settings>
+```
+
+(El `max="99.9"` mantiene el objetivo dentro de la plantilla `"88.8"`; no hay pérdida real — un objetivo de tres dígitos no existe en bici.)
+
+**Schema VERIFICADO compilando (2026-07-26):** estos dos XML, con la property `float` y el `settingConfig type="numeric"` con `min`/`max` — la única combinación que B no usa y que nadie había probado en este repo — **compilan limpios en edge840 y edge830** con el SDK 9.2.0 (probe temporal, revertido). El implementador puede pegarlos tal cual.
+
+**Strings** — agregar a `resources/strings/strings.xml` (base EN):
+
+```xml
+<string id="SetReference">Compare against</string>
+<string id="RefAverage">Ride average</string>
+<string id="RefTarget">Fixed target</string>
+<string id="SetTargetSpeed">Target speed (in your device speed unit, km/h or mph)</string>
+<string id="TargetLabel">Goal</string>
+```
+
+y a `resources-spa/strings/strings.xml`:
+
+```xml
+<string id="SetReference">Comparar contra</string>
+<string id="RefAverage">Promedio de la salida</string>
+<string id="RefTarget">Objetivo fijo</string>
+<string id="SetTargetSpeed">Velocidad objetivo (en la unidad de tu dispositivo, km/h o mph)</string>
+<string id="TargetLabel">Meta</string>
+```
+
+⚠️ Recordatorios de plataforma ya pagados en este repo: nada de `--` dentro de comentarios XML, y el manifest **no** necesita cambios por settings.
+
+### 9.3 `SpeedFormat` — una función pura nueva (con test, §10)
+
+```monkeyc
+// Target speed typed by the user -> tenths, the SAME integer domain shownTenths uses, so
+// TrendArrow.classify compares like with like (SPEC 9). The value is ALREADY in display
+// units (device paceUnits) by decision: no conversion. null / zero / negative mean "not
+// configured" -> null, and the caller falls back to the ride average.
+function targetTenths(value as Float or Number or Null) as Number or Null {
+    if (value == null) { return null; }
+    var f = value.toFloat();
+    if (f <= 0.0) { return null; }
+    return roundHalf(f * 10.0);
+}
+```
+
+### 9.4 `TrendArrowApp.mc` — pasa a reenviar settings (deja de ser mínimo)
+
+Reemplazar la clase completa por el patrón de B (`GradeVamApp.mc`):
+
+```monkeyc
+class TrendArrowApp extends Application.AppBase {
+
+    private var mView as TrendArrowView or Null = null;
+
+    function initialize() {
+        AppBase.initialize();
+    }
+
+    function getInitialView() {
+        mView = new TrendArrowView();
+        return [mView];
+    }
+
+    // Fired when the user saves app settings from the phone / Express. NOT fired by a
+    // device units change -- compute() re-reads paceUnits every tick for that.
+    function onSettingsChanged() as Void {
+        if (mView != null) {
+            mView.reloadSettings();
+        }
+        WatchUi.requestUpdate();
+    }
+}
+```
+
+(Actualizar también el comentario de cabecera del archivo, que hoy dice «v1 has NO settings».)
+
+### 9.5 `TrendArrowView.mc` — cambios exactos
+
+Agregar `import Toybox.Application;` a los imports.
+
+**Miembros nuevos** (junto a `mAvgPrefix`):
+
+```monkeyc
+private var mTargetPrefix as String = "GOAL";        // "Meta"/"Goal" uppercased (loaded once)
+private var mRefPrefix as String = "AVG";            // ACTIVE prefix: mAvgPrefix or mTargetPrefix
+private var mUseTarget as Boolean = false;           // referenceMode == 1
+private var mTargetTenths as Number or Null = null;  // pre-rounded target, null = not usable
+```
+
+**`initialize()`**: tras cargar `mAvgPrefix`, cargar `mTargetPrefix = (WatchUi.loadResource(Rez.Strings.TargetLabel) as String).toUpper();` y llamar `reloadSettings();` al final.
+
+**Funciones nuevas** (calco de B; `readNumber` es COPIA del de `GradeVamView.mc`):
+
+```monkeyc
+// Re-read the 2 app settings (called from initialize() and from TrendArrowApp.
+// onSettingsChanged()). Never called per-tick.
+function reloadSettings() as Void {
+    mUseTarget = (readNumber("referenceMode", 0) == 1);
+    mTargetTenths = SpeedFormat.targetTenths(readFloat("targetSpeed", 0.0));
+    // Active prefix: GOAL/META only when the target is actually usable; target mode with
+    // an unset/zero number silently behaves as average mode (SPEC 9.1).
+    mRefPrefix = (mUseTarget && mTargetTenths != null) ? mTargetPrefix : mAvgPrefix;
+    mCacheW = -1;   // prefix width changed -> force font/layout re-selection (B's idiom)
+}
+
+private function readNumber(key as String, dflt as Number) as Number {
+    var v = Application.Properties.getValue(key);
+    if (v instanceof Lang.Number) { return v; }
+    if (v instanceof Lang.Float) { return v.toNumber(); }
+    return dflt;
+}
+
+private function readFloat(key as String, dflt as Float) as Float {
+    var v = Application.Properties.getValue(key);
+    if (v instanceof Lang.Float) { return v; }
+    if (v instanceof Lang.Number) { return v.toFloat(); }
+    return dflt;
+}
+```
+
+**`compute()`** — el único cambio de lógica. Donde hoy dice
+
+```monkeyc
+mAvgStr = SpeedFormat.displayString(avgTenths);
+mBothStr = mCurStr + INLINE_SEP + mAvgStr;
+mArrowState = TrendArrow.classify(curTenths, avgTenths, DEAD_BAND_TENTHS);
+```
+
+pasa a
+
+```monkeyc
+// The reference the arrow AND the second line compare against: the fixed target when
+// configured and valid, else the ride average (silent fallback, SPEC 9.1). Same
+// DEAD_BAND_TENTHS in both modes (author's decision, 2026-07-26).
+var refTenths = (mUseTarget && mTargetTenths != null) ? mTargetTenths : avgTenths;
+mAvgStr = SpeedFormat.displayString(refTenths);
+mBothStr = mCurStr + INLINE_SEP + mAvgStr;
+mArrowState = TrendArrow.classify(curTenths, refTenths, DEAD_BAND_TENTHS);
+```
+
+(`mAvgStr`/`mAvgFont`/`mAvgBandH` CONSERVAN su nombre — ahora significan «la referencia»; documentarlo en el comentario del miembro y no renombrar, para que el diff sea mínimo.)
+
+**Los 4 usos de `mAvgPrefix` fuera de `initialize()` pasan a `mRefPrefix`** — hoy son exactamente estos, y ninguno más:
+
+1. `onUpdate()`, medición de la línea secundaria: `dc.getTextWidthInPixels(mAvgPrefix, mAvgUnitFont)` → `mRefPrefix`.
+2. `onUpdate()`, dibujo del prefijo de esa línea: `dc.drawText(ax, avgCy, mAvgUnitFont, mAvgPrefix, ...)` → `mRefPrefix`.
+3. `selectLabel()`, sufijo del label ancho: `var suffix = mIsWide ? (INLINE_SEP + mAvgPrefix) : "";` → `mRefPrefix` (el label ancho pasa a decir `VELOCIDAD / META` en modo objetivo).
+4. `fitUnitFont()`, reserva de ancho `withPrefix`: `dc.getTextWidthInPixels(mAvgPrefix, u)` → `mRefPrefix`.
+
+**Nada más cambia.** Ni fuentes, ni tamaños, ni centrado, ni la unidad apilada, ni el glifo/primitiva de la flecha (§6.6/§6.11): el prefijo activo entra en las mismas mediciones de siempre y el `mCacheW = -1` de `reloadSettings()` garantiza que la escalera se re-elija con el ancho del prefijo nuevo. `META`/`GOAL` miden como `PROM`/`AVG` (4 vs 4 y 4 vs 3 caracteres): sin riesgo de desbordes nuevos.
+
+### 9.6 Casos borde (todos con comportamiento definido)
+
+| caso | comportamiento |
+|---|---|
+| modo objetivo, número 0 / negativo / nunca tocado | promedio, prefijo `PROM`/`AVG` — indistinguible del modo 0 |
+| el usuario cambia settings EN MEDIO de una actividad | `onSettingsChanged` → `reloadSettings` → efecto inmediato al siguiente tick |
+| cambia las unidades del device con objetivo fijado | el número se reinterpreta en la unidad nueva (decisión); la flecha sigue coherente porque actual y objetivo están ambos en décimas de display |
+| tipos raros desde GCM (Number donde Float, null) | `readNumber`/`readFloat` degradan al default, como en B |
+| objetivo válido pero sin GPS aún (`curTenths == null`) | `classify` ya devuelve NONE con null; el campo muestra `--` como hoy |
+
+### 9.7 Cómo probarlo sin salir a andar
+
+En el **simulador**: correr con F5 y editar los settings en caliente desde el menú del simulador (en el 9.2.0 es la opción que edita los *App Settings*; el nombre exacto del menú puede variar entre versiones del SDK — es la misma que se usó para probar los 4 settings de B, y dispara `onSettingsChanged` de verdad). Con `TEST_MODE = true` el generador converge la media a **20,0 km/h** (§11): fijar objetivo `25.0` → la flecha debe quedar ABAJO en todos los tramos salvo el de 30,0, y la segunda línea debe decir `META 25.0` fija; volver el modo a promedio → vuelve `PROM` y la línea se mueve. En **device real**: cambiar el setting desde Garmin Connect Mobile con el campo en pantalla y verificar que cambia sin reiniciar.
+
+**Criterios de aceptación:** los de siempre (§13) más: (1) suite verde incluido `testTargetTenths`; (2) export de los 17 targets sin warnings; (3) en el sim, el ciclo completo promedio→objetivo→promedio sin tocar F5; (4) el prefijo cambia también en el label del modo ancho.
 
 ## 10. Unit tests (obligatorio — convención del repo desde 2026-07-19)
 
@@ -704,6 +874,26 @@ function testUnitLabel(logger as Test.Logger) as Boolean {
     return true;
 }
 ```
+
+**`SpeedFormatTest.mc` — caso nuevo para la referencia configurable (§9.3):**
+
+```monkeyc
+(:test)
+function testTargetTenths(logger as Test.Logger) as Boolean {
+    Test.assertEqualMessage(SpeedFormat.targetTenths(25.0), 250, "25.0 -> 250 tenths");
+    // 22.25 is exact in binary: 22.25*10 = 222.5 exactly -> half away from zero -> 223.
+    // Do NOT use values like 22.35 here: they are not representable and the test would
+    // hinge on float noise.
+    Test.assertEqualMessage(SpeedFormat.targetTenths(22.25), 223, "22.25 -> 223 (half away)");
+    Test.assertEqualMessage(SpeedFormat.targetTenths(15), 150, "integer Number accepted");
+    Test.assertMessage(SpeedFormat.targetTenths(0.0) == null, "0 -> null (not configured)");
+    Test.assertMessage(SpeedFormat.targetTenths(-5.0) == null, "negative -> null");
+    Test.assertMessage(SpeedFormat.targetTenths(null) == null, "null -> null");
+    return true;
+}
+```
+
+La elección de referencia en sí (`refTenths = objetivo o promedio`) vive en `compute()` — View fina, no testeable por convención (§3); por eso el fallback se prueba desde la función pura (`0 → null`) más el paseo del simulador de §9.7.
 
 ## 11. Hooks de debug para el simulador (patrón A §13 / B §9 — obligatorio)
 
