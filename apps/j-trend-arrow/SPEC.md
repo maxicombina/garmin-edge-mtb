@@ -105,7 +105,14 @@ Se testearon el master y el launcher de 35 px con **7 observadores independiente
 
 Riesgos repetidos: **ajustes/configuración 7 de 7** (el peor falso amigo en una lista de apps), upload/firmware 7/7, eject 6/7. Además 4 de 7 vieron la franja partida como **dos marcas sueltas** en vez de una línea ocluida.
 
-**Consecuencia aplicada — se sacaron los tacos.** No comunicaban neumático (0/7) y sí comunicaban ajustes (7/7): costo puro. `gen_master.py` los recorta detectando el radio exterior del aro (el mayor radio cuyo perímetro está cubierto >95 %; más afuera solo hay lóbulos, en pocos ángulos) y `gen_icon.py` dibuja los launchers con `nubs_mode='none'`. **La franja quedó continua** por detrás de la flecha (hueco = silueta exacta, sin dilatar). Lo que ningún dibujo arregla es "la raya = tu promedio": eso lo explican el nombre de la app, la ficha y el propio campo en pantalla; al ícono le alcanza con diferenciar y no mentir.
+**Consecuencia aplicada, pero ASIMÉTRICA (decisión del autor, 2026-07-26).** Los tacos se sacaron **solo de los launchers**; el master y el ícono de tienda **los conservan**:
+
+| asset | tacos | por qué |
+|---|---|---|
+| `icon-master-1024.png` + `store-icon-500.png` | **sí** | a tamaño de ficha se lee el neumático y le gusta al autor; el riesgo de "ajustes" era un fenómeno de tamaño chico |
+| los 13 `launcher_icon.png` (35–68 px) | **no**, aro liso | a 35 px los lóbulos eran justo lo que hacía leer engranaje (7 de 7) sin aportar el neumático (0 de 7) |
+
+`gen_master.py` lleva el flag `DROP_KNOBS` (hoy `False`) que recorta los tacos detectando el radio exterior del aro — el mayor radio cuyo perímetro está cubierto >95 %, porque más afuera solo hay lóbulos y en pocos ángulos; `gen_icon.py` dibuja los launchers con `nubs_mode='none'`. **La franja ámbar quedó continua** por detrás de la flecha (hueco = silueta exacta, sin dilatar). Lo que ningún dibujo arregla es "la raya = tu promedio": eso lo explican el nombre de la app, la ficha y el propio campo en pantalla; al ícono le alcanza con diferenciar y no mentir.
 
 *Limitación de la prueba: son observadores de IA, no un estudio con usuarios humanos. Sirven para detectar lecturas erróneas evidentes (el "ajustes" 7/7 lo es), no para medir preferencia ni recordación.*
 
@@ -124,6 +131,19 @@ Queda, y es correcto, **una columna de 1 px** más oscura en un encuentro del ma
 **Dato del research REFUTADO con evidencia (no repetirlo):** que los launchers de los MIP haya que dibujarlos en una paleta de 64 colores (canales `00/55/AA/FF`, y por eso usar `#0055FF`). El launcher de la Opción A —validado en el Edge 840 real del autor— tiene **282 colores distintos y solo 2 caen en esa grilla**. Se usa el `#0070F0` del proyecto.
 
 Compila limpio (release `-w`) en un device por cada tamaño de launcher: edge840, edge830, edgemtb, edge1040, edge850, edge1050.
+
+### 3.4 Capturas para la ficha del store (2026-07-26)
+
+`store/trend-arrow-{1,2,3}.png` + `trend-arrow-4-inv.png`: la pantalla del Edge 840 (246×322) a escala 2×, recortada de capturas del simulador, **sin reescalar** (píxeles originales). Muestran los cuatro casos que valen la pena: campo a pantalla completa con actual+promedio, layout mixto con el campo grande en el medio, modo inline `30.0 / 20.6`, y el mismo layout en **tema oscuro**.
+
+Cómo se recortaron, y los dos errores que costó (el script quedó en el scratchpad, no en el repo — el autor prefiere rehacerlas con otra herramienta):
+
+- Los bordes IZQ/DER salen de las **líneas separadoras azules** del simulador, que abarcan exactamente el ancho de la pantalla. Cuando no hay separadores (campo a pantalla completa) se cae al gradiente por columna: los dos bordes de la pantalla acumulan un conteo **parecido entre sí** (644 y 624 px) mientras el borde de la VENTANA acumula mucho más (1104) — elegir por "conteo máximo" agarra la ventana, hay que elegir por parecido.
+- Los bordes ARRIBA/ABAJO salen de puntuar **cada fila** por la fracción de píxeles "de pantalla" entre los bordes laterales. Hay que **suavizar el perfil** (media móvil de 7 filas) porque alguna fila suelta que cruza el medio de los dígitos grandes es casi toda antialias y cae por debajo del umbral, cortando el recorrido.
+- **Error 1:** el primer recorte incluía la línea de borde de la pantalla y las **esquinas redondeadas del bisel** → marco negro alrededor. Solución: meter el recorte 6 px hacia dentro y repintar las esquinas con el color de fondo.
+- **Error 2:** el color de fondo se detectaba mirando el **centro** de la imagen, que en el tema oscuro cae sobre texto blanco → rellenó las esquinas de blanco sobre negro. Solución: color **dominante** de todo el recorte (moda sobre histograma grueso).
+
+**Atajo para la próxima:** el simulador tiene su propia función de captura y guarda directamente la pantalla en 246×322 (son los `.BMP` de `screenshots/`, que está gitignoreado). Esos no necesitan recorte ninguno.
 
 ## 4. Entradas — `Activity.Info` (verificado 2026-07-22 por doc oficial + compile-probe contra el SDK)
 
@@ -405,6 +425,8 @@ selectFonts(dc, usableW, h, labelH):
 
 ### 6.6 Primitivas de flecha (reusar + espejar)
 
+> **Glifo si el device puede, primitiva si no — IMPLEMENTADO (2026-07-25, decisión del autor).** La primitiva **sigue siendo obligatoria** porque es la única que funciona en los 13 (§11.2: `↑ ↓ ▲ ▼` no están en ninguna fuente numérica ni en la de texto de 6 devices, y un glifo ausente **desaparece sin dejar rastro**). Pero el Edge 840 real **sí los pinta**, vía una cadena de fuentes de respaldo no documentada, así que el autor pidió aprovecharlo donde exista. El código **prueba la disponibilidad en el propio device** y elige; el peor caso es exactamente el comportamiento anterior. Ver §6.11 para la mecánica y §11.2 para las mediciones.
+
 **Reusar tal cual** `drawUpArrow` de la B (`apps/b-grade-vam/source/GradeVamView.mc:536-544`): cabeza triangular rellena (`fillPolygon`) + tallo rectangular (`fillRectangle`), ocupando `[x0, x0+w]` de ancho y centrada verticalmente en `cyMid` con alto `h`.
 
 ```monkeyc
@@ -486,6 +508,25 @@ Tres causas, tres arreglos:
 **Verificado headless en las 6 celdas típicas** (§11.1). En la celda del screenshot (122×62, métrico): valor `NUMBER_MEDIUM` (a=33) + unidad `FONT_SMALL` (a=12, bloque 19 px) + label `VELOCIDAD` + flecha → **tinta de dígitos calculada en y 28..55 vs. 28..54 del nativo, `km` en 30..41 vs. 30..40, `h` en 45..55 vs. 44..54** (≤1 px de diferencia en todo). Celda ancha corta (246×62) también sube a `NUMBER_MEDIUM` inline. Celda de 3 columnas (82×62) sigue cayendo a fuente de texto: el grupo `[flecha + "88.8" + unidad]` no entra ni con la unidad en `XTINY` — **no es una regresión** (el comportamiento anterior era idéntico) y se acepta: se prefiere flecha + número chico a número grande sin flecha (la flecha ES la app). En el edge830 (sin glance font, label a=10) el valor también sube a `NUMBER_MEDIUM`.
 
 Compila limpio (release 840+830, `-w`) + **11/11 tests verdes**. **PENDIENTE (autor):** validación visual en el sim contra el nativo (afinar `UNIT_LINE_GAP`/`UNIT_BOTTOM_NUDGE` y el `BAND_SLACK` si el número roza el label).
+
+### 6.11 Flecha: glifo con fallback a primitiva, y el hueco que no se mueve (2026-07-25)
+
+**Elección en runtime, nunca por lista de devices.** `arrowGlyphFont(dc, targetAscent)` decide, y lo hace **midiendo en el device que está corriendo** — las tablas de fuente no predicen el render y el simulador se equivoca en las dos direcciones (§11.2). Dos señales, las dos deben pasar:
+
+1. el glifo avanza **más de 2 px** — en la familia `.cft` (530/830/1030×3/explore2) un glifo ausente mide exactamente **1 px**;
+2. **no mide lo mismo que `U+E000`** (área de uso privado, que ninguna fuente puede tener legítimamente) — en esa misma familia la fuente numérica devuelve **22 px para ambos**: es una única caja *notdef* compartida.
+
+Si cualquiera falla → primitiva. Medido: edge840 `w(↑)=17` en `FONT_LARGE` (control 0) → **GLIFO**; edge830 `w(↑)=1` en las tres fuentes de texto → **PRIMITIVA**.
+
+**El glifo se pide en una fuente de TEXTO, no en la del valor.** Es contraintuitivo porque en fuente numérica el 840 lo dibuja *más grande* (26 px, justo el tamaño que el campo quiere), pero ahí `getTextWidthInPixels` devuelve **0**: medida y renderizador no coinciden y no hay ancho con el cual maquetar. En fuente de texto los dos concuerdan (11 y 11). El costo es el techo: `FONT_LARGE`, ascent 22, contra los 42 px que alcanza la primitiva junto a un `THAI_HOT`.
+
+**Se resuelve UNA vez, en `selectFonts`** (cacheada por `(w, h, unidades)`), y se guarda en `mGlyphFont` / `mInlineGlyphFont`. Estuvo mal implementado un rato —se probaba dentro de `drawTrendValue`, o sea en cada tick— y lo detectó el autor: rompía la regla del repo de *medir en `selectFonts`, dibujar en `onUpdate`, cero medición por tick*.
+
+**EL HUECO DE LA FLECHA SE RESERVA SIEMPRE, se pinte o no.** Bug reportado por el autor viéndolo en el simulador: el grupo `[flecha][gap][valor][gap][unidad]` va centrado, así que cuando la flecha desaparecía en la banda muerta el grupo se achicaba y **el número saltaba lateralmente** media flecha + medio gap — y eso pasa cada vez que cruzás tu media, o sea todo el tiempo. Ahora `drawTrendValue` recibe `reserveArrow` (¿cabe una flecha acá?) y deriva adentro si toca pintarla; el ancho reservado es **el mayor entre ↑ y ↓**, así tampoco se mueve al cambiar de dirección, y el glifo se dibuja centrado en ese hueco.
+
+**Gotcha de plataforma:** al agregar un parámetro, el método quedó con 10 argumentos y **el edge830 dejó de compilar — CIQ 3.3 admite 9 como máximo**. El edge840 compilaba igual. Por eso `paintArrow` se deriva de miembros en vez de pasarse. (Regla general en `CLAUDE.md`: compilar contra todos los devices, no contra dos.)
+
+**Constantes:** `USE_ARROW_GLYPH` (a `false` fuerza la primitiva en todos lados), `ARROW_GLYPH_UP`/`DOWN` (`\u2191`/`\u2193`; `\u25B2`/`\u25BC` para triángulos sólidos), `GLYPH_CONTROL = \uE000`, `GLYPH_MIN_W = 2`.
 
 ## 7. Extender a otras métricas Tier 1 (documentado, NO implementar en v1)
 
@@ -615,6 +656,8 @@ function testUnitLabel(logger as Test.Logger) as Boolean {
   dursSec   = [  15,   15,   15,   15,   15,   15,   15,   15]
   ```
   El generador acumula **su propia distancia y tiempo** y calcula el promedio **exactamente como Garmin** (`distanciaAcumulada / tiempoAcumulado`, la misma fórmula de tasa vista en §8) — así el promedio converge de forma realista a lo largo del ciclo y la demo muestra las 3 flechas (arriba en los tramos rápidos, abajo en los lentos, sin flecha cerca del cruce) **y a la vez deja ver el número de promedio evolucionando** en la línea secundaria (§6), que es exactamente lo que el autor quiere validar de un vistazo.
+  **Perfil actualizado 2026-07-25** para ejercitar la FLECHA, no solo el número: ocho valores que promedian **exactamente 20,0 km/h** (`[30.0, 10.0, 20.0, 25.0, 15.0, 20.1, 19.9, 20.0]`, segmentos de 3 s), así la media converge ahí y el ciclo recorre los tres estados a propósito — arriba (30/25), abajo (10/15) y **sin flecha** (20,0 y los bordes ±0,1 donde decide `DEAD_BAND_TENTHS`). Las transiciones flecha↔sin-flecha son las que destaparon el salto lateral de §6.11. Los perfiles anteriores quedan **comentados en el código, no borrados** (pedido del autor).
+
 - **`DEBUG_MEASURE`** (`const false` plano, patrón A/B): imprime a la consola cada tamaño de celda distinto + las fuentes elegidas (valor/promedio, alto/ascent/descent) + si la flecha entró (`mArrowFits`) + si se muestra el promedio (`mShowAvg`). Misma utilidad que en A/B: es la data para afinar el layout en las 6 resoluciones.
 - **Esquema de exclusión del release:** idéntico a A/B — `const false` plano (el optimizador `-r` elimina el bloque) + `(:debug)`/`(:release)` pares para las funciones llamadas desde el guard. Volver ambos flags a `false` antes de todo build de release.
 
@@ -630,6 +673,36 @@ Receta (fue un archivo **temporal**, `source/FontProbeTest.mc`, borrado después
 4. Para medir métricas crudas de fuente (`getFontAscent/Descent`, `getFontHeight`, `getTextWidthInPixels` de plantillas y labels) alcanza el mismo `Dc` offscreen sin la View — así se armó la tabla de §6.10.
 
 Lo que la técnica **NO** reemplaza: ver los píxeles. No hay lectura de píxeles desde Monkey C (`Dc` no tiene `getPixel`), así que la validación estética final (¿se ve bien?) sigue siendo del autor con F5. Lo que sí da: certeza de QUÉ fuente/tamaño se elige en cada celda de cada device, que es donde estaban los bugs.
+
+### 11.2 `GLYPH_PROBE` — la flecha como glifo de fuente: experimento y resultado (2026-07-25)
+
+Hook de debug (`const GLYPH_PROBE = false` + par `(:debug)`/`(:release)`, igual que `TEST_MODE`) que reemplaza todo el campo por una galería de glifos. Existe para contestar, **en hardware real**, si la flecha podía dejar de ser primitiva. Está diseñado para **auto-diagnosticarse**: dos de sus tres filas son CONTROLES cuyo resultado esperado es "no se pinta nada".
+
+| fila | contenido | para qué |
+|---|---|---|
+| 1 | `↑↓▲▼` en fuente de TEXTO | los candidatos |
+| 2 | `↑▲8` en fuente NUMÉRICA | **control**: por tabla no existen ahí; el `8` solo prueba que la fila se dibujó. Si aparecen flechas → el runtime **sustituye fuentes** |
+| 3 | `⬆` (U+2B06, ausente hasta del TTF) + las dos primitivas | **control** de "glifo ausente" + comparación de forma |
+
+**Resultados — y no coinciden entre sí, que es justamente el hallazgo:**
+
+| fila | predicción por tablas de fuente | SIMULADOR (840) | **EDGE 840 REAL** (captura `bin/2026-07-25-20-29-34.BMP`) |
+|---|---|---|---|
+| 1 · texto | las 4 | las 4 | **las 4** |
+| 2 · numérica *(control)* | solo el `8` | flechas + `8` | **`↑` 12×26 px, `▲` 22×22, `8`** |
+| 3 · `⬆` *(control)* | nada | **nada** | **pintó, 10×15 px** |
+
+(Las otras dos formas de la fila 3 miden 7×11 y son las primitivas: el cálculo daba 6×11.)
+
+Tres conclusiones, ninguna obvia de antemano:
+
+1. **Existe una cadena de FUENTES DE RESPALDO no documentada.** El 840 pintó los dos glifos en fuente numérica, que no los tiene, y pintó U+2B06, que **no está en ningún archivo de fuente del SDK**. Las tablas de fuente dicen qué hay en el archivo nominal; **no predicen lo que el device dibuja**.
+2. **El simulador se equivoca en LAS DOS direcciones**: falsos positivos (fila 2) y falsos **negativos** (fila 3 — el device pinta lo que el sim no). Es MÁS restrictivo que el hardware, al revés de lo que uno asumiría. Ningún resultado del simulador sobre un carácter no-ASCII sirve como prueba.
+3. **El argumento de tamaño se cae**: el `↑` sustituido en fuente numérica salió de **26 px de alto**, justo lo que J necesita. Pedido en fuente de texto toparía en 18 px; pedido en numérica, la sustitución lo escala.
+
+**Decisión del autor: aprovechar el glifo donde exista, con fallback.** La primitiva no se toca — sigue siendo lo que funciona en los 13 y lo único que escala hasta 42 px. Pero como el 840 sí resuelve el glifo, el código lo detecta en runtime y lo usa ahí; en la familia `.cft` cae a la primitiva, que es el comportamiento de siempre. Mecánica en §6.11. Lo que NO se hizo, a propósito: confiar en el tamaño grande que da la sustitución en fuente numérica, porque ahí la medida devuelve 0 y no se puede maquetar.
+
+**HECHO en hardware** (Edge 840 real, sideload del `.prg` de debug, 2026-07-25) — resultados en la tabla de arriba. Lo único que quedaría por comprobar es un **Edge 830 físico**, que el autor no tiene; por eso la recomendación no depende de conseguirlo.
 
 ## 12. Presupuesto y rendimiento
 

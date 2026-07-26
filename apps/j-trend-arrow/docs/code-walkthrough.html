@@ -55,6 +55,12 @@
   h2 { font-size: clamp(1.4rem, 3.2vw, 1.9rem); font-weight: 750; margin-bottom: 6px; }
   h3 { font-size: 1.1rem; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.01em; }
   p { margin: 12px 0; max-width: 66ch; }
+  /* Listas: heredan la medida de lectura de p y el marcador toma el acento del documento,
+     para que no aparezcan con los estilos por defecto del navegador. */
+  ul { margin: 12px 0; padding-left: 1.15em; max-width: 66ch; list-style: none; }
+  ul li { position: relative; margin: 7px 0; }
+  ul li::before { content: "\2014"; position: absolute; left: -1.15em; color: var(--accent);
+    font-weight: 700; }
   a { color: var(--link); text-decoration: none;
       border-bottom: 1px solid color-mix(in srgb, var(--link) 35%, transparent); }
   a:hover { border-bottom-color: var(--link); }
@@ -151,7 +157,7 @@
       </p>
     </div>
     <div class="screen" aria-hidden="true">
-      <span class="lbl">Speed km/h</span>
+      <span class="lbl">Velocidad</span>
       <span class="cur"><span class="arw">▲</span><span class="val">24.3</span></span>
       <span class="avg">AVG 21.7</span>
     </div>
@@ -233,16 +239,20 @@
         la velocidad — es comparar sobre <strong>lo que el usuario ve</strong>. Se redondea una sola vez, y
         <code>TrendArrow</code> compara los enteros redondeados:
       </p>
-      <pre class="code"><span class="k">function</span> classify(shownCurrent, shownAverage) {
+      <pre class="code"><span class="k">function</span> classify(shownCurrent, shownAverage, deadBand) {
     <span class="k">if</span> (shownCurrent == <span class="k">null</span> || shownAverage == <span class="k">null</span>) { <span class="k">return</span> NONE; }
-    <span class="k">if</span> (shownCurrent &gt; shownAverage) { <span class="k">return</span> UP; }
-    <span class="k">if</span> (shownCurrent &lt; shownAverage) { <span class="k">return</span> DOWN; }
-    <span class="k">return</span> NONE;   <span class="cm">// mismo entero mostrado -> sin flecha</span>
+    <span class="k">var</span> d = shownCurrent - shownAverage;
+    <span class="k">if</span> (d &gt; deadBand)  { <span class="k">return</span> UP; }
+    <span class="k">if</span> (d &lt; -deadBand) { <span class="k">return</span> DOWN; }
+    <span class="k">return</span> NONE;   <span class="cm">// dentro de la banda -> "vas a la media"</span>
 }</pre>
       <p>
-        Como el número de pantalla y la flecha <strong>salen del mismo redondeo</strong>, es imposible que se
-        contradigan: si el número no cambió, no hay flecha. La banda muerta sale gratis, sin un umbral aparte.
-        (Con 1 decimal se compara en <em>décimas</em>: <code>24.3 km/h</code> es el entero <code>243</code>.)
+        Con 1 decimal se compara en <em>décimas</em>: <code>24.3 km/h</code> es el entero <code>243</code>.
+        Redondear una sola vez ya da una banda muerta gratis, pero el autor pidió una
+        <strong>semántica</strong> más ancha: para él una diferencia de 0,1 km/h <em>es</em> ir a la media, así
+        que <code>deadBand</code> vale una décima. Eso relaja a propósito la invariante de que la flecha nunca
+        contradiga al número (se puede ver <code>24.3</code> contra <code>24.2</code> sin flecha) — esperable en
+        un indicador de <em>tendencia</em>, no de igualdad.
       </p>
     </div>
   </section>
@@ -258,9 +268,9 @@
       <p>
         En la J es al revés a propósito: la flecha <strong>es el dato</strong> — cambia cada segundo según
         actual-vs-media, igual que el número — así que va <strong>pegada al valor</strong>, como en el Cateye.
-        Se dibuja con primitivas <code>dc</code> (no un glifo de fuente: la cobertura del carácter flecha no
-        está garantizada en los 13 devices). La de subir se reusa tal cual de la B; la de bajar es su
-        <strong>espejo vertical exacto</strong>:
+        Se dibuja con primitivas <code>dc</code>: la cobertura del carácter flecha no está garantizada en los
+        13 devices, y eso se acabó verificando a fondo — con un resultado más raro de lo esperado, más abajo.
+        La de subir se reusa tal cual de la B; la de bajar es su <strong>espejo vertical exacto</strong>:
       </p>
       <pre class="code"><span class="cm">// cabeza triangular (fillPolygon) + astil (fillRectangle)</span>
 <span class="k">function</span> drawUpArrow(dc, x0, cyMid, w, h) {
@@ -297,8 +307,10 @@
         se dibuja como <strong>un solo string en una sola fuente</strong>, sin partirlo. Más simple que la B.
       </p>
       <div class="note">
-        <p>Verificado en el <strong>simulador</strong> (perfil edge840), no en hardware físico — el estándar
-        que el repo usa para decisiones de fuente, pero pendiente de una confirmación eventual en device.
+        <p>Se verificó primero en el <strong>simulador</strong> y después, mejor, <strong>leyendo las tablas
+        de las fuentes que el SDK instala</strong>: el punto, la coma y el <code>%</code> están en las fuentes
+        numéricas de las dos familias de device. Eso importa porque el simulador, por sí solo, no alcanza como
+        prueba para caracteres no-ASCII (ver más abajo).
         (De paso dejó anotado que quizás la B tampoco necesitaba partir el <code>%</code> — pero eso no se
         toca sin pedirlo.)</p>
       </div>
@@ -328,8 +340,87 @@
       <p style="margin-top:16px">
         Los aprendizajes de fuentes de A/B se heredan tal cual: <code>FONT_SYSTEM_NUMBER_*</code> para los
         dígitos, <code>FONT_GLANCE</code> para el label, y el centrado óptico por <code>descent/2</code> (las
-        fuentes numéricas reservan un descendente que los dígitos no usan). La unidad va <em>en el label</em>
-        (<code>SPEED KM/H</code>), como el <code>VAM M/H</code> de la B.
+        fuentes numéricas reservan un descendente que los dígitos no usan). La unidad <strong>no</strong> va en
+        el label: se dibuja como el campo nativo, un <code>km</code> sobre una <code>h</code> a la derecha del
+        número, con la <code>h</code> apoyada en la misma línea base que los dígitos.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Igualar al campo nativo</h2>
+      <p>
+        El autor puso nuestro campo al lado del de velocidad nativo, en la misma pantalla, y el nuestro se veía
+        más chico en todo. Medido pixel a pixel sobre la captura (celda de 122×62 px en los dos casos), la causa
+        no era el layout sino <strong>cómo se elegía la fuente</strong>.
+      </p>
+      <div class="cards">
+        <div class="card">
+          <h3>El gate iba contra la altura</h3>
+          <p>Se descartaba una fuente si <code>getFontHeight</code> no entraba en la banda. Pero la altura de una
+             fuente numérica incluye un descendente que <em>los dígitos nunca pintan</em>: el nativo mete una
+             fuente de 42 px de alto en una banda de 41 porque solo dibuja su ascent de 33. Ahora el gate es
+             <code>getFontAscent(f) &lt;= banda − 2</code>. Es el mismo hecho que ya regía el centrado óptico,
+             aplicado a la <em>selección</em>.</p>
+        </div>
+        <div class="card">
+          <h3>La plantilla reservaba de más</h3>
+          <p><code>"888.8"</code> costaba un escalón entero de fuente por una velocidad que en bici no existe.
+             Pasó a <code>"88.8"</code>, y para que siga siendo una cota real <code>SpeedFormat</code>
+             <strong>suelta el decimal a partir de 100</strong> (<code>"104"</code>): en toda fuente numérica
+             <code>w("888") &lt; w("88.8")</code>, así que ningún valor posible desborda.</p>
+        </div>
+        <div class="card">
+          <h3>La unidad, proporcional</h3>
+          <p>Era un <code>FONT_XTINY</code> fijo y al lado del número parecía una mota. El nativo la dibuja con
+             un ascent de ~2/5 del número, las dos líneas centradas entre sí. Si el grupo no entra a lo ancho se
+             <strong>encoge primero la unidad</strong> y solo después el número: el número es el dato.</p>
+        </div>
+      </div>
+      <p style="margin-top:16px">
+        Resultado en esa celda: <code>NUMBER_MEDIUM</code> + unidad <code>FONT_SMALL</code> + label
+        <code>VELOCIDAD</code> — tinta a menos de 1 px de la nativa en las tres líneas. El label también degrada
+        como el nativo: nombre largo si entra, <code>VEL</code> si no.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>La flecha: glifo si el device puede, dibujo si no</h2>
+      <p>
+        La flecha empezó siendo una <strong>primitiva</strong>: un triángulo con <code>fillPolygon</code> y un
+        astil con <code>fillRectangle</code>. El motivo declarado era que la cobertura del glifo
+        <code>↑</code> no estaba garantizada en los 13 devices. Se verificó, y resultó ser peor y más
+        interesante de lo que decía la spec.
+      </p>
+      <ul>
+        <li><strong>Los 13 devices son dos familias de fuente</strong> (7 con TTF, 6 con bitmaps
+            <code>.cft</code> recortados) y la partición <em>no coincide</em> con las 6 resoluciones. El 830 y el
+            840 caen en familias distintas: validar en uno no dice nada del otro.</li>
+        <li><strong>El simulador miente en las dos direcciones.</strong> Pinta glifos que la fuente pedida no
+            tiene (falso positivo) y se comió un <code>⬆</code> que el 840 real sí dibuja (falso negativo).</li>
+        <li><strong>La tabla de la fuente tampoco predice el render:</strong> el 840 pinta la flecha incluso en
+            fuente numérica, y hasta un codepoint que no está en ningún archivo del SDK. Hay una cadena de
+            fuentes de respaldo que nadie documenta.</li>
+        <li><strong>Y si el glifo falta de verdad, es invisible:</strong> ni caja ni interrogante. El campo se
+            ve "bien" y falta un elemento.</li>
+      </ul>
+      <p>
+        Con eso, la decisión fue usar el glifo <em>donde exista</em> sin perder la red de seguridad:
+        <code>arrowGlyphFont()</code> <strong>lo mide en el propio device</strong> —nada de listas de modelos— y
+        exige dos señales: que avance más de 2 px (un glifo ausente mide 1 en la familia <code>.cft</code>) y que
+        no mida lo mismo que <code>U+E000</code>, un codepoint de uso privado que ninguna fuente puede tener
+        (si coinciden, es una caja <em>notdef</em> compartida). Si cualquiera falla, primitiva. El peor caso es
+        exactamente el comportamiento anterior.
+      </p>
+      <p>
+        Dos detalles que el autor encontró probándolo, y que valen como regla: la detección se resuelve
+        <strong>una vez en <code>selectFonts</code></strong> y no en cada tick —medir en la selección, dibujar en
+        el tick—, y <strong>el hueco de la flecha se reserva siempre</strong>, se pinte o no. Sin eso, el grupo
+        centrado se encogía en los segundos sin flecha y el número <em>saltaba de lado</em> cada vez que la
+        velocidad cruzaba la media, o sea todo el tiempo.
       </p>
     </div>
   </section>
@@ -340,7 +431,7 @@
       <p>
         Criterio del repo: <strong>los unit tests en verde antes de la validación visual</strong>. Los dos
         módulos puros tienen su <code>*Test.mc</code> con <code>(:test)</code> de <code>Toybox.Test</code>
-        (excluidos del release). Corren con "Monkey C: Run Tests" — <strong>y ya corrieron: 9 tests, 9 PASS</strong>.
+        (excluidos del release). Corren con "Monkey C: Run Tests" — <strong>y ya corrieron: 11 tests, 11 PASS</strong>.
       </p>
       <div class="tblwrap">
         <table>
@@ -381,24 +472,33 @@
   <section>
     <div class="wrap">
       <h2>Qué falta</h2>
-      <p>Los unit tests están en verde (9/9), el review adversarial limpio y los builds compilan. Queda:</p>
+      <p>
+        Los unit tests están en verde (<strong>11/11</strong>), el export de los <strong>17 targets</strong>
+        compila sin un warning, el render iguala al nativo y los íconos son propios. Queda:
+      </p>
       <div class="cards">
         <div class="card">
-          <h3>1 · Validación visual en simulador</h3>
-          <p>F5 con <code>TEST_MODE = true</code>; ver la flecha siguiendo a la media y afinar el umbral de la
-             línea de promedio (<code>AVG_MIN_H</code>) en las 6 resoluciones. Es el paso que necesita ojo humano.</p>
+          <h3>1 · Elegir la flecha</h3>
+          <p>En el 840 el glifo funciona. Falta que el autor decida entre <code>↑</code> (flecha de línea) y
+             <code>▲</code> (triángulo sólido, más parecido a la primitiva que verán los devices de la otra
+             familia). Son dos constantes.</p>
         </div>
         <div class="card">
-          <h3>2 · Íconos reales</h3>
-          <p>Los launcher actuales son placeholder (copiados de la A). Rediseñar con un motivo de flecha /
-             tendencia.</p>
+          <h3>2 · Afinar en el simulador</h3>
+          <p>El umbral de la línea de promedio (<code>AVG_MIN_H</code>), el del modo inline (80 % del ancho de
+             pantalla) y los nudges de la unidad, en las 6 resoluciones. Es el paso que necesita ojo humano.</p>
         </div>
         <div class="card">
-          <h3>3 · Validación en device</h3>
-          <p>Confirmar en el Edge real que la flecha sigue a la "Avg Speed" nativa, y que el punto decimal se
-             ve bien (lo confirmado hasta ahora es de simulador).</p>
+          <h3>3 · La ficha del store</h3>
+          <p>Capturas, textos EN/ES y el hero opcional. El ícono ya está: master 1024 con alpha real y el 500×500
+             sobre gris, más los 13 launchers dibujados a su tamaño.</p>
         </div>
       </div>
+      <p style="margin-top:16px">
+        Un pendiente que no se puede cerrar: <strong>nadie tiene un Edge 830 físico</strong> para comprobar que
+        ahí la flecha cae a la primitiva como se espera. La detección está hecha para que ese caso sea el
+        comportamiento seguro, no una apuesta.
+      </p>
     </div>
   </section>
 </main>

@@ -31,7 +31,10 @@ import numpy as np, struct, zlib
 SRC='3-flecha-arreglada.png'
 OUT_MASTER='icon-master-1024.png'
 OUT_500='store-icon-500.png'
-DROP_KNOBS=True          # False -> conserva los lobulos del original
+DROP_KNOBS=False         # decision del autor 2026-07-26: el MASTER y el icono de tienda van
+                         # CON los tacos redondeados (le gustan, y a tamano grande se lee el
+                         # neumatico). Los 13 LAUNCHERS, en cambio, van LISOS: a 35 px los
+                         # tacos eran lo que hacia leer "ajustes" (SPEC 3.3). True los recorta.
 STORE_BG=(230,230,230)   # mismo gris que la ficha de la Opcion A
 FILL=0.88                # cuanto del lienzo ocupa el sujeto
 

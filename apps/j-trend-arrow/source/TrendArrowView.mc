@@ -106,11 +106,16 @@ class TrendArrowView extends WatchUi.DataField {
     private var mAvgFont as Graphics.FontType = Graphics.FONT_XTINY;
     private var mAvgUnitFont as Graphics.FontType = Graphics.FONT_XTINY;   // unit + prefix of the avg line
     private var mArrowFits as Boolean = false;    // did [arrow + gap + value] fit at the chosen font?
+    // Text font to draw the arrow GLYPH with, or null for the drawn primitive. Resolved ONCE here
+    // (probing it costs text measurements) and never per tick -- same rule as every other font in
+    // this class: measure in selectFonts, draw in onUpdate.
+    private var mGlyphFont as Graphics.FontType or Null = null;
     // --- EXPERIMENTAL wide-cell (inline both-values) state ---
     private var mIsWide as Boolean = false;                 // full-width cell -> inline "cur / avg"
     private var mInlineFont as Graphics.FontType = Graphics.FONT_MEDIUM;
     private var mInlineUnitFont as Graphics.FontType = Graphics.FONT_XTINY;
     private var mInlineArrowFits as Boolean = false;        // did [arrow + gap + pair] fit?
+    private var mInlineGlyphFont as Graphics.FontType or Null = null;
 
     // --- Simulator test hook (SPEC 11). TEST_MODE stays a PLAIN const false so the guard in
     //     compute() is dead-code-eliminated in release (-r drops the block AND the call); the
@@ -122,6 +127,42 @@ class TrendArrowView extends WatchUi.DataField {
     (:debug) private var mSynTick as Number = 0;
     (:debug) private var mSynDist as Float = 0.0;   // synthetic accumulated distance (m)
     (:debug) private var mSynTime as Number = 0;    // synthetic accumulated moving time (s)
+
+    // --- Trend arrow as a FONT GLYPH, with fallback to the drawn primitive (SPEC 6.6 / 11.2).
+    //     Turn off to force the primitive everywhere. Availability is probed per device at runtime
+    //     in arrowGlyphFor(); the fallback IS the previous behaviour, so a device that cannot draw
+    //     the glyph loses nothing.
+    private const USE_ARROW_GLYPH = true;
+    private const ARROW_GLYPH_UP = "\u2191";     // line arrow up. Swap for "\u25B2" to get a
+    private const ARROW_GLYPH_DOWN = "\u2193";   // line arrow down.       solid triangle instead
+    private const GLYPH_CONTROL = "\uE000";      // private-use code point: no font can legitimately
+                                                 // have it, so it is the "notdef" reference width
+    private const GLYPH_MIN_W = 2;               // px: below this the glyph is effectively absent
+    // Own ladder for the glyph: the TEXT fonts, largest first. FONT_LARGE is not in mTextLadder
+    // (nothing else needs it) but it is the biggest text font, so it is the arrow's ceiling.
+    private var mGlyphLadder as Array<Graphics.FontType> = [];
+
+    // --- Glyph probe (SPEC 11.2). Flip to true + DEBUG build to replace the whole field with a
+    //     gallery that answers, ON THE REAL DEVICE, whether the arrow could be a font glyph
+    //     instead of the drawn primitive. It is SELF-DIAGNOSING: row 2 and the first item of row 3
+    //     are CONTROLS whose expected result is "nothing is painted", so the probe also tells you
+    //     whether the runtime is silently substituting fonts (which would make any glyph test in
+    //     the simulator a false positive). Read the rows as:
+    //       1. TEXT font, "^ v UP DOWN" glyphs   -> present in the edge840 font family
+    //       2. NUMBER font, same glyphs + "8"    -> CONTROL: per the font tables they do NOT exist
+    //          there; the "8" only proves the row was drawn. Arrows here == font substitution.
+    //       3. TEXT font, U+2B06 + the two PRIMITIVES -> U+2B06 is absent even from the edge840
+    //          TTF, so it is the "missing glyph" control: whatever it paints is what a missing
+    //          glyph looks like on this device. Next to it, today's primitives, to compare shape.
+    //     Glyphs are written as \u escapes on purpose: keeps the source pure ASCII (no editor or
+    //     tooling can re-encode them) and it is verified to compile and reach the runtime as the
+    //     right code point.
+    private const GLYPH_PROBE = false;
+    (:debug) private const G_UP = "\u2191";      // arrow up
+    (:debug) private const G_DOWN = "\u2193";    // arrow down
+    (:debug) private const G_TRI_UP = "\u25B2";  // black up-pointing triangle
+    (:debug) private const G_TRI_DN = "\u25BC";  // black down-pointing triangle
+    (:debug) private const G_ABSENT = "\u2B06";  // CONTROL: absent from every Edge font table
 
     // --- Simulator measurement hook (SPEC 11, same scheme as A/B). ---
     private const DEBUG_MEASURE = false;
@@ -141,6 +182,14 @@ class TrendArrowView extends WatchUi.DataField {
             Graphics.FONT_SYSTEM_NUMBER_HOT,
             Graphics.FONT_SYSTEM_NUMBER_MEDIUM,
             Graphics.FONT_SYSTEM_NUMBER_MILD,
+            Graphics.FONT_MEDIUM,
+            Graphics.FONT_SMALL,
+            Graphics.FONT_TINY,
+            Graphics.FONT_XTINY
+        ];
+
+        mGlyphLadder = [
+            Graphics.FONT_LARGE,
             Graphics.FONT_MEDIUM,
             Graphics.FONT_SMALL,
             Graphics.FONT_TINY,
@@ -213,6 +262,12 @@ class TrendArrowView extends WatchUi.DataField {
         dc.setColor(fg, bg);
         dc.clear();
 
+        if (GLYPH_PROBE) {
+            // (:debug)-only body; the const-false guard drops it (and the call) in release.
+            glyphProbe(dc, w, h, fg);
+            return;
+        }
+
         // Font/layout selection is cached; re-run only when the cell size or unit system changes.
         if (w != mCacheW || h != mCacheH || mIsStatute != mCacheStatute) {
             selectFonts(dc, w, h);
@@ -236,15 +291,14 @@ class TrendArrowView extends WatchUi.DataField {
         // Wide (full-width) cell: both values inline on one line, "[arrow] cur / avg [unit]".
         if (mIsWide) {
             var cyW = mLabelH + mPrimaryBandH / 2 + Graphics.getFontDescent(mInlineFont) / 2 - VALUE_NUDGE;
-            var showArrowW = mInlineArrowFits && (mArrowState != TrendArrow.NONE) && !mCurStr.equals("--");
-            drawTrendValue(dc, w, fg, mInlineFont, mInlineUnitFont, mBothStr, cyW, showArrowW);
+            drawTrendValue(dc, w, fg, mInlineFont, mInlineUnitFont, mInlineGlyphFont, mBothStr, cyW,
+                           mInlineArrowFits);
             return;
         }
 
         // --- Current value + arrow + native stacked unit, centred in the primary band ---
         var primaryCy = mLabelH + mPrimaryBandH / 2 + Graphics.getFontDescent(mValueFont) / 2 - VALUE_NUDGE;
-        var showArrow = mArrowFits && (mArrowState != TrendArrow.NONE) && !mCurStr.equals("--");
-        drawTrendValue(dc, w, fg, mValueFont, mUnitFont, mCurStr, primaryCy, showArrow);
+        drawTrendValue(dc, w, fg, mValueFont, mUnitFont, mGlyphFont, mCurStr, primaryCy, mArrowFits);
 
         // --- Average line (only if the cell is tall enough): "AVG 21.7 [unit]" ---
         if (mShowAvg) {
@@ -270,29 +324,50 @@ class TrendArrowView extends WatchUi.DataField {
     // The arrow (trend of current vs average) precedes the value; the native km/h unit follows it.
     private function drawTrendValue(dc as Graphics.Dc, w as Number, fg as Graphics.ColorType,
                                     valueFont as Graphics.FontType, unitFont as Graphics.FontType,
-                                    valueStr as String,
-                                    cy as Number, showArrow as Boolean) as Void {
+                                    glyphFont as Graphics.FontType or Null,
+                                    valueStr as String, cy as Number,
+                                    reserveArrow as Boolean) as Void {
+        // (CIQ 3.3 caps a method at 9 arguments -- the edge830 build enforces it, the edge840 one
+        // does not. Hence "paint" is derived here from members instead of being a 10th parameter.)
+        var paintArrow = reserveArrow && (mArrowState != TrendArrow.NONE) && !mCurStr.equals("--");
         var vW = dc.getTextWidthInPixels(valueStr, valueFont);
         var uW = unitBlockWidth(dc, unitFont);
+        // The arrow's slot is reserved whenever an arrow COULD be drawn here, not only when one is
+        // being drawn right now. Otherwise the group shrinks on the ticks with no arrow and, since
+        // it is centred, the number visibly jumps sideways every time the speed crosses the average
+        // -- which is constantly. Reserving keeps the number nailed in place (SPEC 6.11).
+        var aH = reserveArrow ? (Graphics.getFontAscent(valueFont) * 4) / 5 : 0;
+        var gf = reserveArrow ? glyphFont : null;   // resolved in selectFonts; null -> primitive
+        var glyph = (mArrowState == TrendArrow.UP) ? ARROW_GLYPH_UP : ARROW_GLYPH_DOWN;
         var aW = 0;
-        var aH = 0;
-        if (showArrow) {
-            aH = (Graphics.getFontAscent(valueFont) * 4) / 5;
-            aW = (aH * 3) / 5;
+        if (reserveArrow) {
+            // Reserve the WIDER of the two states so up and down never shift the number either.
+            if (gf != null) {
+                var wu = dc.getTextWidthInPixels(ARROW_GLYPH_UP, gf);
+                var wd = dc.getTextWidthInPixels(ARROW_GLYPH_DOWN, gf);
+                aW = (wu > wd) ? wu : wd;
+            } else {
+                aW = (aH * 3) / 5;
+            }
         }
-        var lead = showArrow ? (aW + ARROW_GAP) : 0;
+        var lead = reserveArrow ? (aW + ARROW_GAP) : 0;
         var totalW = lead + vW + UNIT_GAP + uW;
         var x = w / 2 - totalW / 2;
         var vx = x + lead;
         dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-        if (showArrow) {
-            // Value is VCENTREd on its box, whose descent the digits don't use -> centre the arrow on
-            // the visible glyphs (cy - descent/2), then a fine +ARROW_NUDGE (B's idiom).
+        if (paintArrow) {
+            // Both routes centre on the value's VISIBLE glyphs: the value is VCENTREd on a box
+            // whose descent the digits never use, so shift up by descent/2, then B's fine nudge.
             var arrowCy = cy - Graphics.getFontDescent(valueFont) / 2 + ARROW_NUDGE;
-            if (mArrowState == TrendArrow.UP) {
-                drawUpArrow(dc, x, arrowCy, aW, aH);
+            if (gf != null) {
+                dc.drawText(x + aW / 2, arrowCy, gf, glyph,
+                            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             } else {
-                drawDownArrow(dc, x, arrowCy, aW, aH);
+                if (mArrowState == TrendArrow.UP) {
+                    drawUpArrow(dc, x, arrowCy, aW, aH);
+                } else {
+                    drawDownArrow(dc, x, arrowCy, aW, aH);
+                }
             }
         }
         dc.drawText(vx, cy, valueFont, valueStr, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
@@ -300,6 +375,58 @@ class TrendArrowView extends WatchUi.DataField {
         // line as the digits' feet). numberBaseline for a VCENTREd value = cy + (ascent - descent)/2.
         var baseY = cy + (Graphics.getFontAscent(valueFont) - Graphics.getFontDescent(valueFont)) / 2 + UNIT_BOTTOM_NUDGE;
         drawStackedUnit(dc, vx + vW + UNIT_GAP, baseY, unitFont);
+    }
+
+    // Width to RESERVE for the arrow when choosing a value font: the primitive's, or the glyph's if
+    // this device resolves it and it happens to be wider. Reserving the max means the group can
+    // never overflow the cell whichever of the two ends up being drawn.
+    private function arrowLeadWidth(dc as Graphics.Dc, valueFont as Graphics.FontType,
+                                    primitiveW as Number) as Number {
+        var gf = arrowGlyphFont(dc, (Graphics.getFontAscent(valueFont) * 4) / 5);
+        if (gf == null) {
+            return primitiveW;
+        }
+        var up = dc.getTextWidthInPixels(ARROW_GLYPH_UP, gf);
+        var dn = dc.getTextWidthInPixels(ARROW_GLYPH_DOWN, gf);
+        var g = (up > dn) ? up : dn;
+        return (g > primitiveW) ? g : primitiveW;
+    }
+
+    // The TEXT font to draw the trend arrow glyph with, or null to fall back to the drawn
+    // primitive. `targetAscent` is how tall the primitive would have been, so the glyph never
+    // comes out bigger than what it replaces.
+    //
+    // WHY A TEXT FONT AND NOT THE VALUE'S OWN (NUMBER) FONT -- measured, 2026-07-25 (SPEC 11.2):
+    // asking a number font for the glyph is a trap. On an edge840 `getTextWidthInPixels("↑",
+    // FONT_SYSTEM_NUMBER_MEDIUM)` returns **0** and yet the device DOES paint an arrow there (26 px
+    // tall, seen in a real-hardware capture) -- measurement and renderer disagree, so there is no
+    // width to lay out around. In a TEXT font the two agree (11 px measured, 11 px drawn), which is
+    // the only way the group can be positioned correctly. The cost is the ceiling: FONT_LARGE.
+    //
+    // AVAILABILITY IS MEASURED ON THE DEVICE, never assumed from a font table and never from a
+    // device list -- the tables do not predict what the runtime draws and the simulator is wrong in
+    // both directions (SPEC 11.2). Two signals, both must pass:
+    //   1. the glyph advances more than a couple of pixels -- on the edge830 family, whose text
+    //      font is a trimmed bitmap, a missing arrow measures exactly 1 px;
+    //   2. it does not measure the same as a private-use code point that no font can have -- on
+    //      that same family a number font reports 22 px for BOTH, i.e. one shared "notdef" box.
+    // Either failing means the primitive, i.e. exactly the previous behaviour.
+    private function arrowGlyphFont(dc as Graphics.Dc, targetAscent as Number) as Graphics.FontType or Null {
+        if (!USE_ARROW_GLYPH) {
+            return null;
+        }
+        for (var i = 0; i < mGlyphLadder.size(); i++) {
+            var f = mGlyphLadder[i];
+            if (Graphics.getFontAscent(f) > targetAscent) {
+                continue;
+            }
+            var wUp = dc.getTextWidthInPixels(ARROW_GLYPH_UP, f);
+            if (wUp <= GLYPH_MIN_W || wUp == dc.getTextWidthInPixels(GLYPH_CONTROL, f)) {
+                return null;   // same font file at every size: if this one lacks it, all do
+            }
+            return f;
+        }
+        return null;
     }
 
     // Width of the stacked unit block = max width of its two lines (bottom may be empty -> width 0).
@@ -378,7 +505,7 @@ class TrendArrowView extends WatchUi.DataField {
             var f = mLadder[i];
             if (!fitsBand(f, mPrimaryBandH)) { continue; }
             var ah = (Graphics.getFontAscent(f) * 4) / 5;
-            var aw = (ah * 3) / 5;
+            var aw = arrowLeadWidth(dc, f, (ah * 3) / 5);
             var u = fitUnitFont(dc, f, VALUE_TPL, aw + ARROW_GAP, usableW, false);
             if (u != null) {
                 mValueFont = f;
@@ -401,6 +528,9 @@ class TrendArrowView extends WatchUi.DataField {
                 }
             }
         }
+
+        // Arrow glyph availability: probed once here, cached with the rest of the layout.
+        mGlyphFont = arrowGlyphFont(dc, (Graphics.getFontAscent(mValueFont) * 4) / 5);
 
         // --- Average font (no arrow; the "AVG" prefix shares the unit font so the whole secondary
         //     line scales together). ---
@@ -500,7 +630,7 @@ class TrendArrowView extends WatchUi.DataField {
             var f = mLadder[i];
             if (!fitsBand(f, mPrimaryBandH)) { continue; }
             var ah = (Graphics.getFontAscent(f) * 4) / 5;
-            var aw = (ah * 3) / 5;
+            var aw = arrowLeadWidth(dc, f, (ah * 3) / 5);
             var u = fitUnitFont(dc, f, INLINE_TPL, aw + ARROW_GAP, usableW, false);
             if (u != null) {
                 mInlineFont = f;
@@ -522,6 +652,7 @@ class TrendArrowView extends WatchUi.DataField {
                 }
             }
         }
+        mInlineGlyphFont = arrowGlyphFont(dc, (Graphics.getFontAscent(mInlineFont) * 4) / 5);
     }
 
 
@@ -557,9 +688,19 @@ class TrendArrowView extends WatchUi.DataField {
     //     (:debug) only; see the TEST_MODE note above. ---
     (:debug)
     private function nextSynthetic() as Array {
-        var speedsKmh = [10.4, 25.7, 10.1, 30.2, 15.6, 20.3, 8.5, 28.9];
+        // Profile built to exercise the ARROW, not just the number. Symmetric around 20.0 km/h
+        // (the eight values average exactly 20.0), so the running average converges there and the
+        // cycle then visits the three states on purpose: clearly above (UP), clearly below (DOWN)
+        // and AT the average (NO arrow -- the dead band), including the +/-0.1 edges where
+        // DEAD_BAND_TENTHS decides. The no-arrow <-> arrow transitions are what reveals whether
+        // the number stays put when the arrow comes and goes (SPEC 6.11).
+        var speedsKmh = [30.0, 10.0, 20.0, 25.0, 15.0, 20.1, 19.9, 20.0];
+        // Kept for reference, do not delete:
+        //   original sweep -- average not centred, so the arrow stayed pinned most of the cycle:
+        //var speedsKmh = [10.4, 25.7, 10.1, 30.2, 15.6, 20.3, 8.5, 28.9];
+        //   near-constant slow ride, for watching the dead band alone:
         //var speedsKmh = [10.4, 10.2, 10.4, 10.4, 10.4, 10.4, 10.6, 10.3];
-        var segSec = 4;                               // each segment lasts 4 s (faster sim cycling)
+        var segSec = 3;                               // each segment lasts 3 s (fast cycling)
         var total = speedsKmh.size() * segSec;
         var phase = mSynTick % total;
         var idx = phase / segSec;                     // integer division -> segment index 0..7
@@ -575,6 +716,54 @@ class TrendArrowView extends WatchUi.DataField {
     (:release)
     private function nextSynthetic() as Array {
         return [null, null, null];
+    }
+
+    // Glyph gallery -- see the GLYPH_PROBE note above for how to read the three rows.
+    (:debug)
+    private function glyphProbe(dc as Graphics.Dc, w as Number, h as Number, fg as Graphics.ColorType) as Void {
+        // One text font for rows 1 and 3, sized so three rows fit; one number font for row 2.
+        var tf = Graphics.FONT_XTINY;
+        for (var i = 0; i < mTextLadder.size(); i++) {
+            if (dc.getFontHeight(mTextLadder[i]) <= h / 3) { tf = mTextLadder[i]; break; }
+        }
+        var nf = Graphics.FONT_SYSTEM_NUMBER_MILD;
+        if (dc.getFontHeight(nf) > h / 3) { nf = Graphics.FONT_MEDIUM; }
+        var y1 = h / 6;
+        var y2 = h / 2;
+        var y3 = (h * 5) / 6;
+        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
+        var C = Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER;
+        // Row 1 -- the candidates, in a TEXT font.
+        dc.drawText(w / 2, y1, tf, G_UP + G_DOWN + G_TRI_UP + G_TRI_DN, C);
+        // Row 2 -- CONTROL: same candidates in a NUMBER font (they should NOT paint); the "8" only
+        // proves the row ran. Anything arrow-shaped here means the runtime substituted a font.
+        dc.drawText(w / 2, y2, nf, G_UP + G_TRI_UP + "8", C);
+        // Row 3 -- CONTROL: a code point absent from every Edge font, then today's primitives.
+        var aH = (Graphics.getFontAscent(tf) * 4) / 5;
+        var aW = (aH * 3) / 5;
+        var gW = dc.getTextWidthInPixels(G_ABSENT, tf);
+        var total = gW + 8 + aW + 8 + aW;
+        var x = w / 2 - total / 2;
+        dc.drawText(x, y3, tf, G_ABSENT, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        drawUpArrow(dc, x + gW + 8, y3, aW, aH);
+        drawDownArrow(dc, x + gW + 8 + aW + 8, y3, aW, aH);
+    }
+
+    // Release stub: never called (GLYPH_PROBE is const false -> the call site is eliminated).
+    (:release)
+    private function glyphProbe(dc as Graphics.Dc, w as Number, h as Number, fg as Graphics.ColorType) as Void {
+    }
+
+    // "GLYPH(w=N)" or "PRIMITIVE(w=N)" for the debug log -- same decision the drawing takes.
+    (:debug)
+    private function arrowRouteLabel(dc as Graphics.Dc, valueFont as Graphics.FontType) as String {
+        var aH = (Graphics.getFontAscent(valueFont) * 4) / 5;
+        var gf = arrowGlyphFont(dc, aH);
+        if (gf == null) {
+            return "PRIMITIVE(w=" + ((aH * 3) / 5) + " h=" + aH + ")";
+        }
+        return "GLYPH(w=" + dc.getTextWidthInPixels(ARROW_GLYPH_UP, gf)
+               + " ascent=" + Graphics.getFontAscent(gf) + " vs primitive h=" + aH + ")";
     }
 
     // Prints each distinct cell size + the chosen fonts + arrow/avg flags, once per size. Use it to
@@ -595,6 +784,9 @@ class TrendArrowView extends WatchUi.DataField {
             + " label=\"" + mLabelText + "\" labelF a=" + Graphics.getFontAscent(mLabelFont)
             + " labelH=" + mLabelH + " showAvg=" + mShowAvg + " wide=" + mIsWide
             + " arrowFits=" + mArrowFits
+            // Which arrow route this cell resolved to, so the simulator console answers
+            // "glyph or primitive?" without having to judge it by eye.
+            + " ARROW=" + arrowRouteLabel(dc, mValueFont)
             // The wide (inline) path uses its OWN fonts; the fields above are untouched there.
             + " | inlineF h/a=" + dc.getFontHeight(mInlineFont) + "/" + Graphics.getFontAscent(mInlineFont)
             + " inlineUnitF a=" + Graphics.getFontAscent(mInlineUnitFont)
