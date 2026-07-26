@@ -452,9 +452,8 @@ mArrowState = TrendArrow.classify(curTenths, refTenths, DEAD_BAND_TENTHS);</pre>
         vuelva a elegir el layout.
       </p>
 
-      <h3>El default es el promedio, y cuesta salirse de él</h3>
       <p>
-        Quien actualice y no toque nada tiene que ver <strong>exactamente</strong> la v0.1.0. Eso se apoya en
+        <strong>El default es el promedio, y cuesta salirse de él.</strong> Quien actualice y no toque nada tiene que ver <strong>exactamente</strong> la v0.1.0. Eso se apoya en
         cuatro capas independientes —el <code>properties.xml</code> (<code>0</code>), el
         <code>settings.xml</code> (el <code>0</code> es "promedio"), el fallback de lectura
         (<code>readNumber(…, 0)</code>) y los inicializadores de miembro— y en una quinta red que es la que de
@@ -471,9 +470,8 @@ mArrowState = TrendArrow.classify(curTenths, refTenths, DEAD_BAND_TENTHS);</pre>
         pantalla, <code>PROM</code> o <code>META</code>.</p>
       </div>
 
-      <h3>Un decimal que la UI no puede exigir</h3>
       <p>
-        El objetivo se quiere con un decimal, pero el schema de settings <strong>no lo puede imponer</strong>:
+        <strong>Un decimal que la UI no puede exigir.</strong> El objetivo se quiere con un decimal, pero el schema de settings <strong>no lo puede imponer</strong>:
         el <code>resources.xsd</code> del SDK admite en un <code>settingConfig</code> solo
         <code>type</code>, <code>readonly</code>, <code>required</code>, <code>min</code>, <code>max</code>,
         <code>maxLength</code> y <code>errorMessage</code> — no existe <code>step</code> ni
@@ -490,7 +488,6 @@ mArrowState = TrendArrow.classify(curTenths, refTenths, DEAD_BAND_TENTHS);</pre>
         el otro setting empuja su copia cacheada y revive el <code>22.37</code>. El número iría y vendría solo.
       </p>
 
-      <h3>Dos cosas que sorprendieron</h3>
       <div class="cards">
         <div class="card">
           <h3>Los prefijos no miden igual</h3>
