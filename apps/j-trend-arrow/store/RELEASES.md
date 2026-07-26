@@ -14,6 +14,11 @@ Entradas, más nueva primero.
 
 ## v0.1.0 — 2026-07-26 — prod
 
+**SUBIDA al portal el 2026-07-26.** El `.iq` salió del commit `1a6417a` de la rama `release`, que es
+el que lleva el tag `j-trend-arrow/v0.1.0`; versión tipeada a mano en el portal: `0.1.0`. Ficha con
+los textos EN/ES de [`LISTING.md`](LISTING.md), categoría Cycling, seis capturas, hero 1440×720 y
+contacto `el.soldador.garmin@gmail.com`.
+
 Primera subida. Campo de datos que muestra la **velocidad actual** en grande con una **flecha ↑/↓
 al lado**, comparándola contra la **velocidad promedio de la actividad** (estilo Cateye), y el
 promedio en una línea secundaria cuando la celda es alta.
@@ -43,4 +48,6 @@ promedio en una línea secundaria cuando la celda es alta.
 
 No se publicó ninguna `v0.0.1`: ese número se registró un día y se reemplazó por este antes de subir nada.
 
-Pendiente antes de subir: los textos EN/ES de la ficha y el hero 1440×720 (opcional).
+Pendiente **posterior** a esta subida: elegir entre la flecha `↑` y el triángulo `▲` mirando el
+sideload en el 840 (son dos constantes, `ARROW_GLYPH_UP`/`DOWN`), y la iteración de la referencia
+configurable de la SPEC §9.1.
