@@ -1,0 +1,11 @@
+<strings>
+    <!-- Spanish (spa) overrides. Any id not listed here falls back to resources/strings.
+         AppName is repeated so the packager does not warn about an untranslated resource. -->
+    <string id="AppName">Tendencia Vel.</string>
+
+    <!-- Long label = what the native Spanish speed field shows ("VELOCIDAD"); the short one is
+         the fallback for cells too narrow for it. -->
+    <string id="SpeedLabel">Velocidad</string>
+    <string id="SpeedLabelShort">Vel</string>
+    <string id="AvgLabel">Prom</string>
+</strings>

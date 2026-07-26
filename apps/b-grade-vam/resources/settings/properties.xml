@@ -1,0 +1,8 @@
+<properties>
+    <!-- Defaults for the 4 app settings (SPEC 7). Read via Application.Properties.getValue().
+         Stored values are the ACTUAL magnitudes (seconds / metres), not list indices. -->
+    <property id="vamWindowSec" type="number">10</property>
+    <property id="gradeWindowM" type="number">15</property>
+    <property id="primaryMetric" type="number">0</property>   <!-- 0 = grade, 1 = VAM -->
+    <property id="colorZones" type="boolean">true</property>
+</properties>

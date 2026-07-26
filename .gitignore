@@ -3,10 +3,12 @@ bin/
 gen/
 mir/
 internal-mir/
+external-mir/
 *.iq
 *.prg
 *.prg.debug.xml
 *.debug.xml
+*-settings.json
 
 # Developer keys — NEVER commit these
 *.der
@@ -26,3 +28,6 @@ developer_key*
 # Local AI tooling / agent worktrees
 .serena/
 .claude/
+
+# Transient device screenshot dumps used for visual tuning (not store assets)
+screenshots/

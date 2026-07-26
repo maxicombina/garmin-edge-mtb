@@ -1,0 +1,514 @@
+<style>
+  :root {
+    --bg: #EEF2F3;
+    --surface: #FFFFFF;
+    --surface-2: #E4EBEC;
+    --code-bg: #0E1519;
+    --code-ink: #D7E3E8;
+    --code-dim: #7C8D95;
+    --ink: #141E20;
+    --ink-soft: #4F5F62;
+    --line: #D3DDDE;
+    --accent: #0B7A9E;
+    --accent-ink: #0B7A9E;
+    --link: #0B6E8C;
+    --up: #2E8B57;      /* current above average -> up arrow */
+    --down: #4A6572;    /* current below average -> down arrow */
+    --screen-bg: #0F161A;
+    --radius: 14px;
+    --maxw: 880px;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0C1214; --surface: #131C1F; --surface-2: #192428; --code-bg: #080C0E;
+      --code-ink: #D7E3E8; --code-dim: #6C7B83; --ink: #E5EDEB; --ink-soft: #92A19B;
+      --line: #243036; --accent: #3FB6D6; --accent-ink: #56C3E0; --link: #57BDDB;
+      --up: #4FC17E; --down: #8AA0AC; --screen-bg: #080C0E;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #EEF2F3; --surface: #FFFFFF; --surface-2: #E4EBEC; --code-bg: #0E1519;
+    --code-ink: #D7E3E8; --code-dim: #7C8D95; --ink: #141E20; --ink-soft: #4F5F62;
+    --line: #D3DDDE; --accent: #0B7A9E; --accent-ink: #0B7A9E; --link: #0B6E8C;
+    --up: #2E8B57; --down: #4A6572; --screen-bg: #0F161A;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0C1214; --surface: #131C1F; --surface-2: #192428; --code-bg: #080C0E;
+    --code-ink: #D7E3E8; --code-dim: #6C7B83; --ink: #E5EDEB; --ink-soft: #92A19B;
+    --line: #243036; --accent: #3FB6D6; --accent-ink: #56C3E0; --link: #57BDDB;
+    --up: #4FC17E; --down: #8AA0AC; --screen-bg: #080C0E;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--font-sans); font-size: 17px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 22px; }
+  main > section { padding: 42px 0; border-top: 1px solid var(--line); }
+
+  h1, h2, h3 { text-wrap: balance; line-height: 1.14; letter-spacing: -0.02em; margin: 0; }
+  h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 800; }
+  h2 { font-size: clamp(1.4rem, 3.2vw, 1.9rem); font-weight: 750; margin-bottom: 6px; }
+  h3 { font-size: 1.1rem; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.01em; }
+  p { margin: 12px 0; max-width: 66ch; }
+  /* Listas: heredan la medida de lectura de p y el marcador toma el acento del documento,
+     para que no aparezcan con los estilos por defecto del navegador. */
+  ul { margin: 12px 0; padding-left: 1.15em; max-width: 66ch; list-style: none; }
+  ul li { position: relative; margin: 7px 0; }
+  ul li::before { content: "\2014"; position: absolute; left: -1.15em; color: var(--accent);
+    font-weight: 700; }
+  a { color: var(--link); text-decoration: none;
+      border-bottom: 1px solid color-mix(in srgb, var(--link) 35%, transparent); }
+  a:hover { border-bottom-color: var(--link); }
+  strong { font-weight: 680; }
+
+  .eyebrow { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--accent-ink); margin: 0 0 10px; }
+  .lead { font-size: 1.16rem; color: var(--ink-soft); max-width: 62ch; margin-top: 14px; }
+
+  code { font-family: var(--font-mono); font-size: 0.85em; background: var(--surface-2);
+    padding: 0.1em 0.38em; border-radius: 6px; }
+  pre.code { font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.6;
+    background: var(--code-bg); color: var(--code-ink); padding: 16px 18px;
+    border-radius: 12px; overflow-x: auto; margin: 16px 0; tab-size: 4;
+    border: 1px solid color-mix(in srgb, var(--code-ink) 12%, transparent); }
+  pre.code .cm { color: var(--code-dim); }
+  pre.code .k  { color: #F5A15A; }
+  pre.code .s  { color: #93C9A6; }
+  pre.code .n  { color: #7FC7DE; }
+  pre.code b   { color: #FFFFFF; font-weight: 600; }
+
+  /* hero */
+  header.hero { padding: 54px 0 18px; }
+  .hero-grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 32px; align-items: center; }
+  @media (max-width: 720px) { .hero-grid { grid-template-columns: 1fr; } }
+  .screen { background: var(--screen-bg); border-radius: 16px; padding: 22px 18px;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06), 0 14px 34px -20px rgba(0,0,0,0.6); }
+  .screen .lbl { font-size: 0.64rem; letter-spacing: 0.18em; color: #8B99A2;
+    text-transform: uppercase; margin-bottom: 6px; }
+  .screen .cur { display: flex; align-items: center; gap: 8px; }
+  .screen .arw { color: var(--up); font-size: 2.1rem; line-height: 1; }
+  .screen .val { font-family: var(--font-mono); font-weight: 700; font-variant-numeric: tabular-nums;
+    font-size: 3.2rem; color: #E6EDEA; line-height: 1; }
+  .screen .avg { font-family: var(--font-mono); font-size: 0.92rem; color: #93A29B;
+    margin-top: 12px; letter-spacing: 0.06em; }
+
+  /* generic cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px; margin: 20px 0 4px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 16px 18px; }
+  .card p { margin: 6px 0 0; font-size: 0.94rem; color: var(--ink-soft); max-width: none; }
+  .tag { font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent-ink); }
+
+  /* module map */
+  .modmap { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 10px; }
+  .mod { background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; }
+  .mod .name { font-family: var(--font-mono); font-weight: 700; font-size: 0.9rem; }
+  .mod .pure { display: inline-block; font-size: 0.62rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--up); font-weight: 700; margin-left: 6px; }
+  .mod .role { font-size: 0.84rem; color: var(--ink-soft); margin-top: 4px; }
+
+  /* pipeline / steps */
+  ol.flow { counter-reset: s; list-style: none; padding: 0; margin: 18px 0 0;
+    display: grid; gap: 8px; }
+  ol.flow li { counter-increment: s; position: relative; padding: 12px 14px 12px 52px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    font-size: 0.95rem; }
+  ol.flow li::before { content: counter(s); position: absolute; left: 12px; top: 11px;
+    width: 26px; height: 26px; border-radius: 7px; background: var(--surface-2);
+    color: var(--accent-ink); font-family: var(--font-mono); font-weight: 700; font-size: 0.85rem;
+    display: flex; align-items: center; justify-content: center; }
+  ol.flow li b { font-weight: 680; }
+
+  /* table */
+  .tblwrap { overflow-x: auto; margin: 18px 0 4px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line);
+    vertical-align: top; }
+  th { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+  td code { font-size: 0.82em; }
+
+  .note { background: var(--surface-2); border-left: 3px solid var(--accent);
+    border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 18px 0 4px; font-size: 0.94rem; }
+  .note p { margin: 0; max-width: none; }
+
+  footer { padding: 34px 0 60px; color: var(--ink-soft); font-size: 0.88rem; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+</style>
+
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <p class="eyebrow">Opción J · Connect IQ data field · Edge 830/840</p>
+      <h1>¿Vas por encima de tu media?</h1>
+      <p class="lead">
+        Un ciclocomputador Cateye de los viejos ponía una flechita al lado de la velocidad: apuntaba
+        <strong>arriba</strong> si ibas más rápido que tu promedio, <strong>abajo</strong> si más lento,
+        y desaparecía cuando coincidían. Este campo revive esa idea — y de paso muestra los dos números
+        juntos, para leerlo de un vistazo. Este documento explica cómo, y por qué es la más
+        <strong>simple</strong> de las tres apps del repo.
+      </p>
+    </div>
+    <div class="screen" aria-hidden="true">
+      <span class="lbl">Velocidad</span>
+      <span class="cur"><span class="arw">▲</span><span class="val">24.3</span></span>
+      <span class="avg">AVG 21.7</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section>
+    <div class="wrap">
+      <h2>El rol honesto</h2>
+      <p>
+        Garmin ya muestra velocidad actual y velocidad media — pero <strong>en celdas separadas</strong>.
+        Ninguna combina las dos en un solo indicador de tendencia. Ese es el único motivo para usar
+        este campo en la calle. Y tiene otras dos gracias:
+      </p>
+      <div class="cards">
+        <div class="card">
+          <h3>La flecha del Cateye</h3>
+          <p>Actual vs. promedio de la salida, con una flecha ▲/▼ al lado del número. Sin flecha cuando
+             coinciden (la banda muerta). Feedback de esfuerzo de un vistazo, con guantes.</p>
+        </div>
+        <div class="card">
+          <h3>Casi gratis (Tier 1)</h3>
+          <p>Para velocidad, Garmin <strong>ya calcula el promedio</strong> (<code>averageSpeed</code>).
+             No hace falta buffer, ni suavizado, ni filtro — a diferencia de la Opción B. <code>compute()</code>
+             es casi trivial.</p>
+        </div>
+        <div class="card">
+          <h3>Genérico por dentro</h3>
+          <p>El módulo que decide ▲/▼/nada no sabe qué métrica compara. Sumar frecuencia cardíaca o
+             cadencia mañana es escribir un adaptador nuevo, no tocar la lógica.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>La arquitectura: dos módulos puros y una vista fina</h2>
+      <p>
+        Como en la A y la B, <strong>toda la lógica vive en módulos puros y testeables</strong> — sin
+        <code>Dc</code>, sin <code>Activity.Info</code>, sin estado del device. La <code>View</code> es un
+        wrapper fino que lee, formatea y dibuja. Pero acá hay <strong>mucho menos que orquestar</strong>:
+        no hay buffer de muestras ni pipeline de suavizado (eso era necesario en la B porque calculaba
+        pendiente y VAM desde cero; acá la métrica y su promedio llegan hechos).
+      </p>
+      <div class="modmap" style="margin-top:16px">
+        <div class="mod"><span class="name">TrendArrow</span><span class="pure">puro</span>
+          <div class="role">Dos enteros ya redondeados → <code>UP</code> / <code>NONE</code> / <code>DOWN</code>. No sabe de qué métrica.</div></div>
+        <div class="mod"><span class="name">SpeedFormat</span><span class="pure">puro</span>
+          <div class="role">m/s → km/h o mph, redondeo, y el string <code>"24.3"</code>.</div></div>
+        <div class="mod"><span class="name">TrendArrowView</span>
+          <div class="role">Wrapper fino NO testeable: lee, formatea, dibuja el valor + flecha + media.</div></div>
+        <div class="mod"><span class="name">TrendArrowApp</span>
+          <div class="role">AppBase: entrega la View. Sin settings → ni siquiera <code>onSettingsChanged</code>.</div></div>
+        <div class="mod"><span class="name">TestUtil</span>
+          <div class="role">Helpers de test (copia propia — nada se comparte entre apps).</div></div>
+      </div>
+      <p style="margin-top:16px">
+        Lo que cada segundo pasa por <code>compute()</code> es literalmente: leer las unidades del device,
+        leer velocidad actual y media, redondear, comparar, formatear. Sin más.
+      </p>
+      <ol class="flow">
+        <li><b>Unidades.</b> <code>paceUnits</code> del device → km/h o mph (se relee cada tick: cambiarlas no avisa).</li>
+        <li><b>Leer</b> <code>currentSpeed</code> y <code>averageSpeed</code> de <code>Activity.Info</code> (m/s, pueden ser null).</li>
+        <li><b>Redondear</b> ambos a décimas con la MISMA función (<code>shownTenths</code>).</li>
+        <li><b>Comparar</b> los dos enteros → ▲/▼/nada (<code>TrendArrow.classify</code>).</li>
+        <li><b>Formatear</b> los strings de display; <code>onUpdate()</code> solo dibuja.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>La banda muerta ES el redondeo</h2>
+      <p>
+        El único riesgo de este indicador es el <strong>parpadeo cerca del cruce</strong>: si vas justo a
+        tu media, una micro-fluctuación cambiaría la flecha ▲▼▲▼ cada segundo. La solución no es suavizar
+        la velocidad — es comparar sobre <strong>lo que el usuario ve</strong>. Se redondea una sola vez, y
+        <code>TrendArrow</code> compara los enteros redondeados:
+      </p>
+      <pre class="code"><span class="k">function</span> classify(shownCurrent, shownAverage, deadBand) {
+    <span class="k">if</span> (shownCurrent == <span class="k">null</span> || shownAverage == <span class="k">null</span>) { <span class="k">return</span> NONE; }
+    <span class="k">var</span> d = shownCurrent - shownAverage;
+    <span class="k">if</span> (d &gt; deadBand)  { <span class="k">return</span> UP; }
+    <span class="k">if</span> (d &lt; -deadBand) { <span class="k">return</span> DOWN; }
+    <span class="k">return</span> NONE;   <span class="cm">// dentro de la banda -> "vas a la media"</span>
+}</pre>
+      <p>
+        Con 1 decimal se compara en <em>décimas</em>: <code>24.3 km/h</code> es el entero <code>243</code>.
+        Redondear una sola vez ya da una banda muerta gratis, pero el autor pidió una
+        <strong>semántica</strong> más ancha: para él una diferencia de 0,1 km/h <em>es</em> ir a la media, así
+        que <code>deadBand</code> vale una décima. Eso relaja a propósito la invariante de que la flecha nunca
+        contradiga al número (se puede ver <code>24.3</code> contra <code>24.2</code> sin flecha) — esperable en
+        un indicador de <em>tendencia</em>, no de igualdad.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>La flecha es DATO, no adorno</h2>
+      <p>
+        Acá hay una regla que <strong>invierte</strong> la de la Opción B, y es importante. En la B, el
+        triangulito de "pendiente" es una <em>decoración estática del label</em>: siempre igual, pegado al
+        rótulo, nunca al número. Regla dura: nunca junto al valor.
+      </p>
+      <p>
+        En la J es al revés a propósito: la flecha <strong>es el dato</strong> — cambia cada segundo según
+        actual-vs-media, igual que el número — así que va <strong>pegada al valor</strong>, como en el Cateye.
+        Se dibuja con primitivas <code>dc</code>: la cobertura del carácter flecha no está garantizada en los
+        13 devices, y eso se acabó verificando a fondo — con un resultado más raro de lo esperado, más abajo.
+        La de subir se reusa tal cual de la B; la de bajar es su <strong>espejo vertical exacto</strong>:
+      </p>
+      <pre class="code"><span class="cm">// cabeza triangular (fillPolygon) + astil (fillRectangle)</span>
+<span class="k">function</span> drawUpArrow(dc, x0, cyMid, w, h) {
+    <span class="k">var</span> top = cyMid - h/2;  <span class="k">var</span> headBase = top + (h*55)/100;
+    dc.fillPolygon([[x0 + w/2, top], [x0, headBase], [x0 + w, headBase]]);
+    dc.fillRectangle(x0 + w/2 - stemW/2, headBase, stemW, h - headH);
+}
+<span class="k">function</span> drawDownArrow(dc, x0, cyMid, w, h) {   <span class="cm">// espejo: cabeza abajo, astil arriba</span>
+    <span class="k">var</span> bot = cyMid + h/2;  <span class="k">var</span> headTop = bot - (h*55)/100;
+    dc.fillPolygon([[x0 + w/2, bot], [x0, headTop], [x0 + w, headTop]]);
+    dc.fillRectangle(x0 + w/2 - stemW/2, cyMid - h/2, stemW, h - headH);
+}</pre>
+      <div class="note">
+        <p><strong>Gotcha reutilizable:</strong> <code>fillPolygon</code> espera una tupla
+        <code>[Numeric, Numeric]</code>. Hay que pasar el literal <code>[[x,y],...]</code> <em>sin</em> cast —
+        un <code>as Array&lt;Array&lt;Number&gt;&gt;</code> rompe el build (lección de la B).</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Un decimal, una sola fuente</h2>
+      <p>
+        El valor va con 1 decimal, como el nativo. Acá hubo una duda real: ¿las fuentes numéricas del sistema
+        (<code>FONT_SYSTEM_NUMBER_*</code>) tienen el glifo <code>.</code>? En la B se había asumido que
+        <strong>no</strong> tenían el <code>%</code>, y por eso el <code>%</code> se dibuja en una fuente de
+        texto aparte. Copiar ese truco para el punto habría sido lo "seguro".
+      </p>
+      <p>
+        En vez de asumir, se <strong>verificó</strong>: una app de prueba desechable dibujando
+        <code>12.3</code>, <code>12,3</code>, <code>12:34</code>, <code>-12</code> y <code>12%3</code> en esa
+        fuente, corrida en el simulador. Renderizan <strong>todos</strong> — punto incluido. Así que el valor
+        se dibuja como <strong>un solo string en una sola fuente</strong>, sin partirlo. Más simple que la B.
+      </p>
+      <div class="note">
+        <p>Se verificó primero en el <strong>simulador</strong> y después, mejor, <strong>leyendo las tablas
+        de las fuentes que el SDK instala</strong>: el punto, la coma y el <code>%</code> están en las fuentes
+        numéricas de las dos familias de device. Eso importa porque el simulador, por sí solo, no alcanza como
+        prueba para caracteres no-ASCII (ver más abajo).
+        (De paso dejó anotado que quizás la B tampoco necesitaba partir el <code>%</code> — pero eso no se
+        toca sin pedirlo.)</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>El render: un valor grande + su media</h2>
+      <p>
+        Una sola métrica protagonista, así que — como la A — la adaptación es <strong>continua</strong>: una
+        escalera de fuentes elige la más grande que entra, con la selección <strong>cacheada</strong> (solo se
+        re-mide si cambia el tamaño de celda o la unidad). Sobre eso, dos añadidos:
+      </p>
+      <div class="cards">
+        <div class="card">
+          <h3>Valor + flecha, centrados</h3>
+          <p>El grupo <code>[flecha + número]</code> se centra. Si la flecha no entra (celda muy angosta) se
+             descarta con gracia y queda el número solo — nunca se pierde el dato principal.</p>
+        </div>
+        <div class="card">
+          <h3>Media en una línea aparte</h3>
+          <p>Si la celda es alta (<code>AVG_MIN_H</code>), debajo aparece <code>AVG 21.7</code> más chico,
+             sin flecha (es la referencia). Si no hay lugar, se omite: sigue siendo un indicador útil.</p>
+        </div>
+      </div>
+      <p style="margin-top:16px">
+        Los aprendizajes de fuentes de A/B se heredan tal cual: <code>FONT_SYSTEM_NUMBER_*</code> para los
+        dígitos, <code>FONT_GLANCE</code> para el label, y el centrado óptico por <code>descent/2</code> (las
+        fuentes numéricas reservan un descendente que los dígitos no usan). La unidad <strong>no</strong> va en
+        el label: se dibuja como el campo nativo, un <code>km</code> sobre una <code>h</code> a la derecha del
+        número, con la <code>h</code> apoyada en la misma línea base que los dígitos.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Igualar al campo nativo</h2>
+      <p>
+        El autor puso nuestro campo al lado del de velocidad nativo, en la misma pantalla, y el nuestro se veía
+        más chico en todo. Medido pixel a pixel sobre la captura (celda de 122×62 px en los dos casos), la causa
+        no era el layout sino <strong>cómo se elegía la fuente</strong>.
+      </p>
+      <div class="cards">
+        <div class="card">
+          <h3>El gate iba contra la altura</h3>
+          <p>Se descartaba una fuente si <code>getFontHeight</code> no entraba en la banda. Pero la altura de una
+             fuente numérica incluye un descendente que <em>los dígitos nunca pintan</em>: el nativo mete una
+             fuente de 42 px de alto en una banda de 41 porque solo dibuja su ascent de 33. Ahora el gate es
+             <code>getFontAscent(f) &lt;= banda − 2</code>. Es el mismo hecho que ya regía el centrado óptico,
+             aplicado a la <em>selección</em>.</p>
+        </div>
+        <div class="card">
+          <h3>La plantilla reservaba de más</h3>
+          <p><code>"888.8"</code> costaba un escalón entero de fuente por una velocidad que en bici no existe.
+             Pasó a <code>"88.8"</code>, y para que siga siendo una cota real <code>SpeedFormat</code>
+             <strong>suelta el decimal a partir de 100</strong> (<code>"104"</code>): en toda fuente numérica
+             <code>w("888") &lt; w("88.8")</code>, así que ningún valor posible desborda.</p>
+        </div>
+        <div class="card">
+          <h3>La unidad, proporcional</h3>
+          <p>Era un <code>FONT_XTINY</code> fijo y al lado del número parecía una mota. El nativo la dibuja con
+             un ascent de ~2/5 del número, las dos líneas centradas entre sí. Si el grupo no entra a lo ancho se
+             <strong>encoge primero la unidad</strong> y solo después el número: el número es el dato.</p>
+        </div>
+      </div>
+      <p style="margin-top:16px">
+        Resultado en esa celda: <code>NUMBER_MEDIUM</code> + unidad <code>FONT_SMALL</code> + label
+        <code>VELOCIDAD</code> — tinta a menos de 1 px de la nativa en las tres líneas. El label también degrada
+        como el nativo: nombre largo si entra, <code>VEL</code> si no.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>La flecha: glifo si el device puede, dibujo si no</h2>
+      <p>
+        La flecha empezó siendo una <strong>primitiva</strong>: un triángulo con <code>fillPolygon</code> y un
+        astil con <code>fillRectangle</code>. El motivo declarado era que la cobertura del glifo
+        <code>↑</code> no estaba garantizada en los 13 devices. Se verificó, y resultó ser peor y más
+        interesante de lo que decía la spec.
+      </p>
+      <ul>
+        <li><strong>Los 13 devices son dos familias de fuente</strong> (7 con TTF, 6 con bitmaps
+            <code>.cft</code> recortados) y la partición <em>no coincide</em> con las 6 resoluciones. El 830 y el
+            840 caen en familias distintas: validar en uno no dice nada del otro.</li>
+        <li><strong>El simulador miente en las dos direcciones.</strong> Pinta glifos que la fuente pedida no
+            tiene (falso positivo) y se comió un <code>⬆</code> que el 840 real sí dibuja (falso negativo).</li>
+        <li><strong>La tabla de la fuente tampoco predice el render:</strong> el 840 pinta la flecha incluso en
+            fuente numérica, y hasta un codepoint que no está en ningún archivo del SDK. Hay una cadena de
+            fuentes de respaldo que nadie documenta.</li>
+        <li><strong>Y si el glifo falta de verdad, es invisible:</strong> ni caja ni interrogante. El campo se
+            ve "bien" y falta un elemento.</li>
+      </ul>
+      <p>
+        Con eso, la decisión fue usar el glifo <em>donde exista</em> sin perder la red de seguridad:
+        <code>arrowGlyphFont()</code> <strong>lo mide en el propio device</strong> —nada de listas de modelos— y
+        exige dos señales: que avance más de 2 px (un glifo ausente mide 1 en la familia <code>.cft</code>) y que
+        no mida lo mismo que <code>U+E000</code>, un codepoint de uso privado que ninguna fuente puede tener
+        (si coinciden, es una caja <em>notdef</em> compartida). Si cualquiera falla, primitiva. El peor caso es
+        exactamente el comportamiento anterior.
+      </p>
+      <p>
+        Dos detalles que el autor encontró probándolo, y que valen como regla: la detección se resuelve
+        <strong>una vez en <code>selectFonts</code></strong> y no en cada tick —medir en la selección, dibujar en
+        el tick—, y <strong>el hueco de la flecha se reserva siempre</strong>, se pinte o no. Sin eso, el grupo
+        centrado se encogía en los segundos sin flecha y el número <em>saltaba de lado</em> cada vez que la
+        velocidad cruzaba la media, o sea todo el tiempo.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Cómo se prueba</h2>
+      <p>
+        Criterio del repo: <strong>los unit tests en verde antes de la validación visual</strong>. Los dos
+        módulos puros tienen su <code>*Test.mc</code> con <code>(:test)</code> de <code>Toybox.Test</code>
+        (excluidos del release). Corren con "Monkey C: Run Tests" — <strong>y ya corrieron: 11 tests, 11 PASS</strong>.
+      </p>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>Módulo</th><th>Qué fija el test</th></tr></thead>
+          <tbody>
+            <tr><td><code>TrendArrow</code></td><td>arriba/abajo/igual → UP/DOWN/NONE (incluso con negativos); null en cualquiera → NONE (sin crash).</td></tr>
+            <tr><td><code>SpeedFormat</code></td><td>10 m/s → 36.0 km/h exacto y → mph; redondeo half-away; <code>shownTenths</code> (10.2 m/s → 367 décimas); <code>displayString</code> (243→"24.3", −13→"-1.3", 0→"0.0", 50→"5.0", null→"--"); label KM/H·MPH.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:14px">
+        Además, un <strong>review adversarial</strong> de tres lecturas independientes (conformidad con la
+        spec, correctitud y casos borde, release-safety y convenciones) comparó el código contra la spec y
+        contra la Opción B, y no encontró nada. Compila limpio para <code>edge840</code> y <code>edge830</code>.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Depurar sin salir a andar</h2>
+      <p>
+        Con <code>TEST_MODE = true</code> en un build de debug, <code>compute()</code> ignora el sensor y
+        consume un generador sintético que recorre un perfil de velocidades. La clave: acumula
+        <strong>su propia distancia y tiempo</strong> y calcula el promedio como lo hace Garmin
+        (<code>dist / tiempo</code>), así la media <strong>converge</strong> de forma realista a lo largo del
+        ciclo — y se ven las tres flechas (arriba en los tramos rápidos, abajo en los lentos, nada en el cruce)
+        conviviendo con el número de la media, que es justo lo que hay que validar de un vistazo.
+      </p>
+      <p>
+        El flag vive en <code>false</code> en el repo (se pone en <code>true</code> solo mientras se depura, y
+        nunca llega a un release). El esquema de exclusión es el mismo de A/B: <code>const</code> plano →
+        el optimizador borra el bloque, y las funciones de debug van en pares <code>(:debug)</code>/<code>(:release)</code>.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Qué falta</h2>
+      <p>
+        Los unit tests están en verde (<strong>11/11</strong>), el export de los <strong>17 targets</strong>
+        compila sin un warning, el render iguala al nativo y los íconos son propios. Queda:
+      </p>
+      <div class="cards">
+        <div class="card">
+          <h3>1 · Elegir la flecha</h3>
+          <p>En el 840 el glifo funciona. Falta que el autor decida entre <code>↑</code> (flecha de línea) y
+             <code>▲</code> (triángulo sólido, más parecido a la primitiva que verán los devices de la otra
+             familia). Son dos constantes.</p>
+        </div>
+        <div class="card">
+          <h3>2 · Afinar en el simulador</h3>
+          <p>El umbral de la línea de promedio (<code>AVG_MIN_H</code>), el del modo inline (80 % del ancho de
+             pantalla) y los nudges de la unidad, en las 6 resoluciones. Es el paso que necesita ojo humano.</p>
+        </div>
+        <div class="card">
+          <h3>3 · La ficha del store</h3>
+          <p>Capturas, textos EN/ES y el hero opcional. El ícono ya está: master 1024 con alpha real y el 500×500
+             sobre gris, más los 13 launchers dibujados a su tamaño.</p>
+        </div>
+      </div>
+      <p style="margin-top:16px">
+        Un pendiente que no se puede cerrar: <strong>nadie tiene un Edge 830 físico</strong> para comprobar que
+        ahí la flecha cae a la primitiva como se espera. La detección está hecha para que ese caso sea el
+        comportamiento seguro, no una apuesta.
+      </p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>apps/j-trend-arrow · Opción J</span>
+    <span>·</span>
+    <span>Monkey C · Connect IQ 3.3 · 13 Edge (referencia: 840)</span>
+    <span>·</span>
+    <span>La fuente de verdad es <code>SPEC.md</code>.</span>
+  </div>
+</footer>

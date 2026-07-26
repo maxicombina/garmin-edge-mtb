@@ -1,0 +1,13 @@
+<strings>
+    <!-- English is the base / fallback language (like A and B). -->
+    <string id="AppName">Speed Trend</string>
+
+    <!-- Field label drawn above the current value (uppercased at runtime). Metric NAME only:
+         the unit is drawn next to the number, native style. Two variants, like the native
+         field: the long name is used when it fits the cell width, else the short one. -->
+    <string id="SpeedLabel">Speed</string>
+    <string id="SpeedLabelShort">Speed</string>
+
+    <!-- Prefix drawn before the average value on the secondary line (uppercased). -->
+    <string id="AvgLabel">Avg</string>
+</strings>

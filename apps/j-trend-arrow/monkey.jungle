@@ -1,0 +1,13 @@
+# Build config. The SDK auto-discovers ./source and ./resources by convention,
+# INCLUDING resource qualifiers like ./resources-<device> and ./resources-spa, so
+# pointing at the manifest is enough.
+#
+# Launcher icons: each device has its own resources-<device>/drawables/ with a
+# correctly-sized icon plus its own drawable definition (auto-discovered by the
+# device qualifier). There is deliberately NO icon in the base resources/ -- a base
+# icon would be overridden by every device and the packager would warn about it. The
+# base resources/ holds only shared, size-independent resources (strings).
+#
+# NOTE (2026-07-23): the launcher icons here are PLACEHOLDERS copied from Option A;
+# redesign with a trend-arrow motif before publishing (see SPEC 3.2).
+project.manifest = manifest.xml
