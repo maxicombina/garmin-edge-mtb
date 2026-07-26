@@ -425,20 +425,106 @@
     </div>
   </section>
 
+
+  <section>
+    <div class="wrap">
+      <h2>La referencia, configurable</h2>
+      <p>
+        La v0.1.0 comparaba siempre contra el promedio de la salida. Ahora se puede elegir: <strong>promedio
+        real</strong> o <strong>una velocidad objetivo fija</strong> que define el usuario. Con objetivo, el
+        campo cambia de significado — deja de informar y pasa a marcar ritmo: la flecha dice
+        <em>vas por encima / por debajo de lo que te propusiste</em>.
+      </p>
+      <p>
+        Lo interesante es <strong>lo poco que hubo que tocar</strong>. <code>TrendArrow.classify</code> recibe
+        dos enteros y no sabe qué representan: se diseñó genérico el primer día, sin un caso de uso a la vista.
+        Esa decisión se cobró sola acá. La lógica no cambió una línea; cambió <em>de dónde sale el segundo
+        número</em>:
+      </p>
+      <pre class="code"><span class="cm">// la referencia: el objetivo si está configurado y es válido, si no el promedio</span>
+<span class="k">var</span> refTenths = (mUseTarget &amp;&amp; mTargetTenths != <span class="k">null</span>) ? mTargetTenths : avgTenths;
+mAvgStr     = SpeedFormat.displayString(refTenths);
+mArrowState = TrendArrow.classify(curTenths, refTenths, DEAD_BAND_TENTHS);</pre>
+      <p>
+        Los settings se leen <strong>una vez</strong>, en <code>reloadSettings()</code>, que llama el
+        <code>onSettingsChanged()</code> del App — nunca por tick, la misma regla que la selección de fuentes.
+        Y termina con <code>mCacheW = -1</code>: el prefijo cambió de ancho, así que hay que forzar que se
+        vuelva a elegir el layout.
+      </p>
+
+      <h3>El default es el promedio, y cuesta salirse de él</h3>
+      <p>
+        Quien actualice y no toque nada tiene que ver <strong>exactamente</strong> la v0.1.0. Eso se apoya en
+        cuatro capas independientes —el <code>properties.xml</code> (<code>0</code>), el
+        <code>settings.xml</code> (el <code>0</code> es "promedio"), el fallback de lectura
+        (<code>readNumber(…, 0)</code>) y los inicializadores de miembro— y en una quinta red que es la que de
+        verdad lo blinda: con el objetivo en <code>0</code>, <code>targetTenths</code> devuelve
+        <code>null</code> y <strong>la referencia vuelve al promedio aunque el modo diga objetivo</strong>.
+        Hacen falta las dos cosas para salirse. Un ajuste a medio configurar no puede dejar el campo inútil.
+      </p>
+      <div class="note">
+        <p><strong>El default de <code>properties.xml</code> es de primera instalación, no un valor que se
+        reimponga:</strong> se usa solo mientras la propiedad no existe. Si el simulador aparece en modo
+        objetivo "sin motivo", lo primero es buscar un valor guardado de una prueba anterior — el XML ya no
+        manda. Y la fuente de verdad de en qué modo está la app <em>no</em> es el formulario del editor (lo
+        renderiza un servidor de Garmin y esa zona tiene bugs reportados con las listas): es el prefijo en
+        pantalla, <code>PROM</code> o <code>META</code>.</p>
+      </div>
+
+      <h3>Un decimal que la UI no puede exigir</h3>
+      <p>
+        El objetivo se quiere con un decimal, pero el schema de settings <strong>no lo puede imponer</strong>:
+        el <code>resources.xsd</code> del SDK admite en un <code>settingConfig</code> solo
+        <code>type</code>, <code>readonly</code>, <code>required</code>, <code>min</code>, <code>max</code>,
+        <code>maxLength</code> y <code>errorMessage</code> — no existe <code>step</code> ni
+        <code>decimals</code>. Así que el usuario puede tipear <code>22.37</code>, y lo cuantiza el código:
+        <code>targetTenths</code> redondea a décimas y <strong>la segunda línea muestra el valor
+        cuantizado</strong>. Tipeás 22.37, la pantalla dice 22.4, y contra 22.4 compara la flecha: lo que ves
+        es siempre lo que se usa.
+      </p>
+      <p>
+        La tentación es reescribir el valor redondeado a la propiedad para que el formulario del teléfono
+        también muestre 22.4. <strong>Se descartó con evidencia:</strong> escribirlo funciona (Garmin lo
+        confirma para claves que ya son settings declarados), pero <em>verlo al reabrir los ajustes</em> no —
+        hay un bug abierto donde el teléfono sigue mostrando el valor que tipeó el usuario, y si después toca
+        el otro setting empuja su copia cacheada y revive el <code>22.37</code>. El número iría y vendría solo.
+      </p>
+
+      <h3>Dos cosas que sorprendieron</h3>
+      <div class="cards">
+        <div class="card">
+          <h3>Los prefijos no miden igual</h3>
+          <p>La spec afirmaba que <code>META</code>/<code>GOAL</code> medían como <code>PROM</code>/<code>AVG</code>.
+             Medido en el 840: <code>AVG</code> 31 px y <code>GOAL</code> <strong>40</strong> — un 30 % más ancho.
+             No desborda, porque la reserva usa el prefijo activo, pero <strong>en inglés y en celda angosta el
+             modo objetivo puede elegir un escalón de fuente menos</strong>. En español no pasa
+             (<code>META</code> 40 &lt; <code>PROM</code> 42).</p>
+        </div>
+        <div class="card">
+          <h3>Sideload no alcanza</h3>
+          <p>Los settings de una app <strong>sideloadeada no se pueden editar desde el teléfono</strong>: el
+             mecanismo cuelga del vínculo con la store, que el sideload nunca establece. Por eso J estrenó un
+             <strong>id beta</strong> aparte del publicado, para instalar de la store e iterar sin gastar una
+             ronda de review por vuelta.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section>
     <div class="wrap">
       <h2>Cómo se prueba</h2>
       <p>
         Criterio del repo: <strong>los unit tests en verde antes de la validación visual</strong>. Los dos
         módulos puros tienen su <code>*Test.mc</code> con <code>(:test)</code> de <code>Toybox.Test</code>
-        (excluidos del release). Corren con "Monkey C: Run Tests" — <strong>y ya corrieron: 11 tests, 11 PASS</strong>.
+        (excluidos del release). Corren con "Monkey C: Run Tests" — <strong>y ya corrieron: 12 tests, 12 PASS</strong>.
       </p>
       <div class="tblwrap">
         <table>
           <thead><tr><th>Módulo</th><th>Qué fija el test</th></tr></thead>
           <tbody>
             <tr><td><code>TrendArrow</code></td><td>arriba/abajo/igual → UP/DOWN/NONE (incluso con negativos); null en cualquiera → NONE (sin crash).</td></tr>
-            <tr><td><code>SpeedFormat</code></td><td>10 m/s → 36.0 km/h exacto y → mph; redondeo half-away; <code>shownTenths</code> (10.2 m/s → 367 décimas); <code>displayString</code> (243→"24.3", −13→"-1.3", 0→"0.0", 50→"5.0", null→"--"); label KM/H·MPH.</td></tr>
+            <tr><td><code>SpeedFormat</code></td><td>10 m/s → 36.0 km/h exacto y → mph; redondeo half-away; <code>shownTenths</code> (10.2 m/s → 367 décimas); <code>displayString</code> (243→"24.3", −13→"-1.3", 0→"0.0", 50→"5.0", null→"--"); label KM/H·MPH; <code>targetTenths</code> (25.0→250, 22.25→223 con valores binario-exactos a propósito, 0 y negativos → <code>null</code>).</td></tr>
           </tbody>
         </table>
       </div>
@@ -466,6 +552,15 @@
         nunca llega a un release). El esquema de exclusión es el mismo de A/B: <code>const</code> plano →
         el optimizador borra el bloque, y las funciones de debug van en pares <code>(:debug)</code>/<code>(:release)</code>.
       </p>
+      <div class="note">
+        <p><strong>Trampa que costó un <code>.iq</code>:</strong> ese "nunca llega a un release" no es una
+        preferencia de estilo. Con <code>TEST_MODE = true</code>, un build de <em>release</em>
+        <strong>compila limpio y sin warnings</strong> pero el campo muestra <code>--</code> para siempre: el
+        generador sintético es <code>(:debug)</code> y su par <code>(:release)</code> es un stub que devuelve
+        <code>[null, null, null]</code>, así que la rama <code>if (TEST_MODE)</code> toma nulls y nunca lee
+        <code>Activity.Info</code>. Pasó de verdad con el primer <code>.iq</code> beta de la v0.2.0, que hubo
+        que rehacer. Vale para las tres apps del repo, que comparten el esquema.</p>
+      </div>
     </div>
   </section>
 
@@ -473,8 +568,10 @@
     <div class="wrap">
       <h2>Qué falta</h2>
       <p>
-        Los unit tests están en verde (<strong>11/11</strong>), el export de los <strong>17 targets</strong>
-        compila sin un warning, el render iguala al nativo y los íconos son propios. Queda:
+        La <strong>v0.1.0 ya está publicada</strong> en la Connect IQ Store. Los unit tests están en verde
+        (<strong>12/12</strong>), el export de los <strong>17 targets</strong> compila sin un warning, el render
+        iguala al nativo y los íconos son propios. La <strong>v0.2.0</strong> —la de los settings— está
+        construida y esperando subida al <strong>canal beta</strong>. Queda:
       </p>
       <div class="cards">
         <div class="card">
@@ -484,14 +581,15 @@
              familia). Son dos constantes.</p>
         </div>
         <div class="card">
-          <h3>2 · Afinar en el simulador</h3>
-          <p>El umbral de la línea de promedio (<code>AVG_MIN_H</code>), el del modo inline (80 % del ancho de
-             pantalla) y los nudges de la unidad, en las 6 resoluciones. Es el paso que necesita ojo humano.</p>
+          <h3>2 · Los settings, con ojo humano</h3>
+          <p>El paseo promedio → objetivo → promedio cambiando el ajuste <em>en caliente</em>, y el caso que el
+             probe dejó marcado: <code>GOAL</code> en una celda angosta y en inglés, que es 9 px más ancho que
+             <code>AVG</code>. Ninguna de las dos se puede cerrar sin mirar.</p>
         </div>
         <div class="card">
-          <h3>3 · La ficha del store</h3>
-          <p>Capturas, textos EN/ES y el hero opcional. El ícono ya está: master 1024 con alpha real y el 500×500
-             sobre gris, más los 13 launchers dibujados a su tamaño.</p>
+          <h3>3 · Afinar el layout</h3>
+          <p>El umbral de la línea de promedio (<code>AVG_MIN_H</code>), el del modo inline (80 % del ancho de
+             pantalla) y los nudges de la unidad, en las 6 resoluciones.</p>
         </div>
       </div>
       <p style="margin-top:16px">

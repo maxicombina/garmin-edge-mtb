@@ -564,7 +564,7 @@ Esto no es una promesa de v1.1, es solo la prueba de que la arquitectura cumple 
 - **Setting de métrica objetivo, ancho de banda muerta, promedio global vs. ventana móvil:** dejados fuera del v1 a propósito (ver §7 de la spec maestra) — el v1 es 100 % hardcodeado a velocidad + promedio global de la actividad, **cero settings**, para minimizar superficie de implementación (ver §9).
 - **Temperatura:** de valor dudoso para esta feature (no es miembro de `Activity.Info`, sesgada por el calor del propio equipo) — descartada, no solo pospuesta.
 
-## 9. Settings — la referencia configurable (DECIDIDO 2026-07-26; v1 no tenía ninguno)
+## 9. Settings — la referencia configurable (DECIDIDO e IMPLEMENTADO 2026-07-26; v1 no tenía ninguno)
 
 **Historia:** v1 salió sin settings a propósito (patrón de la A: métrica fija, promedio global, banda muerta implícita — el `AppBase` era `initialize()` + `getInitialView()` y nada más). Esta sección especifica la **primera iteración con settings**, pedida por el autor: elegir contra qué se compara la velocidad actual. Las cuatro preguntas de diseño que esta sección dejaba abiertas quedaron **resueltas con el autor el 2026-07-26**; sus respuestas están integradas abajo y marcadas con «(decisión)».
 
@@ -761,7 +761,18 @@ mArrowState = TrendArrow.classify(curTenths, refTenths, DEAD_BAND_TENTHS);
 3. `selectLabel()`, sufijo del label ancho: `var suffix = mIsWide ? (INLINE_SEP + mAvgPrefix) : "";` → `mRefPrefix` (el label ancho pasa a decir `VELOCIDAD / META` en modo objetivo).
 4. `fitUnitFont()`, reserva de ancho `withPrefix`: `dc.getTextWidthInPixels(mAvgPrefix, u)` → `mRefPrefix`.
 
-**Nada más cambia.** Ni fuentes, ni tamaños, ni centrado, ni la unidad apilada, ni el glifo/primitiva de la flecha (§6.6/§6.11): el prefijo activo entra en las mismas mediciones de siempre y el `mCacheW = -1` de `reloadSettings()` garantiza que la escalera se re-elija con el ancho del prefijo nuevo. `META`/`GOAL` miden como `PROM`/`AVG` (4 vs 4 y 4 vs 3 caracteres): sin riesgo de desbordes nuevos.
+**Nada más cambia.** Ni fuentes, ni tamaños, ni centrado, ni la unidad apilada, ni el glifo/primitiva de la flecha (§6.6/§6.11): el prefijo activo entra en las mismas mediciones de siempre y el `mCacheW = -1` de `reloadSettings()` garantiza que la escalera se re-elija con el ancho del prefijo nuevo.
+
+**Anchos MEDIDOS de los prefijos (2026-07-26, probe headless en los dos devices), porque una versión anterior de esta spec afirmaba de más que «miden igual»:**
+
+| fuente | AVG | GOAL | PROM | META |
+|---|---|---|---|---|
+| `FONT_MEDIUM` (840) | 31 | **40** | 42 | 40 |
+| `FONT_XTINY` (840) | 19 | **25** | 26 | 24 |
+| `FONT_MEDIUM` (830) | 37 | **48** | 53 | 49 |
+| `FONT_XTINY` (830) | 18 | **23** | 26 | 25 |
+
+En **español** `META` es más angosto que `PROM`: el modo objetivo nunca aprieta más que el actual. En **inglés**, en cambio, `GOAL` es **6-9 px más ancho que `AVG`** (~30 %). **No hay desborde** —`fitUnitFont` reserva el prefijo ACTIVO, así que el grupo siempre entra— pero la consecuencia real y aceptada es que **en una celda angosta y en inglés el modo objetivo puede elegir un escalón de fuente menos que el modo promedio**. Es visible solo comparando los dos modos en la misma celda chica, y es preferible a recortar el rótulo.
 
 ### 9.6 Casos borde (todos con comportamiento definido)
 
@@ -778,6 +789,159 @@ mArrowState = TrendArrow.classify(curTenths, refTenths, DEAD_BAND_TENTHS);
 En el **simulador**: correr con F5 y editar los settings en caliente desde el menú del simulador (en el 9.2.0 es la opción que edita los *App Settings*; el nombre exacto del menú puede variar entre versiones del SDK — es la misma que se usó para probar los 4 settings de B, y dispara `onSettingsChanged` de verdad). Con `TEST_MODE = true` el generador converge la media a **20,0 km/h** (§11): fijar objetivo `25.0` → la flecha debe quedar ABAJO en todos los tramos salvo el de 30,0, y la segunda línea debe decir `META 25.0` fija; volver el modo a promedio → vuelve `PROM` y la línea se mueve. En **device real**: cambiar el setting desde Garmin Connect Mobile con el campo en pantalla y verificar que cambia sin reiniciar.
 
 **Criterios de aceptación:** los de siempre (§13) más: (1) suite verde incluido `testTargetTenths`; (2) export de los 17 targets sin warnings; (3) en el sim, el ciclo completo promedio→objetivo→promedio sin tocar F5; (4) el prefijo cambia también en el label del modo ancho.
+
+### 9.8 Estado: IMPLEMENTADO (2026-07-26)
+
+Todo lo de §9.2–§9.5 está escrito y verificado por CLI: **export de los 17 targets limpio** (solo el aviso conocido del Edge 1030 con CIQ 3.2.5) y **suite 12/12** (los 11 de antes + `testTargetTenths`). Los cuatro usos de `mAvgPrefix` que §9.5 listaba se reemplazaron y `mAvgPrefix` quedó únicamente en su carga desde recursos y en la línea que elige el prefijo activo.
+
+**Pendiente, y solo el autor puede hacerlo:** los criterios (3) y (4) de arriba — el paseo por el simulador cambiando el setting en caliente, y mirar el modo objetivo en una celda angosta en inglés, que es donde el `GOAL` más ancho puede bajar un escalón de fuente.
+
+### 9.8.1 El default es el PROMEDIO DE LA SALIDA (requisito duro, VERIFICADO end-to-end 2026-07-26)
+
+Una instalación nueva, o un usuario que nunca abre los ajustes, tiene que comportarse **exactamente
+como la v0.1.0**: flecha contra el promedio real de la salida. Se sostiene en cuatro capas
+independientes, y las cuatro apuntan al promedio:
+
+| Capa | Qué dice |
+|---|---|
+| `properties.xml` | `referenceMode` = **0**, `targetSpeed` = **0.0** |
+| `settings.xml` | el valor **0** es `RefAverage` (y es la PRIMERA entrada de la lista) |
+| `reloadSettings()` | `readNumber("referenceMode", 0)` → el fallback si la clave no se puede leer **también** es 0 |
+| inicializadores de miembro | `mUseTarget = false`, `mTargetTenths = null`, `mRefPrefix = "AVG"` |
+
+Y hay una quinta red: `targetSpeed` = 0.0 → `targetTenths` devuelve `null` → aun con el modo en
+objetivo, la condición `mUseTarget && mTargetTenths != null` es falsa y la referencia vuelve al
+promedio. O sea: **para salir del promedio hacen falta las DOS cosas** (modo en objetivo *y* un número
+> 0), lo cual es justamente la degradación silenciosa de §9.6.
+
+**El default de `properties.xml` es de PRIMERA INSTALACIÓN, no un valor que se reimponga.** Se usa
+solo cuando la propiedad todavía no existe; una vez que hay un valor guardado, ese manda y cambiar el
+XML no lo pisa. Evidencia directa: borrando el `.SET` del simulador, la corrida siguiente volvió a
+leer `0` (probado abajo); la otra mitad (que un valor existente le gana a un XML nuevo) sale del foro
+y es coherente con eso. **Para los usuarios juega a favor:** quien viene de la v0.1.0 no tiene ningún
+valor guardado para estas claves → al actualizar le aplica el default = promedio.
+
+⚠️ **Corolario para depurar:** si el simulador muestra el modo objetivo "sin motivo", lo primero es
+mirar si hay un valor guardado de una prueba anterior — el XML ya no manda. Se limpia borrando el
+`.SET` (se regenera con los defaults). Y **la fuente de verdad de en qué modo está la app NO es el
+formulario del editor** (lo renderiza un servidor de Garmin y esa zona tiene bugs reportados con las
+entradas de lista), **es el prefijo de la segunda línea en pantalla**: `PROM` = promedio, `META` =
+objetivo.
+
+**Verificado atravesando la plataforma, no leyendo el XML** (2026-07-26): se borró el `.SET` del
+simulador para forzar una instalación limpia y un probe `(:test)` temporal leyó
+`Application.Properties.getValue` de verdad → `referenceMode=0`, `targetSpeed=0.000000`,
+`targetTenths=null`, y además `new TrendArrowView()` + `onUpdate()` pintó sin excepción con esos
+defaults. El probe se borró después (misma técnica de §11.1).
+
+⚠️ `Application.Properties.getValue` **lanza excepción** si la clave no existe, y estos lectores no
+usan `try/catch` — a propósito: es el mismo patrón que `GradeVamView` de la Opción B (líneas 162/169),
+y las claves están garantizadas porque se compilan dentro del `.prg` desde `properties.xml`. No
+divergir de B acá sin motivo.
+
+### 9.9 Cómo se prueban estos settings (VERIFICADO 2026-07-26)
+
+Tres caminos, y el orden importa porque **solo el primero es completo**.
+
+**1. Simulador — SÍ, es el camino real.** Dos piezas distintas, en dos menús distintos (verificado
+2026-07-26 inspeccionando las cadenas del binario `ConnectIQ.app/Contents/MacOS/simulator`):
+
+- **`File > App Settings Editor`** — el formulario. Sus controles son `Select an app` + `Language`
+  (⚠️ el selector de idioma es lo que permite probar `META` vs `GOAL` sin cambiar el device) y los
+  botones `Close`/`Save`, con `Settings Saved` al confirmar. Lee el schema del
+  `<app>-settings.json` que genera el compilador (existe ya: `bin/test-settings.json`, con las 2
+  claves, los `configMin/configMax` y los strings de los dos idiomas); si no lo encuentra dice
+  *"No settings file found for this app. This app may not have settings."*
+- **`Simulation > Trigger App Settings`** — dispara el evento de settings sin reiniciar la app, o sea
+  lo que ejercita `onSettingsChanged()` → `reloadSettings()` (§9.6). Vive entre `Force onHide` /
+  `Trigger Goal` / `Set Weather`. Al lado hay un `Timeout App Settings` (simula que el push falla).
+
+⚠️ **El editor es SERVER-BACKED, no local** — hallazgo que conviene saber antes de perder tiempo: el
+binario postea a `https://<host>.garmin.com/<...>/appSettings2/sdk/input` con un
+`Authorization: Bearer`, y tiene el error *"Unable to get Connect credentials. Please log in to the
+Connect IQ SDK Manager."* → **hace falta internet y estar logueado en el SDK Manager** con la cuenta
+de Garmin. Es el mismo backend que renderiza el formulario del teléfono, y explica por qué el
+formulario no acepta markdown y por qué el schema tiene tan pocos atributos (§9.10).
+
+Los valores quedan en un archivo `.SET` en el sandbox del simulador:
+
+```
+/var/folders/.../T/com.garmin.connectiq/GARMIN/APPS/SETTINGS/<NOMBRE>.SET
+```
+
+(en esta máquina ya existen `J-TEST.SET` y `B-TEST.SET`; se localizan con
+`find /var/folders -name "*.SET"`). Formato: magic `abcdabcd`, la lista de claves en texto plano
+(`targetSpeed`, `referenceMode`), magic `da7ada7a`, y los valores.
+⚠️ **El nombre del `.SET` NO sale del nombre del `.prg`:** probado el 2026-07-26 corriendo un
+`ZZPROBE.prg` — escribió `J-TEST.SET`, no `ZZPROBE.SET`. El simulador mapea por app, no por archivo.
+
+**2. Sideload + teléfono → NO SE PUEDE (RESUELTO con un canal beta, 2026-07-26).** Los settings de una app sideloadeada **no** se pueden
+editar desde Garmin Connect Mobile ni desde Garmin Express: el mecanismo de settings cuelga del
+vínculo con la Connect IQ Store, y el sideload nunca establece ese vínculo. Es limitación de
+plataforma, no un bug nuestro. Como J **ya está publicada** (v0.1.0, canal producción), la vía
+soportada es subir la versión con settings a la store e instalarla desde ahí: recién entonces
+aparecen los ajustes en el teléfono. **Decisión tomada el 2026-07-26:** para no gastar una ronda de
+review por iteración contra la ficha publicada, J estrena el desdoblamiento de ids de la Opción A —
+id **beta** `f70f3c984e4c43d496006628f3510817` en `main` (entrada del portal **sin publicar**, se
+instala por el link de `apps.garmin.com` + Connect Mobile) e id **prod**
+`140986d8c6bc4026880e117255a6ce67` pinneado en `release`. Los dos ids, el riesgo del merge y el
+procedimiento están en `store/RELEASES.md` y en `CLAUDE.md`.
+
+⚠️ **Y antes de exportar el `.iq`: `TEST_MODE` en `false`.** Con `TEST_MODE = true` un build de
+release compila limpio pero muestra `--` eternamente (el generador sintético es `(:debug)` y el stub
+`(:release)` devuelve nulls). Pasó con el primer `.iq` beta de la v0.2.0. El workaround que documenta Garmin es copiar a mano el `.SET`
+del simulador a `GARMIN/APPS/SETTINGS/` del device por OpenMTP — **probado y descartado**: un
+`Properties.setValue` desde un probe headless se lee bien dentro de la misma corrida pero **no llega
+al `.SET` en disco** (el simulador no vuelca sin que la app termine bien), y aparte (el
+nombre que espera el firmware del device no está confirmado; si el prefijo sale mal, la app
+simplemente sigue con los defaults, así que el costo de probar es bajo y se nota al toque porque el
+prefijo de la línea secundaria pasa de `PROM` a `META`).
+
+**Receta concreta con `TEST_MODE = true`** (el perfil sintético promedia exactamente 20,0 km/h):
+poner el objetivo en **25,0** y no en 20 — contra 25 la flecha solo apunta arriba en el segmento de
+30 km/h, así que el patrón cambia de forma OBVIA respecto del modo promedio y se ve que la referencia
+cambió de verdad. Segunda señal independiente: la línea de abajo queda **clavada** (un objetivo no se
+mueve) mientras que el promedio deriva. Y para ver la cuantización de §9.10, tipear **22.37** → la
+pantalla tiene que decir **22.4**.
+
+**3. Para validar en el 840 solamente el RENDER del modo objetivo** (que `META`/`GOAL` entre y no
+desborde) no hacen falta settings: alcanza un hook `(:debug)` que clave `mUseTarget = true` y
+`mTargetTenths`, del mismo modo que `TEST_MODE`, y sideloadear ese `.prg`. Separa la pregunta
+"¿se ve bien?" (device) de la pregunta "¿el setting llega?" (simulador).
+
+### 9.10 El decimal del objetivo: por qué la UI no lo puede forzar
+
+**Decidido: 1 decimal.** Pero el schema de settings **no puede exigirlo**. La autoridad es
+`resources.xsd` del SDK (verificado 2026-07-26): `settingConfigType` acepta **solo** los atributos
+`type`, `readonly`, `required`, `min`, `max`, `maxLength`, `errorMessage`. **No existe `step` ni
+`decimals`** — un `type="numeric"` acepta cualquier float dentro de `min`/`max`, así que el usuario
+puede tipear `22.37`.
+
+Lo resuelve el código, que ya está implementado y es la razón por la que `targetTenths` existe:
+cuantiza a décimas (`roundHalf(v*10)`) y **la línea secundaria muestra el valor cuantizado**, así que
+lo que se ve en pantalla es siempre exactamente contra lo que compara la flecha (`22.37` → muestra
+`22.4` → compara 224 décimas). El título del setting lo dice: *"Target speed, 1 decimal"*.
+
+La única forma de que la UI misma imponga el decimal sería un `type="list"` con las entradas
+enumeradas (p. ej. 10,0 → 40,0 de a 0,5 = 61 entradas) — **descartado**: cuesta 61 strings, limita el
+rango y no aporta nada sobre la cuantización, que es exacta igual. **Tampoco se escribe de vuelta** el valor cuantizado a la
+propiedad, y esto se evaluó con evidencia (2026-07-26) porque es lo primero que uno quiere hacer:
+
+- *Escribirlo* funciona: `Properties.setValue` sobre una clave que YA es un setting declarado persiste
+  en el device (confirmado por un ingeniero de Garmin en el foro y verificado en hardware por quien
+  reportó — el matiz de ese hilo es que en el SIMULADOR no persiste sin matar la app con Ctrl-K).
+- *Verlo al reabrir los ajustes en el teléfono* NO funciona: hay un bug abierto que describe
+  exactamente este caso (la app corrige el valor en el device, el teléfono sigue mostrando el que
+  tipeó el usuario). Respuesta de Garmin: *"We are currently trying to see if there's an issue with
+  GCM receiving information"*. Guardar transfiere los valores solo HACIA el reloj, no de vuelta.
+- Modo de fallo peor (inferencia a partir de ese hilo, NO verificado): si el teléfono conserva
+  `10.27` cacheado y el usuario después toca el OTRO setting, al guardar empuja su bundle entero y
+  revive el `10.27`, pisando nuestro `10.3` → el número iría y vendría solo.
+
+Por eso el redondeo queda del lado del device y no se reescribe: **la pantalla del Edge ya muestra el
+valor cuantizado** con prefijo `META`/`GOAL`, que es el único lugar donde el ciclista lo mira. Lo que
+queda desalineado es el formulario del teléfono, y eso no está en nuestras manos arreglarlo de forma
+confiable.
 
 ## 10. Unit tests (obligatorio — convención del repo desde 2026-07-19)
 

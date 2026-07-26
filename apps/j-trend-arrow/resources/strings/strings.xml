@@ -10,4 +10,14 @@
 
     <!-- Prefix drawn before the average value on the secondary line (uppercased). -->
     <string id="AvgLabel">Avg</string>
+
+    <!-- App settings, edited from the phone (SPEC 9). -->
+    <string id="SetReference">Compare against</string>
+    <string id="RefAverage">Ride average</string>
+    <string id="RefTarget">Fixed target</string>
+    <string id="SetTargetSpeed">Target speed, 1 decimal (in your device speed unit, km/h or mph)</string>
+
+    <!-- Prefix of the secondary line when comparing against the fixed target, instead of
+         AvgLabel (uppercased at runtime like the other labels). -->
+    <string id="TargetLabel">Goal</string>
 </strings>

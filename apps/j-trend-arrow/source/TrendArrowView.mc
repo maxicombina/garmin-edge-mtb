@@ -1,3 +1,4 @@
+import Toybox.Application;
 import Toybox.WatchUi;
 import Toybox.Graphics;
 import Toybox.Activity;
@@ -80,6 +81,13 @@ class TrendArrowView extends WatchUi.DataField {
     private var mLabelLong as String = "SPEED";
     private var mLabelShort as String = "SPEED";
     private var mAvgPrefix as String = "AVG";
+    // --- Configurable reference (SPEC 9). The arrow and the secondary line compare the current
+    //     speed either against the ride average or against a fixed target the user typed in the
+    //     settings; mRefPrefix is whichever of the two prefixes is ACTIVE right now. ---
+    private var mTargetPrefix as String = "GOAL";        // "Meta"/"Goal", uppercased, loaded once
+    private var mRefPrefix as String = "AVG";            // active: mAvgPrefix or mTargetPrefix
+    private var mUseTarget as Boolean = false;           // referenceMode == 1
+    private var mTargetTenths as Number or Null = null;  // pre-rounded target; null = not usable
 
     // --- Live display state, rebuilt every second in compute() ---
     private var mCurStr as String = "--";
@@ -206,6 +214,35 @@ class TrendArrowView extends WatchUi.DataField {
         mLabelLong = (WatchUi.loadResource(Rez.Strings.SpeedLabel) as String).toUpper();
         mLabelShort = (WatchUi.loadResource(Rez.Strings.SpeedLabelShort) as String).toUpper();
         mAvgPrefix = (WatchUi.loadResource(Rez.Strings.AvgLabel) as String).toUpper();
+        mTargetPrefix = (WatchUi.loadResource(Rez.Strings.TargetLabel) as String).toUpper();
+
+        reloadSettings();
+    }
+
+    // Re-read the 2 app settings and derive what the arrow compares against. Called from
+    // initialize() and from TrendArrowApp.onSettingsChanged() -- NEVER per tick (SPEC 9.5).
+    function reloadSettings() as Void {
+        mUseTarget = (readNumber("referenceMode", 0) == 1);
+        mTargetTenths = SpeedFormat.targetTenths(readFloat("targetSpeed", 0.0));
+        // Active prefix: GOAL/META only when the target is actually usable. Target mode with an
+        // unset, zero or negative number behaves exactly like average mode, silently, so a
+        // half-configured setting can never leave the field useless (SPEC 9.1 / 9.6).
+        mRefPrefix = (mUseTarget && mTargetTenths != null) ? mTargetPrefix : mAvgPrefix;
+        mCacheW = -1;   // the prefix width changed -> force font/layout re-selection (B's idiom)
+    }
+
+    private function readNumber(key as String, dflt as Number) as Number {
+        var v = Application.Properties.getValue(key);
+        if (v instanceof Lang.Number) { return v; }
+        if (v instanceof Lang.Float) { return v.toNumber(); }
+        return dflt;
+    }
+
+    private function readFloat(key as String, dflt as Float) as Float {
+        var v = Application.Properties.getValue(key);
+        if (v instanceof Lang.Float) { return v; }
+        if (v instanceof Lang.Number) { return v.toFloat(); }
+        return dflt;
     }
 
     // Runs ~1x/second. Reads inputs, formats the display strings. No drawing (SPEC 5.3).
@@ -242,9 +279,13 @@ class TrendArrowView extends WatchUi.DataField {
         var curTenths = SpeedFormat.shownTenths(curMps, mIsStatute);
         var avgTenths = SpeedFormat.shownTenths(avgMps, mIsStatute);
         mCurStr = SpeedFormat.displayString(curTenths);
-        mAvgStr = SpeedFormat.displayString(avgTenths);
+        // The reference the arrow AND the secondary line compare against: the fixed target when
+        // it is configured and valid, else the ride average (silent fallback, SPEC 9.1). The dead
+        // band is the SAME in both modes -- the author's decision, so no new constant appears.
+        var refTenths = (mUseTarget && mTargetTenths != null) ? mTargetTenths : avgTenths;
+        mAvgStr = SpeedFormat.displayString(refTenths);
         mBothStr = mCurStr + INLINE_SEP + mAvgStr;   // used only by the wide inline mode
-        mArrowState = TrendArrow.classify(curTenths, avgTenths, DEAD_BAND_TENTHS);
+        mArrowState = TrendArrow.classify(curTenths, refTenths, DEAD_BAND_TENTHS);
     }
 
     function onUpdate(dc as Graphics.Dc) as Void {
@@ -304,12 +345,12 @@ class TrendArrowView extends WatchUi.DataField {
         if (mShowAvg) {
             var avgCy = mLabelH + mPrimaryBandH + mAvgBandH / 2 + Graphics.getFontDescent(mAvgFont) / 2 - VALUE_NUDGE;
             var wAvg = dc.getTextWidthInPixels(mAvgStr, mAvgFont);
-            var prefixW = dc.getTextWidthInPixels(mAvgPrefix, mAvgUnitFont);
+            var prefixW = dc.getTextWidthInPixels(mRefPrefix, mAvgUnitFont);
             var uW = unitBlockWidth(dc, mAvgUnitFont);
             var totalAvgW = prefixW + AVG_LABEL_GAP + wAvg + UNIT_GAP + uW;
             var ax = w / 2 - totalAvgW / 2;
             dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(ax, avgCy, mAvgUnitFont, mAvgPrefix,
+            dc.drawText(ax, avgCy, mAvgUnitFont, mRefPrefix,
                         Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
             var numX = ax + prefixW + AVG_LABEL_GAP;
             dc.drawText(numX, avgCy, mAvgFont, mAvgStr,
@@ -555,7 +596,7 @@ class TrendArrowView extends WatchUi.DataField {
     //     Wide mode names both columns ("VELOCIDAD / PROM"). Mirrors what the native field does:
     //     full name in wide cells, abbreviation in narrow ones. ---
     private function selectLabel(dc as Graphics.Dc, usableW as Number) as Void {
-        var suffix = mIsWide ? (INLINE_SEP + mAvgPrefix) : "";
+        var suffix = mIsWide ? (INLINE_SEP + mRefPrefix) : "";
         var longText = mLabelLong + suffix;
         var shortText = mLabelShort + suffix;
         mLabelFont = Graphics.FONT_GLANCE;
@@ -611,7 +652,7 @@ class TrendArrowView extends WatchUi.DataField {
             var u = mTextLadder[i];
             var groupW = lead + valueW + UNIT_GAP + unitBlockWidth(dc, u);
             if (withPrefix) {
-                groupW += dc.getTextWidthInPixels(mAvgPrefix, u) + AVG_LABEL_GAP;
+                groupW += dc.getTextWidthInPixels(mRefPrefix, u) + AVG_LABEL_GAP;
             }
             if (groupW <= usableW) {
                 return u;

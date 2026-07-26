@@ -1,0 +1,19 @@
+<settings>
+    <!-- Edited from the phone (Garmin Connect Mobile / Connect IQ Store app) or Garmin
+         Express. Data fields cannot be configured on-device (platform limit; same note
+         as b-grade-vam). -->
+    <setting propertyKey="@Properties.referenceMode" title="@Strings.SetReference">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.RefAverage</listEntry>
+            <listEntry value="1">@Strings.RefTarget</listEntry>
+        </settingConfig>
+    </setting>
+    <setting propertyKey="@Properties.targetSpeed" title="@Strings.SetTargetSpeed">
+        <!-- The settings schema CANNOT restrict decimals: resources.xsd allows only
+             type/readonly/required/min/max/maxLength/errorMessage on settingConfig, so there is
+             no step= and no decimals=. The user can type 22.37 here; SpeedFormat.targetTenths
+             quantizes it to tenths and the secondary line shows the quantized value, so what is
+             displayed is always what the arrow compares against. The title says "1 decimal". -->
+        <settingConfig type="numeric" min="0" max="99.9" />
+    </setting>
+</settings>
