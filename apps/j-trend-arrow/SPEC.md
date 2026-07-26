@@ -285,12 +285,18 @@ module SpeedFormat {
 3. curTenths = SpeedFormat.shownTenths(info.currentSpeed, mIsStatute)
 4. avgTenths = SpeedFormat.shownTenths(info.averageSpeed, mIsStatute)
 5. mCurStr = SpeedFormat.displayString(curTenths)
-6. mAvgStr = SpeedFormat.displayString(avgTenths)
-7. mArrowState = TrendArrow.classify(curTenths, avgTenths, DEAD_BAND_TENTHS)   // banda ±0,1 km/h (§5.1)
-8. mUnitLabel = SpeedFormat.unitLabel(mIsStatute)
+6. refTenths = (objetivo configurado y válido) ? mTargetTenths : avgTenths          // §9
+7. mAvgStr = SpeedFormat.displayString(refTenths)
+8. mArrowState = TrendArrow.classify(curTenths, refTenths, DEAD_BAND_TENTHS)   // banda ±0,1 km/h (§5.1)
+9. mUnitTop = SpeedFormat.unitTop(mIsStatute); mUnitBottom = SpeedFormat.unitBottom(mIsStatute)
 ```
 
-Eso es **todo** — sin buffer, sin push, sin filtro. `onUpdate()` solo dibuja `mCurStr`/`mAvgStr`/`mArrowState`/`mUnitLabel`, cero formateo por tick (mismo principio A/B: `compute()` calcula y formatea, `onUpdate()` solo dibuja).
+Eso es **todo** — sin buffer, sin push, sin filtro. `onUpdate()` solo dibuja `mCurStr`/`mAvgStr`/`mArrowState` y las dos líneas de la unidad, cero formateo por tick (mismo principio A/B: `compute()` calcula y formatea, `onUpdate()` solo dibuja).
+
+⚠️ **Dos pasos de este pseudocódigo cambiaron después de escribirlo, y esto ya refleja el código real:** la
+unidad dejó de ser un string pegado al label (`mUnitLabel = unitLabel(...)`) y pasó a las dos líneas
+apiladas al lado del número (**§6.9**; `unitLabel` sigue existiendo pero **no se usa en el render**), y el
+segundo número dejó de ser siempre el promedio: puede ser un objetivo fijo configurable (**§9**).
 
 ## 6. Render adaptativo (`onUpdate(dc)`)
 
@@ -380,7 +386,7 @@ selectFonts(dc, usableW, h, labelH):
         si ninguna entra: mAvgFont = FONT_XTINY
 ```
 
-**Label del valor actual:** `mLabel` = string cargado una vez de `Rez.Strings.SpeedLabel` en `initialize()`, en MAYÚSCULAS (mismo patrón que `mGradeLabel` en B). Se dibuja como `mLabel + " " + SpeedFormat.unitLabel(mIsStatute)`, p. ej. `"SPEED KM/H"` (igual patrón que B con `"VAM M/H"`).
+**Label del valor actual:** `mLabel` = string cargado una vez de `Rez.Strings.SpeedLabel` en `initialize()`, en MAYÚSCULAS (mismo patrón que `mGradeLabel` en B). ⚠️ **SUPERSEDED por §6.9/§6.10:** el diseño original lo dibujaba como `mLabel + " " + SpeedFormat.unitLabel(mIsStatute)`, p. ej. `"SPEED KM/H"` (igual patrón que B con `"VAM M/H"`). El código real dibuja **solo el nombre de la métrica** (`VELOCIDAD`, con degradación a `VEL` y después por la escalera de fuentes vía `selectLabel`), porque la unidad se movió a las dos líneas apiladas al lado del número.
 
 ### 6.5 Dibujo (`onUpdate`)
 
@@ -393,7 +399,10 @@ selectFonts(dc, usableW, h, labelH):
    mShowAvg = (h >= AVG_MIN_H)   // implica labelShow, porque AVG_MIN_H > LABEL_MIN_H
 4. Caché: si (w,h,mIsStatute) cambió -> selectFonts(dc, w - 2*PAD, h, labelH)  -- pasa h TOTAL y
           labelH para que selectFonts calcule postLabelH = h - labelH internamente
-5. Si labelShow: drawText(w/2, LABEL_MARGIN, FONT_GLANCE, mLabel + " " + mUnitLabel, CENTER)
+5. Si labelShow: drawText(w/2, LABEL_MARGIN, mLabelFont, mLabel, CENTER)
+     // ⚠️ SUPERSEDED: el label ya NO lleva la unidad pegada (era `mLabel + " " + mUnitLabel`).
+     // La unidad va apilada al lado del número (§6.9) y el label es solo el nombre de la
+     // métrica, con degradación largo -> corto -> fuente menor (§6.10, `selectLabel`).
 
 6. -- bandas verticales --
    postLabelH = h - labelH
@@ -626,7 +635,7 @@ Dos referencias posibles:
 <string id="SetReference">Compare against</string>
 <string id="RefAverage">Ride average</string>
 <string id="RefTarget">Fixed target</string>
-<string id="SetTargetSpeed">Target speed (in your device speed unit, km/h or mph)</string>
+<string id="SetTargetSpeed">Target speed, 1 decimal (in your device speed unit, km/h or mph)</string>
 <string id="TargetLabel">Goal</string>
 ```
 
@@ -636,7 +645,7 @@ y a `resources-spa/strings/strings.xml`:
 <string id="SetReference">Comparar contra</string>
 <string id="RefAverage">Promedio de la salida</string>
 <string id="RefTarget">Objetivo fijo</string>
-<string id="SetTargetSpeed">Velocidad objetivo (en la unidad de tu dispositivo, km/h o mph)</string>
+<string id="SetTargetSpeed">Velocidad objetivo, 1 decimal (en la unidad de tu dispositivo, km/h o mph)</string>
 <string id="TargetLabel">Meta</string>
 ```
 
@@ -790,7 +799,11 @@ En el **simulador**: correr con F5 y editar los settings en caliente desde el me
 
 **Criterios de aceptación:** los de siempre (§13) más: (1) suite verde incluido `testTargetTenths`; (2) export de los 17 targets sin warnings; (3) en el sim, el ciclo completo promedio→objetivo→promedio sin tocar F5; (4) el prefijo cambia también en el label del modo ancho.
 
-### 9.8 Estado: IMPLEMENTADO (2026-07-26)
+### 9.8 Estado: IMPLEMENTADO y EN LA STORE como v0.2.1 (canal beta, 2026-07-26)
+
+**Subido al canal beta como `v0.2.1`** el 2026-07-26 (la `v0.2.0` quedó quemada: se exportó con
+`TEST_MODE = true` y el portal no permite reusar el número — ver `store/RELEASES.md`). La ficha de
+producción (v0.1.0) no se tocó.
 
 Todo lo de §9.2–§9.5 está escrito y verificado por CLI: **export de los 17 targets limpio** (solo el aviso conocido del Edge 1030 con CIQ 3.2.5) y **suite 12/12** (los 11 de antes + `testTargetTenths`). Los cuatro usos de `mAvgPrefix` que §9.5 listaba se reemplazaron y `mAvgPrefix` quedó únicamente en su carga desde recursos y en la línea que elige el prefijo activo.
 
