@@ -2,14 +2,27 @@
 <!--
   Connect IQ manifest for the j-trend-arrow data field (Option J).
 
-  This id is J's OWN beta id (a separate app from a-activity-timer and b-grade-vam
-  in the store). Production submission uses the release-branch flow (see repo
-  CLAUDE.md); NEVER edit this id with the visual manifest editor (it reformats the
-  XML). Edit by hand.
+  This id is J's BETA id, used on main only. It is a separate app from
+  a-activity-timer and b-grade-vam in the store, and also separate from J's own
+  PRODUCTION app, whose id is 140986d8c6bc4026880e117255a6ce67 and lives pinned on
+  the release branch (that is the one already published as v0.1.0). The beta id was
+  added on 2026-07-26 because app settings CANNOT be configured from the phone for a
+  sideloaded app, so testing them needs a real store install, and doing that against
+  the live listing would mean a review round per iteration.
+
+  ATTENTION at the next PRODUCTION release of J: this line changed on main, so
+  "git merge main" will carry the BETA id into release with no conflict (only one
+  side changed it). Right after that merge, commit the swap back to
+  140986d8c6bc4026880e117255a6ce67 touching only this file, exactly like commit
+  6ad6be8 did for a-activity-timer. From then on merges stay clean, because only
+  release touches this line.
+
+  NEVER edit this id with the visual manifest editor (it reformats the XML). Edit by
+  hand.
 -->
 <iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
     <iq:application
-        id="140986d8c6bc4026880e117255a6ce67"
+        id="f70f3c984e4c43d496006628f3510817"
         type="datafield"
         name="@Strings.AppName"
         entry="TrendArrowApp"
