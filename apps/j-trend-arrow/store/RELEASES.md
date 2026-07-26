@@ -25,7 +25,15 @@ hizo `6ad6be8` con la A. El aviso está también en el comentario del `manifest.
 
 Entradas, más nueva primero.
 
-## v0.2.0 — 2026-07-26 — beta
+## v0.2.1 — 2026-07-26 — beta
+
+⚠️ **La `v0.2.0` está QUEMADA, no la reuses.** Se subió con un `.iq` roto: estaba exportado con
+`TEST_MODE = true`, y en un build de release eso deja el campo mostrando `--` para siempre (el
+generador sintético es `(:debug)` y su stub `(:release)` devuelve nulls, así que nunca lee
+`Activity.Info`; compila limpio y sin warnings). Se rehízo el `.iq` con `TEST_MODE = false`, pero el
+portal **no permite reusar un número de versión ya subido**, así que el `.iq` bueno subió como
+`0.2.1`. Mismo código, mismo commit: la única diferencia entre las dos es ese flag.
+**Lección:** antes de exportar cualquier `.iq`, verificar `TEST_MODE`.
 
 **SUBIDA al canal beta el 2026-07-26** (entrada del portal con el id **beta** `f70f3c98…`, sin
 publicar; se instala por el link de `apps.garmin.com` + Connect Mobile). El `.iq` es
