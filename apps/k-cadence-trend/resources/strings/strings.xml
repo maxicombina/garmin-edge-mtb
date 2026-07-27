@@ -10,4 +10,13 @@
 
     <!-- Prefix drawn before the average value on the secondary line (uppercased). -->
     <string id="AvgLabel">Avg</string>
+
+    <!-- Settings, edited from the phone. Same two as Option J. -->
+    <string id="SetReference">Compare against</string>
+    <string id="RefAverage">Ride average</string>
+    <string id="RefTarget">Fixed target</string>
+    <string id="SetTargetCadence">Target cadence in rpm, whole number</string>
+
+    <!-- Replaces AvgLabel on the secondary line when comparing against the fixed target. -->
+    <string id="TargetLabel">Goal</string>
 </strings>

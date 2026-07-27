@@ -26,7 +26,19 @@ class CadenceTrendView extends WatchUi.DataField {
     // near 200 rpm), so "888" is a real upper bound on every value displayString can produce.
     private const VALUE_TPL = "888";
 
+    // Label glyph: the crank symbol, 23x19 px on the native field -> aspect 23/19. See
+    // drawCadenceIcon for the geometry and where it was measured.
+    private const ICON_ASPECT = 23.0 / 19.0;
+
     private var mRenderer as TrendCore.TrendRenderer;
+
+    // --- Labels. Both prefixes load once; the active one depends on the settings. ---
+    private var mAvgPrefix as String = "AVG";
+    private var mTargetPrefix as String = "GOAL";
+
+    // --- Settings state. Re-read in onSettingsChanged, NEVER per tick. ---
+    private var mUseTarget as Boolean = false;          // referenceMode == 1
+    private var mTargetRpm as Number or Null = null;    // whole rpm; null = not usable
 
     // --- Live display state, rebuilt every second in compute() ---
     private var mCurStr as String = TrendCore.NO_DATA;
@@ -50,15 +62,42 @@ class CadenceTrendView extends WatchUi.DataField {
         DataField.initialize();
 
         mRenderer = new TrendCore.TrendRenderer();
-        // Metric name, long then short (the renderer picks whichever fits the cell, like the native
-        // field), plus the prefix for the secondary line.
-        mRenderer.setLabels(
-            (WatchUi.loadResource(Rez.Strings.CadenceLabel) as String).toUpper(),
-            (WatchUi.loadResource(Rez.Strings.CadenceLabelShort) as String).toUpper(),
-            (WatchUi.loadResource(Rez.Strings.AvgLabel) as String).toUpper());
+        mAvgPrefix = (WatchUi.loadResource(Rez.Strings.AvgLabel) as String).toUpper();
+        mTargetPrefix = (WatchUi.loadResource(Rez.Strings.TargetLabel) as String).toUpper();
         mRenderer.setTemplates(VALUE_TPL, VALUE_TPL + TrendCore.INLINE_SEP + VALUE_TPL);
         // Cadence has no unit variants, so unlike speed this can be set once and never revisited.
         mRenderer.setUnit(CadenceFormat.unitTop(), CadenceFormat.unitBottom());
+        // The crank glyph in front of the label, like the native field. The renderer reserves the box
+        // and calls back; it never learns what the shape is.
+        mRenderer.setLabelIcon(method(:drawCadenceIcon), ICON_ASPECT);
+
+        reloadSettings();   // sets the labels too: the prefix depends on the settings
+    }
+
+    // Re-read the 2 app settings and derive what the arrow compares against. Called from initialize()
+    // and from CadenceTrendApp.onSettingsChanged() -- NEVER per tick (same rule as font selection).
+    function reloadSettings() as Void {
+        mUseTarget = (readNumber("referenceMode", 0) == 1);
+        // RAW value, not readNumber: that would truncate a stray decimal and defeat the rounding
+        // inside targetRpm, which also treats anything non-numeric as "not configured".
+        mTargetRpm = CadenceFormat.targetRpm(Application.Properties.getValue("targetCadence"));
+        // GOAL/META only when the target is actually usable. Target mode with an unset, zero or
+        // negative number behaves exactly like average mode, silently, so a half-configured setting
+        // can never leave the field useless.
+        var refPrefix = (mUseTarget && mTargetRpm != null) ? mTargetPrefix : mAvgPrefix;
+        // setLabels invalidates the layout cache for us: the prefix width changed, and in a wide cell
+        // it is part of the label text too ("CADENCIA / PROM").
+        mRenderer.setLabels(
+            (WatchUi.loadResource(Rez.Strings.CadenceLabel) as String).toUpper(),
+            (WatchUi.loadResource(Rez.Strings.CadenceLabelShort) as String).toUpper(),
+            refPrefix);
+    }
+
+    private function readNumber(key as String, dflt as Number) as Number {
+        var v = Application.Properties.getValue(key);
+        if (v instanceof Lang.Number) { return v; }
+        if (v instanceof Lang.Float) { return v.toNumber(); }
+        return dflt;
     }
 
     // Runs ~1x/second. Reads inputs, formats the display strings. No drawing.
@@ -84,11 +123,16 @@ class CadenceTrendView extends WatchUi.DataField {
         mRunning = (state == Activity.TIMER_STATE_ON);
 
         mCurStr = CadenceFormat.displayString(curRpm);
-        mRefStr = CadenceFormat.displayString(avgRpm);
+        // The reference the arrow AND the secondary line compare against: the fixed target when it is
+        // configured and usable, else the ride average (silent fallback).
+        var refRpm = (mUseTarget && mTargetRpm != null) ? mTargetRpm : avgRpm;
+        mRefStr = CadenceFormat.displayString(refRpm);
         // trendValue, not the raw rpm: it returns null while coasting, so the classifier's null path
-        // gives NONE and a 0 shows without a down arrow (CadenceFormat's header explains why).
+        // gives NONE and a 0 shows without a down arrow (CadenceFormat's header explains why). Applied
+        // to the reference too -- an average of 0, the first seconds before you pedal, is not something
+        // to compare against either.
         mArrowState = TrendCore.TrendArrow.classify(CadenceFormat.trendValue(curRpm),
-                                                    CadenceFormat.trendValue(avgRpm),
+                                                    CadenceFormat.trendValue(refRpm),
                                                     DEAD_BAND_RPM);
     }
 
@@ -96,6 +140,47 @@ class CadenceTrendView extends WatchUi.DataField {
         mRenderer.setValues(mCurStr, mRefStr, mArrowState, mRunning);
         // getBackgroundColor() is a DataField method, so the renderer cannot call it itself.
         mRenderer.draw(dc, getBackgroundColor());
+    }
+
+    // --- The label glyph: Garmin's cadence symbol, drawn with primitives -------------------------
+    //
+    // The native Edge field puts a small pictogram in front of some field names (a stopwatch on
+    // TIEMPO, a heart on ZONA) and none on others (VELOCIDAD, DISTANCIA). CADENCIA gets a CRANK: a
+    // ring with the crank arm crossing it diagonally and a pedal at each end.
+    //
+    // MEASURED off the author's 246x322 capture, not guessed: the glyph is 23x19 px next to a 12 px
+    // cap height, and leaves 3 px before the text (that 3 is the renderer's ICON_GAP). Hence the
+    // 23/19 aspect and the fractions below, which were checked by rendering this same geometry
+    // offline at 13/17/19/25 px and comparing the pixels against the native ones. At 13 px it turns
+    // to mush, which is why the renderer drops the glyph below ICON_MIN_H rather than smudging it.
+    //
+    // Primitives only, no font glyph: exactly the same reason as the trend arrow (a symbol's coverage
+    // is not guaranteed across the 13 devices, and a missing glyph is INVISIBLE, not a box).
+    //
+    // Public and un-annotated on purpose: the barrel invokes it, and a barrel cannot depend on this
+    // app's (:debug)/(:release) exclusions.
+    function drawCadenceIcon(dc as Graphics.Dc, x as Number, y as Number, w as Number, h as Number) as Void {
+        // Everything scales off h, so the shape is identical at every size.
+        var ring = (0.105 * h + 0.5).toNumber();       // ring thickness
+        if (ring < 2) { ring = 2; }
+        var arm = (0.10 * h + 0.5).toNumber();         // crank arm thickness
+        if (arm < 2) { arm = 2; }
+        var cx = x + 0.60 * h;
+        var cy = y + 0.55 * h;
+        var r = 0.335 * h;
+        // The crank arm, upper-left to lower-right, crossing the ring.
+        dc.setPenWidth(arm);
+        dc.drawLine(x + 0.24 * h, y + 0.15 * h, x + 0.97 * h, y + 0.90 * h);
+        // The ring. Drawn with drawCircle at half the thickness inset, so the stroke lands inside r.
+        dc.setPenWidth(ring);
+        dc.drawCircle(cx, cy, r - ring / 2.0);
+        dc.setPenWidth(1);                             // restore: the renderer draws text next
+        // The two pedals: short horizontal bars at the ends of the arm.
+        var pl = (0.30 * h + 0.5).toNumber();          // pedal length
+        var pt = (0.155 * h + 0.5).toNumber();         // pedal thickness
+        if (pt < 2) { pt = 2; }
+        dc.fillRectangle(x + 0.24 * h - pl / 2, y + 0.13 * h - pt / 2, pl, pt);
+        dc.fillRectangle(x + 0.97 * h - pl / 2, y + 0.92 * h - pt / 2, pl, pt);
     }
 
     // --- Simulator-only synthetic generator. One call = one second. Walks a cadence profile and

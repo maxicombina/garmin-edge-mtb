@@ -40,6 +40,34 @@ module CadenceFormat {
         return rpm;
     }
 
+    // The configured fixed target as a WHOLE rpm, or null when it is not usable (unset, zero or
+    // negative) -- null is what makes the reference fall back to the ride average, silently.
+    //
+    // Cadence is the easy case of this: the target is an integer by nature, so unlike Option J's
+    // targetTenths there is no quantisation to explain to the user. Rounding is still done here
+    // DEFENSIVELY, because the settings schema cannot enforce an integer: resources.xsd allows only
+    // type/readonly/required/min/max/maxLength/errorMessage on a settingConfig -- no step=, no
+    // decimals=. The property is declared type=number, but if a Float ever reaches us we round
+    // (half away from zero) instead of truncating, so 84.6 means 85 and never 84.
+    // It takes the RAW property value on purpose, not something already coerced to Number: coercing
+    // first would TRUNCATE a stray decimal (84.6 -> 84) and quietly defeat the rounding below. Anything
+    // that is not a number at all -- null, or a property somehow stored as another type -- reads as
+    // "not configured" rather than crashing the field.
+    function targetRpm(raw) as Number or Null {
+        var n;
+        if (raw instanceof Lang.Float || raw instanceof Lang.Double) {
+            n = (raw >= 0) ? (raw + 0.5).toNumber() : (raw - 0.5).toNumber();
+        } else if (raw instanceof Lang.Number) {
+            n = raw;
+        } else {
+            return null;
+        }
+        if (n <= 0) {
+            return null;
+        }
+        return n;
+    }
+
     // Single-line unit: no country ever spells cadence differently, so there is nothing to stack and
     // the bottom line is empty (the renderer draws one line when it is).
     function unitTop() as String {
