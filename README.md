@@ -2,13 +2,13 @@
 
 Aplicaciones Connect IQ para **Garmin Edge** (830 / 840) orientadas a MTB (XC / senderos técnicos).
 
-Proyecto personal. El objetivo es una familia de *data fields* y una *device app* que aporten métricas útiles durante la rodada, calculadas on-device y sin depender de potenciómetro. Hay **dos apps publicadas** en la Connect IQ Store, una tercera implementada sin publicar, y el resto en especificación.
+Proyecto personal. El objetivo es una familia de *data fields* y una *device app* que aporten métricas útiles durante la rodada, calculadas on-device y sin depender de potenciómetro. Hay **dos apps publicadas** en la Connect IQ Store, **dos más implementadas** sin publicar, y el resto en especificación.
 
 ## Estado
 
-🚴 **Dos apps en producción** (Opciones A y J) · **una implementada y en validación** (Opción B) · el resto, en especificación — ver [`GARMIN_MTB_SPEC.md`](GARMIN_MTB_SPEC.md).
+🚴 **Dos apps en producción** (Opciones A y J) · **dos implementadas y en validación** (B y K) · el resto, en especificación — ver [`GARMIN_MTB_SPEC.md`](GARMIN_MTB_SPEC.md).
 
-La spec define el contexto (hardware, plataforma, restricciones), **10 opciones de producto evaluadas (A–J)** y un roadmap incremental. Resumen:
+La spec define el contexto (hardware, plataforma, restricciones), **10 opciones de producto evaluadas (A–J)** y un roadmap incremental. De la **K** en adelante son productos pensados después, no parte de esa ronda de evaluación; la letra es una etiqueta estable, no un orden. Resumen:
 
 | | Opción | Formato | Estado |
 |---|---|---|---|
@@ -22,6 +22,8 @@ La spec define el contexto (hardware, plataforma, restricciones), **10 opciones 
 | H | Stamina casera (modelo de depósito por FC) | device app | idea |
 | I | Test de subida (VO2max de campo + tracker de forma) | data field / device app | idea |
 | J | Flecha de tendencia estilo Cateye (actual vs. referencia) | data field | **✅ publicada · prod `v0.1.0` · beta `v0.2.1`** |
+| K | La misma flecha, sobre la **cadencia** | data field | **🛠️ implementada · 9/9 tests · sin publicar** |
+| L | La misma flecha, sobre la **frecuencia cardíaca** | data field | en diseño |
 
 ## Las apps
 
@@ -43,9 +45,17 @@ La flechita de los ciclocomputadores Cateye de los 90: velocidad actual en grand
 
 [`SPEC.md`](apps/j-trend-arrow/SPEC.md) · [walkthrough del código](apps/j-trend-arrow/docs/code-walkthrough.html) · [`RELEASES.md`](apps/j-trend-arrow/store/RELEASES.md)
 
+### K — `k-cadence-trend` · implementada, sin publicar
+
+La misma flecha de J, sobre la **cadencia**. La métrica más simple de la familia: llega en rpm enteros y rpm es rpm en todos los países, así que no hay conversión ni unidades que cambien. Su única decisión de producto es el **0 de no pedalear**: en una bajada pasás minutos sin pedalear, y llamar a eso "por debajo de tu media" sería falso, así que muestra el `0` real **sin flecha**. Fue la primera app construida sobre el barrel, y su View quedó en ~130 líneas contra las 841 de J.
+
+[`source/`](apps/k-cadence-trend/source/)
+
 ## Estructura
 
-Cada opción vive como proyecto Connect IQ auto-contenido en `apps/<letra>-<slug>/`, de modo que en el futuro pueda extraerse a su propio repositorio sin reestructurar. Nada se comparte entre apps salvo documentación: si hace falta código común, se decide explícitamente (¿copiar? ¿extraer?).
+Cada opción vive como proyecto Connect IQ auto-contenido en `apps/<letra>-<slug>/`, de modo que en el futuro pueda extraerse a su propio repositorio sin reestructurar. **La letra es una etiqueta estable, no un orden** — no se renumera.
+
+Por defecto **nada se comparte entre apps** salvo documentación; cuando hace falta código común se decide explícitamente. Esa decisión se tomó una vez, para la familia de la flecha de tendencia (J, K, L), que comparte un **barrel** — el mecanismo de librería de Monkey C.
 
 ```
 apps/<app>/
@@ -54,6 +64,8 @@ apps/<app>/
 ├── resources[-spa]/
 ├── docs/          # walkthrough del código en HTML
 └── store/         # RELEASES.md, íconos y assets de la ficha (no son recursos de build)
+
+barrels/trend-core/   # clasificador + motor de render, compartido por J, K y L
 ```
 
 ## Stack
