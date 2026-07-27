@@ -276,14 +276,18 @@
 
     <section>
       <h2>Los archivos</h2>
-      <p>Un proyecto Connect IQ autocontenido. El grueso de la lógica está en <code>ActivityTimerView.mc</code>.</p>
+      <p>Un proyecto Connect IQ autocontenido. El formato del tiempo vive en un <strong>módulo puro y
+      testeable</strong>, y la View es un wrapper fino que dibuja: esa separación es convención dura del
+      repo desde el 2026-07-19, y esta app es su patrón de referencia.</p>
       <div class="tree">
 a-activity-timer/
 ├── <b>manifest.xml</b>        <span class="accent">// datafield · 13 Edge compatibles · API 3.3.0</span>
 ├── <b>monkey.jungle</b>       <span class="accent">// config de build</span>
 ├── source/
 │   ├── <b>ActivityTimerApp.mc</b>   <span class="accent">// AppBase → getInitialView()</span>
-│   └── <b>ActivityTimerView.mc</b>  <span class="accent">// DataField: compute() + onUpdate() ← acá está todo</span>
+│   ├── <b>ActivityTimerView.mc</b>  <span class="accent">// DataField: compute() + onUpdate(), wrapper fino</span>
+│   ├── <b>TimeFormat.mc</b>         <span class="accent">// PURO: format(ms) → Parts, eights(n) ← la lógica</span>
+│   └── <b>TimeFormatTest.mc</b>     <span class="accent">// 7 tests (:test), fuera del release</span>
 └── resources/
     ├── strings/strings.xml    <span class="accent">// nombre + label "Timer"</span>
     └── drawables/…            <span class="accent">// ícono</span>
@@ -292,7 +296,11 @@ a-activity-timer/
 
     <section>
       <h2>Paso a paso: <code>compute()</code></h2>
-      <p>Corre una vez por segundo. Su trabajo es dejar los textos listos para dibujar.</p>
+      <p>Corre una vez por segundo. Su trabajo es dejar los textos listos para dibujar. Los tres pasos que
+      siguen son <strong>lógica pura y viven en <code>TimeFormat.mc</code></strong>, no en la View:
+      <code>compute()</code> llama a <code>TimeFormat.format(totalMs)</code> y recibe un objeto
+      <code>Parts</code> ya armado. Se explican acá porque es donde se entienden, pero el código está
+      separado a propósito — así se puede testear sin simulador ni sensores.</p>
       <ol class="steps">
         <li><div>
           <h3>Leer el timer, a prueba de <code>null</code></h3>
@@ -457,6 +465,52 @@ a-activity-timer/
           <p>Poné <code>DEBUG_MEASURE = true</code> (un hook incluido, al lado de <code>TEST_MODE</code>): imprime en la consola de VS Code el tamaño de cada celda (<code>dc.getWidth()×getHeight()</code>) y las alturas de las fuentes de la escalera — justo lo que la §11.1 pide anotar. Volvé a <code>false</code> al terminar.</p>
         </div></li>
       </ol>
+    </section>
+
+    <section>
+      <h2>La lógica pura y sus 7 tests</h2>
+      <p>Todo lo que se puede calcular sin pantalla vive en <code>TimeFormat.mc</code>: un módulo sin
+      <code>Dc</code>, sin <code>Activity.Info</code> y sin estado de device. Expone dos cosas —
+      <code>format(totalMs)</code>, que devuelve un objeto <code>Parts</code> con el texto grande, el
+      volado y la plantilla, y <code>eights(n)</code>, que arma la plantilla de <code>8</code> del ancho
+      que haga falta. La View no formatea nada: le pide las partes ya hechas.</p>
+      <p>Eso permite lo que de otra forma sería imposible: <strong>probar el formato sin simulador, sin
+      sensores y sin esperar cinco horas de actividad</strong>. Los siete tests fijan justo los casos que
+      duelen — el paso de 59:59 a 1:00:00, el momento en que la plantilla se ensancha (de minutos y de
+      horas), la hora de valor medio, el truncado y el propio <code>eights</code>.</p>
+      <div class="callout">
+        <p class="k">por qué importa</p>
+        <p>Esta app es el <strong>patrón de referencia del repo</strong>: desde el 2026-07-19 la convención
+        es que toda lógica de cálculo o formato va en un módulo puro con su <code>*Test.mc</code> al lado, y
+        la View queda lo más chica posible. Las Opciones B y J se construyeron así desde el día uno
+        (8 y 2 módulos puros). El criterio de aceptación es el mismo en las tres: <strong>los tests en verde
+        antes de mirar nada en pantalla</strong>.</p>
+      </div>
+      <p>El código de test lleva la anotación <code>(:test)</code>, así que <strong>el compilador lo deja
+      afuera del build de release</strong>: cuesta cero memoria en el device.</p>
+    </section>
+
+    <section>
+      <h2>Que lo de depurar no llegue al device</h2>
+      <p>El hook de <code>TEST_MODE</code> y el de medición no pueden viajar en el paquete que se sube a la
+      tienda. El esquema, que las tres apps del repo comparten, tiene dos mitades:</p>
+      <pre class="code"><span class="k">private const</span> TEST_MODE = <span class="k">false</span>;   <span class="cm">// const plano: el optimizador borra el bloque entero</span>
+
+<span class="cm">// y las funciones de depuración van en PARES, una por tipo de build</span>
+(:debug)   <span class="k">function</span> nextSynthetic() { <span class="cm">/* generador de prueba */</span> }
+(:release) <span class="k">function</span> nextSynthetic() { <span class="k">return</span> [<span class="k">null</span>, <span class="k">null</span>, <span class="k">null</span>]; }</pre>
+      <p>Con el <code>const</code> en <code>false</code>, el bloque <code>if (TEST_MODE)</code> desaparece
+      del binario. Y la regla que va con eso: <strong>nunca referenciar un miembro <code>(:debug)</code>
+      desde una función que exista en release</strong> — no resuelve el símbolo y el build falla.</p>
+      <div class="callout">
+        <p class="k">la trampa que costó un paquete</p>
+        <p>Dejar <code>TEST_MODE = true</code> y exportar un build de <strong>release</strong>
+        <strong>compila limpio, sin un solo warning</strong>… y el campo muestra <code>--</code> para
+        siempre: la rama de prueba sigue viva, pero la función que le daba datos es ahora el stub
+        <code>(:release)</code> que devuelve nulls, así que nunca se lee el sensor. Pasó de verdad con un
+        <code>.iq</code> de la Opción J, que hubo que rehacer y le quemó un número de versión. <strong>Antes
+        de exportar cualquier <code>.iq</code>: verificar que el flag esté en <code>false</code>.</strong></p>
+      </div>
     </section>
   </main>
 

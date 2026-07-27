@@ -379,12 +379,18 @@
              (<code>HALF_GRADE_PCT=44</code> → 44/56) para que la fuente compartida salga grande.</p>
         </div>
         <div class="card">
-          <span class="tag">pctFontFor</span>
-          <h3>El <code>%</code> es otro dibujo</h3>
-          <p>Las fuentes numéricas del sistema <strong>no tienen el glifo <code>%</code></strong>: se
-             dibuja aparte, en fuente de TEXTO, como sufijo del número — y <strong>proporcional</strong>
-             (≈&nbsp;2/3 del alto del valor, sobre <code>mTextLadder</code>), no un XTINY fijo que
-             quedaba diminuto al lado de un número grande.</p>
+          <span class="tag">gradeText</span>
+          <h3>El <code>%</code> va en el mismo string</h3>
+          <p>La pendiente se dibuja como <strong>un solo string</strong> —<code>"7%"</code>— en la fuente
+             numérica, con un único <code>drawText</code>. Durante meses esta app hizo lo contrario,
+             partiéndolo en dos y dibujando el <code>%</code> aparte en fuente de texto, porque se creía
+             que <strong>las fuentes numéricas no tenían ese glifo</strong>. <strong>Era falso</strong>: se
+             verificó en el simulador el 2026-07-23 y el <code>%</code> renderiza perfecto en
+             <code>FONT_SYSTEM_NUMBER_*</code>. Al simplificarlo se fueron <code>pctFontFor</code>,
+             <code>mPctFont</code> y tres constantes.</p>
+          <p><strong>El costo se aceptó a sabiendas:</strong> el <code>%</code> ahora mide lo mismo que los
+             dígitos, cuando antes era proporcional a ≈&nbsp;2/3. A cambio, un camino de dibujo en vez de
+             dos.</p>
         </div>
         <div class="card">
           <span class="tag">drawLabelWithRamp</span>
@@ -486,7 +492,10 @@
   <section>
     <div class="wrap">
       <h2>Qué falta</h2>
-      <p>Los unit tests ya están en verde (42/42) y los builds de test y release compilan limpios. Queda:</p>
+      <p>Los unit tests ya están en verde (<strong>43/43</strong>) y los builds de test y release compilan
+      limpios. El 43 es <code>testEngineSpeedStopPersistence</code>: fija que una trabada de uno o dos
+      segundos <strong>no</strong> clave el VAM en cero y que el tercer tick lento sí — la spec pedía
+      "velocidad baja sostenida" y el código lo evaluaba tick a tick. Queda:</p>
       <div class="cards">
         <div class="card">
           <h3>1 · Render en simulador — en curso</h3>
