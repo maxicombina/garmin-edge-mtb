@@ -115,6 +115,32 @@ ronda de review por iteración. Solución: **darle a J el mismo esquema de dos i
 
 - **El usuario ejecuta, el asistente guía.** Para todo lo que sea setup, tooling, configuración de su máquina o cuentas (instalaciones, keys, settings de apps, movimientos de archivos fuera del repo): dar instrucciones claras paso a paso y **no ejecutarlo por él** — el objetivo es que aprenda. Verificar el resultado (lectura) está bien. Las ediciones de archivos *dentro del repo* y los commits que él pida siguen igual que siempre.
 
+## Walkthroughs HTML: en el repo Y publicados (REGLA, 2026-07-27)
+
+Cada app tiene un `apps/<app>/docs/code-walkthrough.html` que explica su código, y **cada uno está
+publicado como artifact** en una URL fija. **Se mantienen los dos al día: el archivo y la página.**
+
+| App | Artifact |
+|---|---|
+| `a-activity-timer` | `https://claude.ai/code/artifact/6de2e1be-f4df-4428-9f08-36f2321617dc` |
+| `b-grade-vam` | `https://claude.ai/code/artifact/2f8bca7f-dfad-4588-80e3-0371e17493e0` |
+| `j-trend-arrow` | `https://claude.ai/code/artifact/1738e29e-85e6-42e2-ab16-06e28fd02467` |
+
+- **Republicar SIEMPRE a la misma URL** (pasándola como `url`): si no, se crea una página nueva y la
+  anotada acá queda huérfana. Las páginas son privadas salvo que el autor las comparta.
+- **Antes de pisar una publicada, leerla** (`WebFetch` de la URL) y comparar con el archivo del repo:
+  puede tener contenido que solo exista arriba. La primera vez que se hizo, esa lectura destapó un
+  resto viejo que el archivo del repo también tenía.
+- **Cómo auditar que un walkthrough no miente** (técnica, 2026-07-27): extraer del HTML todos los
+  símbolos que afirma que existen (los `<code>` que parecen identificadores) y chequearlos contra
+  `source/*.mc` y `resources*/**/*.xml`; comparar el conteo de tests declarado contra los `(:test)`
+  reales; y buscar afirmaciones de estado (versión, publicada o no, qué falta). Así se encontró que la
+  de A describía una arquitectura anterior al módulo puro y la de B repetía una afirmación ya refutada
+  sobre el glifo `%`.
+- ⚠️ **Un walkthrough envejece por lo que NO dice**, no solo por lo que dice mal: el de A citaba solo
+  símbolos que existen y aun así estaba viejo, porque le faltaban `TimeFormat`, sus tests y el esquema
+  `(:debug)`/`(:release)` enteros.
+
 ## Tests (convención dura desde 2026-07-19)
 
 - **Toda lógica de cálculo/formato va en módulos PUROS** (sin `Dc`, sin `Activity.Info`, sin estado de device) **con unit tests `(:test)`** (`Toybox.Test`): un `<Módulo>Test.mc` junto a cada módulo. La View queda como wrapper fino no-testeable, lo más chica posible.
