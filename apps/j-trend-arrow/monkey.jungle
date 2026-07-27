@@ -8,6 +8,9 @@
 # icon would be overridden by every device and the packager would warn about it. The
 # base resources/ holds only shared, size-independent resources (strings).
 #
-# NOTE (2026-07-23): the launcher icons here are PLACEHOLDERS copied from Option A;
-# redesign with a trend-arrow motif before publishing (see SPEC 3.2).
+# The launcher icons are this app's OWN (no longer the placeholders copied from Option A
+# that an earlier version of this comment described): a cobalt ring with the amber average
+# line and the white arrow crossing it, drawn flat at each size by store/gen_icon.py. See
+# SPEC 3.3 for how they were made and why the launchers are smooth while the 1024 master
+# and the 500x500 store icon keep the tyre knobs.
 project.manifest = manifest.xml
