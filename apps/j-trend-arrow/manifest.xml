@@ -2,27 +2,25 @@
 <!--
   Connect IQ manifest for the j-trend-arrow data field (Option J).
 
-  This id is J's BETA id, used on main only. It is a separate app from
-  a-activity-timer and b-grade-vam in the store, and also separate from J's own
-  PRODUCTION app, whose id is 140986d8c6bc4026880e117255a6ce67 and lives pinned on
-  the release branch (that is the one already published as v0.1.0). The beta id was
-  added on 2026-07-26 because app settings CANNOT be configured from the phone for a
-  sideloaded app, so testing them needs a real store install, and doing that against
-  the live listing would mean a review round per iteration.
+  THIS IS THE PRODUCTION SIDE. This id is J's PROD id and it lives ONLY on the
+  release branch; main carries the BETA id f70f3c984e4c43d496006628f3510817 instead.
+  Each id is a separate app in the store: this is the published one (v0.1.0, then
+  v0.2.2). The beta id exists because app settings CANNOT be configured from the
+  phone for a sideloaded app, so testing them needs a real store install, and doing
+  that against the live listing would mean a review round per iteration.
 
-  ATTENTION at the next PRODUCTION release of J: this line changed on main, so
-  "git merge main" will carry the BETA id into release with no conflict (only one
-  side changed it). Right after that merge, commit the swap back to
-  140986d8c6bc4026880e117255a6ce67 touching only this file, exactly like commit
-  6ad6be8 did for a-activity-timer. From then on merges stay clean, because only
-  release touches this line.
+  THIS LINE IS THE ONLY DELTA of release over main for this app, and it is why every
+  "git merge main" carries the BETA id in here with NO conflict (only main changed it
+  last). That happened at v0.2.2 and was swapped back in the very next commit. So,
+  at EVERY future release: merge, then CHECK THIS LINE before exporting the .iq. A
+  wrong id builds and signs perfectly and uploads to the wrong app.
 
   NEVER edit this id with the visual manifest editor (it reformats the XML). Edit by
   hand.
 -->
 <iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
     <iq:application
-        id="f70f3c984e4c43d496006628f3510817"
+        id="140986d8c6bc4026880e117255a6ce67"
         type="datafield"
         name="@Strings.AppName"
         entry="TrendArrowApp"
