@@ -13,4 +13,13 @@
 # line and the white arrow crossing it, drawn flat at each size by store/gen_icon.py. See
 # SPEC 3.3 for how they were made and why the launchers are smooth while the 1024 master
 # and the 500x500 store icon keep the tyre knobs.
+#
+# The TrendCore barrel (the trend classifier + the whole render engine, shared with Options K and L) is
+# consumed BY SOURCE, not as a pre-built .barrel: the bracket form points at the barrel's own jungle and
+# the compiler builds it as part of this app. No extra build step, no binary artifact to version, and
+# editing the barrel takes effect on the next build of any consumer. (A plain, unbracketed path would
+# instead mean "a built .barrel lives here" -- the compiler rejects mixing the two forms.) The path is
+# RELATIVE to this file so the repo works from any checkout location.
+TrendCore = [../../barrels/trend-core/monkey.jungle]
+base.barrelPath = $(TrendCore)
 project.manifest = manifest.xml

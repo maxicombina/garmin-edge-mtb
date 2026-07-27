@@ -209,12 +209,48 @@ module TrendCore {
             mBothStr = curStr + $.TrendCore.INLINE_SEP + refStr;
             mArrowState = arrowState;
             mRunning = running;
-            }
+        }
 
         // Was the inline (wide-cell) layout chosen for the current cell? Only meaningful after a draw;
         // exposed so an app's debug hook can report which branch it took.
         function isWide() as Boolean {
             return mIsWide;
+        }
+
+        // Every layout decision this engine took for the current cell, as one line. Call it AFTER draw().
+        // It exists so a consumer's DEBUG_MEASURE hook keeps working now that the engine is not in the
+        // view any more, and so the headless layout check still reports what the code CHOSE rather than a
+        // re-derivation by hand (that check is the only way to verify font selection without the GUI:
+        // Monkey C has no getPixel, so pixels still need the author's eye).
+        //
+        // Public and un-annotated on purpose: a barrel cannot rely on the consumer's (:debug) exclusions,
+        // and nothing is built unless someone calls this.
+        function debugSummary(dc as Graphics.Dc) as String {
+            return "valueF h/a/d=" + dc.getFontHeight(mValueFont) + "/"
+                       + Graphics.getFontAscent(mValueFont) + "/" + Graphics.getFontDescent(mValueFont)
+                 + " unitF a=" + Graphics.getFontAscent(mUnitFont)
+                 + " unitBlockW=" + unitBlockWidth(dc, mUnitFont)
+                 + " refF h=" + dc.getFontHeight(mRefFont)
+                 + " label=\"" + mLabelText + "\" labelF a=" + Graphics.getFontAscent(mLabelFont)
+                 + " labelH=" + mLabelH + " showRef=" + mShowRef + " wide=" + mIsWide
+                 + " arrowFits=" + mArrowFits
+                 // Which arrow route this cell resolved to, so the console answers "glyph or primitive?"
+                 // without anyone judging it by eye -- the two differ by font FAMILY, not by resolution.
+                 + " ARROW=" + arrowRouteLabel(dc, mValueFont)
+                 // The wide (inline) path uses its OWN fonts; the fields above are untouched there.
+                 + " | inlineF h/a=" + dc.getFontHeight(mInlineFont) + "/" + Graphics.getFontAscent(mInlineFont)
+                 + " inlineUnitF a=" + Graphics.getFontAscent(mInlineUnitFont)
+                 + " inlineArrowFits=" + mInlineArrowFits;
+        }
+
+        private function arrowRouteLabel(dc as Graphics.Dc, valueFont as Graphics.FontType) as String {
+            var aH = (Graphics.getFontAscent(valueFont) * 4) / 5;
+            var gf = arrowGlyphFont(dc, aH);
+            if (gf == null) {
+                return "PRIMITIVE(w=" + ((aH * 3) / 5) + " h=" + aH + ")";
+            }
+            return "GLYPH(w=" + dc.getTextWidthInPixels(ARROW_GLYPH_UP, gf)
+                   + " ascent=" + Graphics.getFontAscent(gf) + " vs primitive h=" + aH + ")";
         }
 
         // --- The draw entry point. `bg` is the app's getBackgroundColor(): a DataField method, so the

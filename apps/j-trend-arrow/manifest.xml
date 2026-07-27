@@ -48,5 +48,8 @@
             <iq:language>eng</iq:language>
             <iq:language>spa</iq:language>
         </iq:languages>
+        <iq:barrels>
+            <iq:depends name="TrendCore" version="0.1.0"/>
+        </iq:barrels>
     </iq:application>
 </iq:manifest>

@@ -45,21 +45,20 @@ El **MVP implementa SOLO Tier 1 con velocidad**. La arquitectura de abajo ya dej
 ```
 j-trend-arrow/
 ├── manifest.xml               # type=datafield; 13 products; minApiLevel 3.3.0; launcherIcon
-├── monkey.jungle               # mínimo (auto-discovery), igual que A y B
+├── monkey.jungle               # declara el barrel TrendCore por FUENTE (ruta relativa, §3.4)
 ├── source/
-│   ├── TrendArrowApp.mc        # AppBase: getInitialView() → [view] + onSettingsChanged (§9.4) →
-│   │                           # no hace falta onSettingsChanged (a diferencia de B).
-│   ├── TrendArrowView.mc       # DataField: compute() (wrapper fino) + onUpdate() (render, §6).
-│   │                           # NO testeable, lo más chico posible (mismo principio que A/B).
-│   ├── TrendArrow.mc           # PURO. Módulo genérico: (actual, promedio) → UP/DOWN/NONE (§5.1)
-│   ├── TrendArrowTest.mc       # tests de TrendArrow (§10)
+│   ├── TrendArrowApp.mc        # AppBase: getInitialView() → [view] + onSettingsChanged (§9.4)
+│   ├── TrendArrowView.mc       # DataField: compute() (wrapper fino) + onUpdate() → delega TODO el
+│   │                           # render al barrel. 225 líneas; eran 858 antes de la migración (§3.4).
 │   ├── SpeedFormat.mc          # PURO. Adaptador Tier-1 de velocidad: m/s → string con 1 decimal (§5.2)
 │   ├── SpeedFormatTest.mc      # tests de SpeedFormat (§10)
 │   ├── TestUtil.mc             # helpers PLANOS assertNear/assertIsNumber (NO (:test) — ver B §10
-│   │                           # gotcha 2). COPIA PROPIA de este archivo — el repo prohíbe compartir
-│   │                           # código entre apps salvo decisión explícita (CLAUDE.md); no importar
-│   │                           # el TestUtil.mc de la B.
+│   │                           # gotcha 2). COPIA PROPIA: el barrel tiene la suya, namespaceada.
 │   └── (ningún módulo de buffer/filtro/EMA — no hace falta para Tier 1, ver §3.1)
+│
+│   # MIGRADO 2026-07-27 (§3.4): `TrendArrow.mc` y `TrendArrowTest.mc` ya NO viven acá — los da
+│   # `barrels/trend-core/` como `TrendCore.TrendArrow`, junto con el motor de render entero
+│   # (`TrendCore.TrendRenderer`), compartido con las Opciones K y L.
 ├── resources/
 │   ├── strings/strings.xml     # AppName, SpeedLabel (+ SpeedLabelShort, §6.10), AvgLabel — settings/ desde §9 (v1 no tenía)
 ├── resources-spa/strings/      # español
@@ -67,9 +66,46 @@ j-trend-arrow/
 └── store/                      # assets de la ficha del store + el generador del ícono (§3.3)
 ```
 
-**Nota dura del repo (CLAUDE.md):** "Nada compartido entre apps salvo documentación. Si surge código común, decidir explícitamente." `TestUtil.mc` se **copia**, no se importa desde B. Si en el futuro se decide extraer algo común de verdad, esa es una decisión aparte, explícita, no implícita por comodidad.
+**Nota dura del repo (CLAUDE.md):** "Nada compartido entre apps salvo documentación. Si surge código común, decidir explícitamente." `TestUtil.mc` se **copia**, no se importa desde B. Si en el futuro se decide extraer algo común de verdad, esa es una decisión aparte, explícita, no implícita por comodidad. → **Eso pasó el 2026-07-27: ver §3.4.**
 
 Reglas de la clase (idénticas a A/B, no re-derivar): `compute(info)` ~1×/s, no dibuja; `onUpdate(dc)` dibuja, no calcula; sin orden garantizado entre ambos → todo miembro inicializado en `initialize()`.
+
+### 3.4 Migración al barrel `TrendCore` (HECHA 2026-07-27)
+
+La Opción K (cadencia) se construyó sobre un barrel con el motor de render **extraído de esta app**, y J
+quedó a propósito sin migrar. Duró un día: el primer bug que apareció (§6.13) hubo que arreglarlo **dos
+veces**, y con las dos iteraciones fueron **cuatro ediciones duplicadas** — así que J se migró.
+
+**Qué se fue de acá:** `TrendArrow.mc` + `TrendArrowTest.mc` (borrados; los da `TrendCore.TrendArrow`) y
+el motor de render entero, que era el 75 % de la View. **`TrendArrowView.mc` pasó de 858 a 225 líneas** y
+no le queda ni una línea de layout. Lo que se queda es lo que ES de la velocidad: `SpeedFormat`, los
+settings de referencia (§9), la banda muerta, la plantilla `"88.8"`, los strings y el generador
+sintético de `TEST_MODE`.
+
+**Cómo se comprobó que no cambia un píxel — la técnica importa más que el resultado.** No se validó "a
+ojo": antes de borrar la copia se compararon **las 13 funciones del motor cuerpo a cuerpo** contra las
+del barrel, normalizadas (comentarios fuera, espacios colapsados y aplicados los renombres del barrel:
+`mAvgFont`→`mRefFont`, `VALUE_TPL`→`mValueTpl`, `"--"`→`NO_DATA`, etc.). Las 13 salieron **idénticas
+carácter por carácter** (`drawTrendValue` 1430 chars normalizados, `selectFonts` 1795, …). Eso convierte
+"no debería cambiar nada" en una afirmación verificable. Vale repetirlo si algún día hay que reconciliar
+dos copias de algo.
+
+**Y después, la comprobación de cableado** (que el diff textual no cubre: podría faltar un `setUnit`):
+un probe headless (§11.1) instancia la View real, le hace `onUpdate` sobre un `BufferedBitmap` para 6
+tamaños de celda y en los dos devices, e imprime lo que el motor **eligió**. Reprodujo exactamente lo
+medido en las capturas del autor: 840 celda 125×62 → `NUMBER_MEDIUM` + `GLYPH(w=18 ascent=22)`, 830 misma
+celda → `PRIMITIVE(w=15 h=25)`, celda grande → `THAI_HOT` + primitiva `h=42`, 246×62 → `wide=true` con
+label `"VELOCIDAD / PROM"`, 82×62 → degradación a fuente de texto y label corto `"VEL"`.
+⚠️ El probe necesita un `compute()` antes del `onUpdate`, o el motor mide con la unidad VACÍA y elige
+fuentes para un grupo más angosto que el real; un `new Activity.Info()` con todo en null alcanza.
+
+**Lo que se perdió, a propósito:** el `GLYPH_PROBE` (§11.2) — su resultado ya está documentado ahí y su
+código necesitaba las internas del motor. **Lo que se salvó:** el hook `DEBUG_MEASURE`, porque el motor
+ahora reporta sus propias decisiones vía `TrendCore.TrendRenderer.debugSummary(dc)` (pública y sin
+anotación: un barrel no puede depender de las exclusiones `(:debug)` del consumidor).
+
+**Verificado:** export de los 17 targets limpio en J y en K, **J 12/12** (7 propios + los 5 del barrel,
+namespaceados, en lugar de los 5 borrados) y **K 9/9**. El `id` de la app no se tocó.
 
 ### 3.3 Ícono — CERRADO (2026-07-25). Híbrido: aro de un modelo de imagen + geometría dibujada por código
 
