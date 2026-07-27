@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<!--
+  Monkey Barrel: the code shared by the trend-arrow family of data fields (Options J, K, L).
+
+  WHY THIS EXISTS. Option J's view is ~840 lines of render engine that took days to tune against
+  the native field (ascent-not-height gate, native stacked unit, arrow glyph with a measured
+  fallback, the reserved arrow slot). Options K (cadence) and L (heart rate) are the SAME field with
+  a different metric, so copying that engine would mean fixing every future render bug three times.
+  The repo rule is "nothing shared between apps without an explicit decision" (CLAUDE.md); this
+  barrel IS that explicit decision, taken 2026-07-27, and it stays extractable to its own repo
+  because a barrel is already a self-contained project.
+
+  HOW APPS CONSUME IT (verified 2026-07-27): by SOURCE, not as a built .barrel, so there is no
+  extra build step and nothing binary to version. In the app's monkey.jungle:
+
+      TrendCore = [<path>/barrels/trend-core/monkey.jungle]
+      base.barrelPath = $(TrendCore)
+
+  and in the app's manifest:  <iq:barrels><iq:depends name="TrendCore" version="0.1.0"/></iq:barrels>
+
+  TWO GOTCHAS, both hit while setting this up:
+    - EVERYTHING here must live inside the `TrendCore` module, tests included. The barrel compiler
+      rejects a top-level symbol with "does not belong to the Monkey Barrel namespace".
+    - `barrelbuild` does NOT take -y: barrels are not signed.
+
+  Unit tests DO run from the consuming app and appear namespaced (TrendCore.testX) alongside the
+  app's own tests : verified with monkeydo -t before committing to this design.
+
+  The product list must cover every device its consumers target: all 13 Edge of the project.
+-->
+<iq:manifest version="3" xmlns:iq="http://www.garmin.com/xml/connectiq">
+    <iq:barrel id="921e7543d6ff4295a091ae1827b103b0" module="TrendCore" version="0.1.0" minApiLevel="3.3.0">
+        <iq:products>
+            <iq:product id="edge530"/>
+            <iq:product id="edge540"/>
+            <iq:product id="edge550"/>
+            <iq:product id="edge830"/>
+            <iq:product id="edge840"/>
+            <iq:product id="edge850"/>
+            <iq:product id="edge1030"/>
+            <iq:product id="edge1030plus"/>
+            <iq:product id="edge1030bontrager"/>
+            <iq:product id="edge1040"/>
+            <iq:product id="edge1050"/>
+            <iq:product id="edgeexplore2"/>
+            <iq:product id="edgemtb"/>
+        </iq:products>
+        <iq:permissions/>
+        <iq:languages>
+            <iq:language>eng</iq:language>
+            <iq:language>spa</iq:language>
+        </iq:languages>
+        <iq:barrels/>
+        <iq:annotations/>
+    </iq:barrel>
+</iq:manifest>
