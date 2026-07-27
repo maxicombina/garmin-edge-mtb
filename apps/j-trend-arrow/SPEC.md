@@ -1380,3 +1380,46 @@ Tres conclusiones, ninguna obvia de antemano:
 - Glifos de `FONT_SYSTEM_NUMBER_*`: verificación propia en device (edge840, 2026-07-23, ver §2) + foro Garmin (developer "Travis.ConnectIQ", "Font Specifications", discusión 251679 — fenix5xplus/vivoactive4s, no Edge, pero consistente).
 - Patrones heredados: [`apps/a-activity-timer/SPEC.md`](../a-activity-timer/SPEC.md) §5.3/6 (escalera de fuentes + caché de un solo valor, `LABEL_MIN_H`), [`apps/b-grade-vam/SPEC.md`](../b-grade-vam/SPEC.md) §6.5 (primitivas `dc` para íconos/flechas, gotcha de `fillPolygon`), §9 (hooks de debug), §10 (convención de tests).
 - Spec maestra: [`GARMIN_MTB_SPEC.md`](../../GARMIN_MTB_SPEC.md) §4 Opción J (contexto de producto, tiers de métrica, decisión de prioridad).
+
+### 6.14 El label era la mitad de grande de lo que debía en la familia bitmap (MEDIDO Y CORREGIDO 2026-07-27)
+
+El autor, mirando el 830, preguntó si "las fuentes se ven peor" y si era lo mejor que se podía hacer.
+La respuesta son **dos mitades distintas**, y confundirlas habría llevado a contestar "es limitación de
+la plataforma" cuando la mitad no lo era:
+
+**Mitad que NO es nuestra (nada que hacer).** Las fuentes del sistema son archivos distintos por
+familia. Medido contando tonos de gris dentro de la caja de los dígitos, en las capturas del autor:
+
+| | tonos distintos en los dígitos | valores |
+|---|---|---|
+| **830** (bitmap `.cft`) | **4** | `0`, `82`, `164`, `255` — cuartos exactos, o sea **2 bits por píxel** |
+| **840** (TTF) | **32** | rampa continua `0, 8, 15, 24, 32, 42, …` → antialias de 8 bits |
+
+Las dos pantallas son 246×322, así que **no es la resolución**. Y el `simulator.json` del edge830
+declara que su campo NATIVO usa `data.font = numberThaiHot`: **la misma fuente que pedimos nosotros**,
+o sea que el nativo se ve igual de duro. Meter una fuente propia (CIQ lo permite) costaría memoria en
+cada `.prg` y **dejaría de parecerse al nativo**, que es el objetivo del proyecto → descartado.
+
+**Mitad que SÍ era nuestra (bug).** `FONT_GLANCE` **no existe en la familia bitmap y resuelve en
+silencio a la fuente más chica**: en el edge830 tiene las mismas métricas que `FONT_XTINY` hasta el
+píxel (a=10 d=3 h=13), mientras `FONT_SMALL` es a=17. En el 840, en cambio, `FONT_GLANCE` es a=15 —
+más grande que `FONT_MEDIUM`. Como `selectLabel` arrancaba en `FONT_GLANCE` y solo podía BAJAR por la
+escalera, el label quedaba clavado en ascent 10 en **6 de los 13 devices**… y el mismo
+`simulator.json` dice que el nativo de ese device usa `label.font = small`. O sea que nuestro título
+era ~40 % más chico que el nativo, en la mitad de la flota.
+
+**Arreglo (`labelBaseFont()`, en el barrel → J y K a la vez):** quedarse con **el mayor entre
+`FONT_GLANCE` y `FONT_SMALL`, midiendo el ascent en runtime**. Arregla la familia entera sin nombrar
+un solo device (el idioma que ya usa la detección del glifo) y en la familia TTF no cambia nada
+(15 > 12 → sigue `GLANCE`).
+
+**Verificado con el probe headless de §11.1 antes de darlo por bueno**, porque un label más alto le
+come banda al número: en las 6 celdas típicas × 830 y 840, **ningún valor bajó un escalón de fuente**
+(830 125×62 y 244×125 conservan `42/32/10` y `70/53/17`; el 840 quedó byte por byte igual, labelF 15 /
+labelH 21). El único cambio extra: en la celda de 82 px de ancho el label degrada de `VELOCIDAD` a
+`VEL` — que es la escalera de degradación prevista y lo que hace el nativo. Probado también en
+edge530, edge1030 y edgeexplore2 (el resto de la familia): sin sorpresas.
+
+**Técnica reutilizable:** `~/Library/Application Support/Garmin/ConnectIQ/Devices/<device>/simulator.json`
+declara, por device, **qué fuente usa el campo NATIVO** (`layouts…datafields…data.font` y
+`label.font`). Es la forma barata de saber contra qué hay que parecerse, sin captura y sin device.

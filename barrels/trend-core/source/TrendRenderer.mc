@@ -565,7 +565,7 @@ module TrendCore {
             var suffix = mIsWide ? ($.TrendCore.INLINE_SEP + mRefPrefix) : "";
             var longText = mLabelLong + suffix;
             var shortText = mLabelShort + suffix;
-            mLabelFont = Graphics.FONT_GLANCE;
+            mLabelFont = labelBaseFont();
             if (dc.getTextWidthInPixels(longText, mLabelFont) <= usableW) {
                 mLabelText = longText;
                 return;
@@ -582,6 +582,27 @@ module TrendCore {
                 }
             }
             mLabelFont = Graphics.FONT_XTINY;
+        }
+
+        // The BIGGEST font a label may use, decided by MEASURING, not by naming devices.
+        //
+        // FONT_GLANCE is the right answer on the TTF family (edge840: ascent 15, bigger than FONT_MEDIUM's
+        // 14) -- but the bitmap family HAS NO GLANCE FONT and silently resolves it to the smallest text
+        // font there is: on the edge830, FONT_GLANCE and FONT_XTINY are the same metrics down to the pixel
+        // (a=10 d=3 h=13), while FONT_SMALL is a=17. So asking for GLANCE unconditionally left the label at
+        // 10 px of ascent on 6 of the 13 devices, when the NATIVE data field of that device uses `small`
+        // (that is literally what edge830's simulator.json declares for its datafield label). Measured
+        // 2026-07-27 from the author's 830 screenshot -- and it reads as "the 830's fonts are worse", which
+        // is only half true: the hard edges are the device's bitmap fonts (2 bits per pixel, 4 grey levels
+        // -- the native field looks exactly as hard), but the SIZE was ours.
+        //
+        // Taking the larger of the two fixes the whole bitmap family without naming a single device: the
+        // TTF family keeps GLANCE (15 > 12) and nothing changes there.
+        private function labelBaseFont() as Graphics.FontType {
+            if (Graphics.getFontAscent(Graphics.FONT_SMALL) > Graphics.getFontAscent(Graphics.FONT_GLANCE)) {
+                return Graphics.FONT_SMALL;
+            }
+            return Graphics.FONT_GLANCE;
         }
 
         // Does a number font's painted part fit a band? Gate on the ASCENT, not the full height: the
