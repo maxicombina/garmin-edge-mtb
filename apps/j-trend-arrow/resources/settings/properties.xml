@@ -1,0 +1,7 @@
+<properties>
+    <!-- Reference the arrow compares against (SPEC 9). Stored values are magnitudes, not
+         list indices. targetSpeed is in the DEVICE's speed unit (paceUnits) by decision:
+         no conversion anywhere. -->
+    <property id="referenceMode" type="number">0</property>
+    <property id="targetSpeed" type="float">0.0</property>
+</properties>

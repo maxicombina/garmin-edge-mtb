@@ -1,0 +1,522 @@
+<title>Opción K — cadencia con flecha de tendencia</title>
+<style>
+  :root {
+    --bg: #EEF2F3;
+    --surface: #FFFFFF;
+    --surface-2: #E4EBEC;
+    --code-bg: #0E1519;
+    --code-ink: #D7E3E8;
+    --code-dim: #7C8D95;
+    --ink: #141E20;
+    --ink-soft: #4F5F62;
+    --line: #D3DDDE;
+    --accent: #0B7A9E;
+    --accent-ink: #0B7A9E;
+    --link: #0B6E8C;
+    --up: #2E8B57;      /* cadencia por encima de la media -> flecha arriba */
+    --down: #4A6572;    /* por debajo -> flecha abajo */
+    --screen-bg: #0F161A;
+    --radius: 14px;
+    --maxw: 880px;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0C1214; --surface: #131C1F; --surface-2: #192428; --code-bg: #080C0E;
+      --code-ink: #D7E3E8; --code-dim: #6C7B83; --ink: #E5EDEB; --ink-soft: #92A19B;
+      --line: #243036; --accent: #3FB6D6; --accent-ink: #56C3E0; --link: #57BDDB;
+      --up: #4FC17E; --down: #8AA0AC; --screen-bg: #080C0E;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #EEF2F3; --surface: #FFFFFF; --surface-2: #E4EBEC; --code-bg: #0E1519;
+    --code-ink: #D7E3E8; --code-dim: #7C8D95; --ink: #141E20; --ink-soft: #4F5F62;
+    --line: #D3DDDE; --accent: #0B7A9E; --accent-ink: #0B7A9E; --link: #0B6E8C;
+    --up: #2E8B57; --down: #4A6572; --screen-bg: #0F161A;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0C1214; --surface: #131C1F; --surface-2: #192428; --code-bg: #080C0E;
+    --code-ink: #D7E3E8; --code-dim: #6C7B83; --ink: #E5EDEB; --ink-soft: #92A19B;
+    --line: #243036; --accent: #3FB6D6; --accent-ink: #56C3E0; --link: #57BDDB;
+    --up: #4FC17E; --down: #8AA0AC; --screen-bg: #080C0E;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--font-sans); font-size: 17px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 22px; }
+  main > section { padding: 42px 0; border-top: 1px solid var(--line); }
+
+  h1, h2, h3 { text-wrap: balance; line-height: 1.14; letter-spacing: -0.02em; margin: 0; }
+  h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 800; }
+  h2 { font-size: clamp(1.4rem, 3.2vw, 1.9rem); font-weight: 750; margin-bottom: 6px; }
+  h3 { font-size: 1.1rem; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.01em; }
+  p { margin: 12px 0; max-width: 66ch; }
+  ul { margin: 12px 0; padding-left: 1.15em; max-width: 66ch; list-style: none; }
+  ul li { position: relative; margin: 7px 0; }
+  ul li::before { content: "\2014"; position: absolute; left: -1.15em; color: var(--accent);
+    font-weight: 700; }
+  a { color: var(--link); text-decoration: none;
+      border-bottom: 1px solid color-mix(in srgb, var(--link) 35%, transparent); }
+  a:hover { border-bottom-color: var(--link); }
+  strong { font-weight: 680; }
+
+  .eyebrow { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--accent-ink); margin: 0 0 10px; }
+  .lead { font-size: 1.16rem; color: var(--ink-soft); max-width: 62ch; margin-top: 14px; }
+
+  code { font-family: var(--font-mono); font-size: 0.85em; background: var(--surface-2);
+    padding: 0.1em 0.38em; border-radius: 6px; }
+  pre.code { font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.6;
+    background: var(--code-bg); color: var(--code-ink); padding: 16px 18px;
+    border-radius: 12px; overflow-x: auto; margin: 16px 0; tab-size: 4;
+    border: 1px solid color-mix(in srgb, var(--code-ink) 12%, transparent); }
+  pre.code .cm { color: var(--code-dim); }
+  pre.code .k  { color: #F5A15A; }
+  pre.code .s  { color: #93C9A6; }
+  pre.code .n  { color: #7FC7DE; }
+  pre.code b   { color: #FFFFFF; font-weight: 600; }
+
+  /* hero */
+  header.hero { padding: 54px 0 18px; }
+  .hero-grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 32px; align-items: center; }
+  @media (max-width: 720px) { .hero-grid { grid-template-columns: 1fr; } }
+  .screens { display: grid; gap: 12px; }
+  .screen { background: var(--screen-bg); border-radius: 16px; padding: 18px 18px;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06), 0 14px 34px -20px rgba(0,0,0,0.6); }
+  .screen .lbl { font-size: 0.64rem; letter-spacing: 0.18em; color: #8B99A2;
+    text-transform: uppercase; margin-bottom: 6px; }
+  .screen .cur { display: flex; align-items: baseline; gap: 8px; }
+  .screen .arw { color: var(--up); font-size: 1.9rem; line-height: 1; }
+  .screen .val { font-family: var(--font-mono); font-weight: 700; font-variant-numeric: tabular-nums;
+    font-size: 2.7rem; color: #E6EDEA; line-height: 1; }
+  .screen .unit { font-family: var(--font-mono); font-size: 0.78rem; color: #93A29B; }
+  .screen .avg { font-family: var(--font-mono); font-size: 0.86rem; color: #93A29B;
+    margin-top: 10px; letter-spacing: 0.06em; }
+  .screen .cap { font-size: 0.72rem; color: #6F7D85; margin-top: 8px; text-align: center; }
+
+  /* generic cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px; margin: 20px 0 4px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 16px 18px; }
+  .card p { margin: 6px 0 0; font-size: 0.94rem; color: var(--ink-soft); max-width: none; }
+  .tag { font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent-ink); }
+
+  /* module map */
+  .modmap { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 10px; }
+  .mod { background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; }
+  .mod .name { font-family: var(--font-mono); font-weight: 700; font-size: 0.9rem; }
+  .mod .pure { display: inline-block; font-size: 0.62rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--up); font-weight: 700; margin-left: 6px; }
+  .mod .shared { display: inline-block; font-size: 0.62rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--accent-ink); font-weight: 700; margin-left: 6px; }
+  .mod .role { font-size: 0.84rem; color: var(--ink-soft); margin-top: 4px; }
+
+  /* pipeline / steps */
+  ol.flow { counter-reset: s; list-style: none; padding: 0; margin: 18px 0 0;
+    display: grid; gap: 8px; }
+  ol.flow li { counter-increment: s; position: relative; padding: 12px 14px 12px 52px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    font-size: 0.95rem; }
+  ol.flow li::before { content: counter(s); position: absolute; left: 12px; top: 11px;
+    width: 26px; height: 26px; border-radius: 7px; background: var(--surface-2);
+    color: var(--accent-ink); font-family: var(--font-mono); font-weight: 700; font-size: 0.85rem;
+    display: flex; align-items: center; justify-content: center; }
+  ol.flow li b { font-weight: 680; }
+
+  /* table */
+  .tblwrap { overflow-x: auto; margin: 18px 0 4px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line);
+    vertical-align: top; }
+  th { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+  td code { font-size: 0.82em; }
+
+  .note { background: var(--surface-2); border-left: 3px solid var(--accent);
+    border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 18px 0 4px; font-size: 0.94rem; }
+  .note p { margin: 0; max-width: none; }
+
+  footer { padding: 34px 0 60px; color: var(--ink-soft); font-size: 0.88rem; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+</style>
+
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <p class="eyebrow">Opción K · Connect IQ data field · Edge 830/840</p>
+      <h1>¿Estás girando más que tu media?</h1>
+      <p class="lead">
+        La misma flechita de la Opción J, sobre la <strong>cadencia</strong>. Es la app más simple del
+        repo por dos motivos distintos: la métrica no tiene unidades que convertir, y
+        <strong>el render no vive acá</strong> — lo aporta un barrel compartido. Su View son 130 líneas
+        y no tiene una sola línea de layout. Este documento cuenta lo poco que es propio, y por qué ese
+        poco vale la pena.
+      </p>
+    </div>
+    <div class="screens" aria-hidden="true">
+      <div class="screen">
+        <span class="lbl">Cadencia</span>
+        <span class="cur"><span class="arw">▲</span><span class="val">92</span><span class="unit">rpm</span></span>
+        <span class="avg">PROM 84</span>
+      </div>
+      <div class="screen">
+        <span class="lbl">Cadencia</span>
+        <span class="cur"><span class="val">0</span><span class="unit">rpm</span></span>
+        <span class="avg">PROM 84</span>
+        <span class="cap">bajando sin pedalear: el 0 se muestra, la flecha no</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section>
+    <div class="wrap">
+      <h2>El rol honesto</h2>
+      <p>
+        El Edge ya muestra cadencia actual y cadencia media — pero <strong>en celdas separadas</strong>.
+        Ninguna las combina en un indicador de tendencia. Y en subida eso es una decisión táctica real:
+        ¿bajo un piñón y giro más, o aguanto la marcha? La flecha responde sin tener que leer y comparar
+        dos números con guantes.
+      </p>
+      <div class="cards">
+        <div class="card">
+          <h3>La métrica más simple que hay</h3>
+          <p>Garmin la entrega en <strong>rpm enteros</strong>, y rpm es rpm en todos los países. Cero
+             conversión, cero décimas, cero unidades que cambien con el device. Nada del aparato que
+             necesitó la velocidad en la J.</p>
+        </div>
+        <div class="card">
+          <h3>Casi gratis (Tier 1)</h3>
+          <p><code>averageCadence</code> ya es el promedio calculado por Garmin. Sin buffer, sin
+             suavizado, sin filtro, sin estado entre ticks. <code>compute()</code> son cuatro pasos.</p>
+        </div>
+        <div class="card">
+          <h3>Una decisión, y una sola</h3>
+          <p>Todo lo demás estaba resuelto. Lo único que hubo que pensar de verdad es qué hacer con el
+             <strong><code>0</code> de no pedalear</strong> — y resultó ser lo más interesante del
+             código.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Por qué son tres apps y no una con un selector</h2>
+      <p>
+        La pregunta se hace sola: si la flecha es genérica, ¿por qué no una sola app con un ajuste
+        «métrica: velocidad / cadencia / frecuencia cardíaca»? Porque <strong>en Connect IQ los settings
+        pertenecen a la APP, no a la celda</strong> donde la pusiste — se ve en el sandbox del
+        simulador, hay un archivo de settings por app. Un selector mostraría
+        <strong>la misma métrica en todas las instancias del campo</strong>, así que no podrías ver
+        velocidad y cadencia al mismo tiempo, que es exactamente para lo que uno lo quiere.
+      </p>
+      <p>
+        Costo aceptado a sabiendas: tres apps, tres fichas, tres ids, tres de los ~10 slots de campo del
+        device. A cambio, las tres conviven en la misma pantalla.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>La arquitectura: casi todo es prestado</h2>
+      <p>
+        Esta fue la primera app construida sobre <strong><code>barrels/trend-core/</code></strong>, la
+        primera y única excepción a la regla del repo de que «nada se comparte entre apps». Un
+        <em>barrel</em> es el mecanismo de librería de Monkey C: se consume por <strong>fuente</strong>
+        (una línea en el <code>monkey.jungle</code> con corchetes, más un <code>&lt;iq:depends&gt;</code> en
+        el manifest), así que no hay paso de build extra ni artefacto binario que versionar.
+      </p>
+      <div class="modmap" style="margin-top:16px">
+        <div class="mod"><span class="name">TrendCore.TrendArrow</span><span class="shared">barrel</span>
+          <div class="role">Dos enteros ya redondeados → <code>UP</code>/<code>NONE</code>/<code>DOWN</code>. No sabe qué métrica compara.</div></div>
+        <div class="mod"><span class="name">TrendCore.TrendRenderer</span><span class="shared">barrel</span>
+          <div class="role">~710 líneas: mide la celda, elige fuentes, dibuja. No sabe qué métrica dibuja.</div></div>
+        <div class="mod"><span class="name">CadenceFormat</span><span class="pure">puro</span>
+          <div class="role">rpm → string, y el entero que la flecha compara. Cuatro funciones.</div></div>
+        <div class="mod"><span class="name">CadenceTrendView</span>
+          <div class="role">130 líneas: lee <code>Activity.Info</code>, formatea, delega el dibujo.</div></div>
+        <div class="mod"><span class="name">CadenceTrendApp</span>
+          <div class="role">AppBase: entrega la View. Sin settings → ni <code>onSettingsChanged</code>.</div></div>
+      </div>
+      <p style="margin-top:18px">
+        El reparto tiene una regla de oro: <strong>el barrel no sabe qué métrica dibuja, y no debe
+        enterarse nunca</strong>. Si algo de la cadencia necesitara un <code>if</code> adentro del
+        barrel, estaría mal puesto.
+      </p>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>Lo aporta el barrel</th><th>Lo aporta esta app</th></tr></thead>
+          <tbody>
+            <tr><td>El clasificador ▲/▼/nada</td><td>El <strong>valor</strong> de la banda muerta: 3 rpm</td></tr>
+            <tr><td>Todo el layout, las fuentes y el dibujo</td><td>Los <strong>strings</strong> de display (<code>CadenceFormat</code>)</td></tr>
+            <tr><td>El caché de layout por celda</td><td>La <strong>plantilla</strong> de ancho estable <code>"888"</code></td></tr>
+            <tr><td>El bloque de unidad, apilado o de una línea</td><td>La <strong>unidad</strong>: <code>"rpm"</code>, sin segunda línea</td></tr>
+            <tr><td>El label que degrada como el nativo</td><td>Los <strong>textos</strong>: <code>CADENCIA</code>/<code>CAD</code>/<code>PROM</code></td></tr>
+            <tr><td>Las constantes, todas medidas contra el nativo</td><td>Leer <code>Activity.Info</code> y el <code>TEST_MODE</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">
+        El beneficio se puede medir, y por eso vale contarlo: <strong>la View de K son ~130
+        líneas</strong>. La de J, antes de extraer el motor, tenía <strong>858</strong> — y hoy tiene 225,
+        porque J se migró al mismo barrel el mismo día. Lo que decidió esa migración no fue la elegancia:
+        fue que el primer bug del motor hubo que arreglarlo <strong>dos veces por iteración</strong>,
+        cuatro ediciones duplicadas en un día.
+      </p>
+      <p>
+        Cada segundo, entonces, pasa esto y nada más:
+      </p>
+      <ol class="flow">
+        <li><b>Leer</b> <code>currentCadence</code>, <code>averageCadence</code> y <code>timerState</code> de <code>Activity.Info</code> (rpm enteros, pueden ser null).</li>
+        <li><b>Formatear</b> los dos strings de display con <code>displayString</code>.</li>
+        <li><b>Comparar</b> con <code>trendValue</code> de cada uno → ▲/▼/nada.</li>
+        <li><b>Dibujar:</b> <code>onUpdate</code> le pasa los valores al barrel y le pide que dibuje. Tres líneas.</li>
+      </ol>
+      <p style="margin-top:16px">
+        Fijate que <strong>no se lee <code>System.getDeviceSettings()</code> en ningún momento</strong>.
+        La J lo relee en cada tick, porque cambiar las unidades del device <em>no</em> dispara
+        <code>onSettingsChanged</code> y hay que notarlo en vivo. Acá la unidad se configura una vez en
+        <code>initialize()</code> y no se vuelve a mirar nunca.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>La única decisión: el <code>0</code> de no pedalear</h2>
+      <p>
+        En MTB una bajada son minutos sin pedalear, y la cadencia entonces es un <strong>0
+        legítimo</strong> — no un dato faltante. Tratarlo como cualquier otro número clavaría una flecha
+        ▼ durante toda la bajada, y diría algo <strong>falso</strong>: no estás pedaleando más lento que
+        tu media, no estás pedaleando.
+      </p>
+      <p>
+        Lo elegido: <strong>se muestra el <code>0</code> real y no se dibuja flecha.</strong> Lo
+        interesante es cómo, porque hay una asimetría deliberada entre las dos funciones del módulo:
+      </p>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th></th><th>pedaleando (84)</th><th>sin pedalear (0)</th><th>sin sensor (null)</th></tr></thead>
+          <tbody>
+            <tr><td><code>displayString</code></td><td><code>"84"</code></td><td><strong><code>"0"</code></strong></td><td><code>"--"</code></td></tr>
+            <tr><td><code>trendValue</code></td><td><code>84</code></td><td><strong><code>null</code></strong></td><td><code>null</code></td></tr>
+            <tr><td>flecha</td><td>▲/▼/nada</td><td><strong>nada</strong></td><td>nada</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <pre class="code"><span class="cm">// el entero que la flecha compara, o null para "no hay tendencia"</span>
+<span class="k">function</span> trendValue(rpm) {
+    <span class="k">if</span> (rpm == <span class="k">null</span> || rpm &lt;= 0) { <span class="k">return</span> <span class="k">null</span>; }
+    <span class="k">return</span> rpm;
+}</pre>
+      <p>
+        Devolver <code>null</code> <strong>reusa el camino <code>null → NONE</code> que el clasificador
+        ya tenía</strong> para «sin datos». No hubo que tocar ni una línea del barrel — y eso importa,
+        porque es código compartido con J y con L, donde un 0 no significa lo mismo. Un caso especial
+        adentro del motor habría sido la solución fácil y la equivocada.
+      </p>
+      <div class="note">
+        <p><strong>Hay un test que defiende la asimetría.</strong>
+        <code>testCadenceCoastingProducesNoArrow</code> junta las dos funciones como las usa la View y
+        <strong>falla si alguien "simplifica" <code>trendValue</code> metiéndola dentro de
+        <code>displayString</code></strong>. Parece un descuido que una devuelva <code>"0"</code> y la
+        otra <code>null</code>; el test está ahí para que se note que es a propósito.</p>
+      </div>
+      <p>
+        Un detalle fácil de pasar por alto: <code>trendValue</code> se aplica <strong>también al
+        promedio</strong>, no solo al valor actual. Un promedio de 0 —los primeros segundos de la
+        actividad, antes de empezar a pedalear— tampoco es una referencia contra la que comparar.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>La banda muerta: 3 rpm</h2>
+      <p>
+        La flecha aparece solo si te separás <strong>más de 3 rpm</strong> de tu media. El autor propuso
+        2 o 3, y se eligió 3 con un argumento concreto: la lectura a 1 Hz <strong>jitterea sola un par
+        de rpm</strong>, así que con una banda de 1 la flecha seguiría al ruido del sensor en vez de a tu
+        pedaleo.
+      </p>
+      <p>
+        Igual que en la J, es antes que nada una decisión <strong>semántica</strong>, no un filtro
+        anti-parpadeo: para el autor, pedalear dentro de 3 rpm de su media <em>es</em> pedalear a su
+        media. Y es una sola constante si algún día hay que ensancharla, porque
+        <code>classify</code> recibe la banda como <strong>parámetro</strong>:
+      </p>
+      <pre class="code">mArrowState = TrendCore.TrendArrow.classify(CadenceFormat.trendValue(curRpm),
+                                            CadenceFormat.trendValue(avgRpm),
+                                            DEAD_BAND_RPM);   <span class="cm">// 3</span></pre>
+      <p>
+        Ese parámetro es lo que permite que <strong>el mismo clasificador</strong> sirva para las dos
+        apps: la J le pasa <em>décimas</em> de km/h (24.3 → 243, banda 1 = 0,1 km/h) y la K le pasa rpm
+        enteros. El módulo solo resta y compara; la escala es asunto de quien llama. Hay un test del
+        barrel dedicado justamente a eso.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Lo que se hereda hecho (y una consecuencia rara)</h2>
+      <p>
+        Todo el render viene del barrel, y viene <strong>afinado pixel a pixel contra el campo nativo
+        del Edge</strong>. Vale saber qué hay ahí adentro, aunque esta app no lo toque:
+      </p>
+      <ul>
+        <li><strong>La flecha se ancla a la <em>baseline</em> del número</strong>, no a su tinta: cuánto
+            de su <code>ascent</code> llenan los dígitos <em>cambia según la familia de fuentes</em>
+            (0,79 en el 840, 0,91 en el 830) y ninguna API lo expone, así que toda constante para
+            «centrar con la tinta» es un número horneado de una captura que otro device rompe.</li>
+        <li><strong>El hueco de la flecha se reserva siempre</strong>, se pinte o no. Sin eso el grupo
+            centrado se encoge en los segundos sin flecha y el número <em>salta de lado</em> cada vez
+            que cruzás tu media, o sea todo el tiempo.</li>
+        <li><strong>La fuente se elige por <code>getFontAscent</code>, nunca por
+            <code>getFontHeight</code></strong>: las fuentes numéricas reservan un descendente que los
+            dígitos no pintan, y exigirle ese espacio tiraba un escalón entero de fuente al vacío.</li>
+        <li><strong>El label pide el mayor entre <code>FONT_GLANCE</code> y <code>FONT_SMALL</code>
+            midiendo en runtime</strong>, porque en la familia de fuentes bitmap <code>FONT_GLANCE</code>
+            no existe y resuelve en silencio a la más chica de todas.</li>
+        <li><strong>La flecha es un glifo donde el device lo resuelve y un dibujo donde no</strong>,
+            decidido midiendo en el propio device con dos señales, nunca por lista de modelos.</li>
+      </ul>
+      <div class="note">
+        <p><strong>Consecuencia heredada, no un defecto de esta app:</strong> el glifo va en fuente de
+        texto y su techo es <code>FONT_LARGE</code>, así que en una celda grande mide ~41 % del alto de
+        los dígitos, mientras la primitiva dibujada mide ~79 %. O sea que <strong>el campo se ve distinto
+        según la familia de fuentes del device</strong>. Está medido, y el cambio preferido si algún día
+        se toca es forzar la primitiva en todos lados: una constante, <em>en el barrel</em>, y las tres
+        apps lo heredan de una vez. Eso es exactamente para lo que existe el barrel.</p>
+      </div>
+      <p>
+        Un detalle propio sí hay en el render, y es la <strong>plantilla de ancho estable</strong>. El
+        barrel elige la fuente midiendo una plantilla de 8s, nunca el valor en vivo (si midiera el valor,
+        uno entraría y el siguiente no, y el layout saltaría cada segundo). Acá la plantilla es
+        <code>"888"</code>: la cadencia humana no llega a cuatro dígitos —los sprints de pista en récord
+        del mundo andan por 200 rpm—, así que es una cota real. Y es <em>más angosta</em> que la
+        <code>"88.8"</code> de la J, así que en la misma celda la cadencia suele conseguir una fuente
+        igual o más grande que la velocidad.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Cómo se prueba</h2>
+      <p>
+        Criterio del repo: <strong>los unit tests en verde antes de la validación visual</strong>. Acá
+        son <strong>9, y los 9 pasan</strong> — corridos con <code>monkeydo -t</code> en el edge840. Y hay
+        algo que vale la pena mirar dos veces: <strong>4 son de esta app y 5 son del barrel</strong>, que
+        corren desde acá namespaceados como <code>TrendCore.testX</code>. O sea que el clasificador
+        compartido se testea <em>una vez por app consumidora</em>.
+      </p>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>Test</th><th>Qué fija</th></tr></thead>
+          <tbody>
+            <tr><td><code>testCadenceDisplayString</code></td><td><code>84</code>→<code>"84"</code>, <strong><code>0</code>→<code>"0"</code></strong> (no <code>--</code>), <code>120</code>→3 dígitos, <code>null</code>→<code>"--"</code>.</td></tr>
+            <tr><td><code>testCadenceTrendValueCoasting</code></td><td><code>84</code>→<code>84</code>; <strong><code>0</code>→<code>null</code></strong>; <code>null</code>→<code>null</code>; <code>-5</code>→<code>null</code> (guarda defensiva: no es físico, pero tampoco debe dar flecha).</td></tr>
+            <tr><td><code>testCadenceCoastingProducesNoArrow</code></td><td>Las dos piezas juntas: <code>0</code> contra media 80 → <strong>NONE, no DOWN</strong>; 90→UP; 70→DOWN; ±3 dentro de la banda. El test que protege la asimetría.</td></tr>
+            <tr><td><code>testCadenceUnitParts</code></td><td><code>"rpm"</code> arriba y <strong>vacío abajo</strong>: una sola línea de unidad.</td></tr>
+            <tr><td><code>TrendCore.*</code> (5)</td><td>Del barrel: arriba/abajo/igual, negativos, <code>null</code> en cualquiera → NONE sin crash, banda <strong>inclusiva</strong> (±3 no da flecha, ±4 sí) y la misma aritmética con décimas y con rpm.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:14px">
+        Y el <strong>export de los 17 targets compila limpio</strong>. El único warning es el conocido:
+        un Edge 1030 viejo (CIQ 3.2.5) que no llega al API mínimo del proyecto y queda fuera del
+        <code>.iq</code> — pasa en las cuatro apps del repo y está decidido dejarlo así, porque otros
+        part numbers del mismo 1030 sí llegan y esos sí lo reciben.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Depurar sin salir a andar</h2>
+      <p>
+        Con <code>TEST_MODE = true</code> en un build de debug, <code>compute()</code> ignora el sensor y
+        consume un generador sintético. El perfil está armado para ejercitar <strong>la flecha y la
+        regla del 0</strong>, no el número: <code>[95, 84, 0, 70, 87, 81, 0, 60]</code> rpm, 3 s por
+        tramo. Tiene valores por encima y por debajo de la media, los bordes de ±3 rpm donde decide la
+        banda muerta, y <strong>dos tramos de <code>0</code></strong> que deben mostrar el cero
+        <em>sin</em> flecha. El promedio lo acumula el propio generador, así converge como el de Garmin.
+      </p>
+      <div class="note">
+        <p><strong>Trampa que ya costó un número de versión:</strong> con
+        <code>TEST_MODE = true</code>, un build de <em>release</em> <strong>compila limpio y sin
+        warnings</strong> pero el campo muestra <code>--</code> para siempre — el generador es
+        <code>(:debug)</code> y su par <code>(:release)</code> es un stub que devuelve nulls, así que
+        nunca se lee <code>Activity.Info</code>. Le pasó a la J con su primer <code>.iq</code> beta, y el
+        portal no permite reusar un número de versión: la <code>v0.2.0</code> quedó quemada. Verificar el
+        flag antes de exportar cualquier cosa.</p>
+      </div>
+      <p>
+        Para lo que <em>no</em> necesita ojo humano hay una técnica prestada de la J: un test
+        <code>(:test)</code> temporal dibuja sobre un <code>BufferedBitmap</code>, instancia la View real
+        y le pide al barrel que reporte sus decisiones
+        (<code>TrendRenderer.debugSummary(dc)</code>) — así se verifica <strong>qué fuente eligió el
+        código</strong> para cada tamaño de celda y en los dos devices, sin abrir la GUI del simulador.
+        Lo que no reemplaza es mirar los píxeles: Monkey C no tiene <code>getPixel</code>.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Qué falta</h2>
+      <p>
+        El código está terminado y verde. Lo que queda es casi todo de la mano del autor, más un
+        pendiente de dibujo:
+      </p>
+      <div class="cards">
+        <div class="card">
+          <h3>1 · Íconos propios</h3>
+          <p>Los 13 launchers son <strong>los de la J, byte-idénticos</strong>: en la lista de campos del
+             Edge esta app es indistinguible de aquélla salvo por el nombre. Bloquea la subida a la
+             store, no el desarrollo. Motivo natural: biela, plato o pedal — que además rompe la silueta
+             circular del ícono de J.</p>
+        </div>
+        <div class="card">
+          <h3>2 · Mirarlo andar</h3>
+          <p>F5 con <code>TEST_MODE = true</code>: que la flecha siga al promedio, que los dos tramos de
+             <code>0</code> no muestren flecha, y el layout en celdas de varios tamaños. Los píxeles no
+             se pueden verificar sin ojo.</p>
+        </div>
+        <div class="card">
+          <h3>3 · ¿El promedio incluye los ceros?</h3>
+          <p>Nuestro generador sintético los excluye, y el comentario del código dice que Garmin también
+             — pero <strong>eso no está verificado</strong>. Si el promedio nativo los incluyera, sería
+             más bajo y en subida la flecha marcaría ▲ casi siempre. Se cierra comparando contra el campo
+             nativo en una salida real.</p>
+        </div>
+      </div>
+      <p style="margin-top:16px">
+        La versión <strong><code>v0.1.0</code> está registrada</strong> en
+        <code>store/RELEASES.md</code> para la primera subida al canal beta, pero todavía
+        <strong>no se subió nada</strong>: sin ícono propio no tiene sentido.
+      </p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>apps/k-cadence-trend · Opción K</span>
+    <span>·</span>
+    <span>Monkey C · Connect IQ 3.3 · 13 Edge (referencia: 840) · barrel <code>trend-core</code></span>
+    <span>·</span>
+    <span>La fuente de verdad es <code>SPEC.md</code>.</span>
+  </div>
+</footer>

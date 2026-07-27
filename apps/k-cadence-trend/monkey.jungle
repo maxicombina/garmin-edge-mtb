@@ -1,0 +1,21 @@
+# Build config. The SDK auto-discovers ./source and ./resources by convention, INCLUDING
+# resource qualifiers like ./resources-<device> and ./resources-spa, so pointing at the
+# manifest is enough for those.
+#
+# The TrendCore barrel is consumed BY SOURCE, not as a pre-built .barrel: the bracket form
+# points at the barrel's own jungle and the compiler builds it as part of this app. That means
+# no extra build step, no binary artifact to version, and editing the barrel takes effect on
+# the next build of any consumer. (A plain, unbracketed path would instead mean "a built
+# .barrel lives here" -- the compiler rejects mixing the two forms.)
+#
+# The path is RELATIVE to this file so the repo works from any checkout location.
+TrendCore = [../../barrels/trend-core/monkey.jungle]
+base.barrelPath = $(TrendCore)
+
+# Launcher icons: each device has its own resources-<device>/drawables/ with a correctly-sized
+# icon (auto-discovered by the device qualifier). There is deliberately NO icon in the base
+# resources/ -- a base icon would be overridden by every device and the packager would warn.
+#
+# NOTE: the launcher icons here are PLACEHOLDERS copied from Option J. They show J's speed
+# motif, so K is indistinguishable from J in the device's field list. Redesign before publishing.
+project.manifest = manifest.xml

@@ -52,6 +52,20 @@ function testDisplayString(logger as Test.Logger) as Boolean {
 }
 
 (:test)
+function testTargetTenths(logger as Test.Logger) as Boolean {
+    Test.assertEqualMessage(SpeedFormat.targetTenths(25.0), 250, "25.0 -> 250 tenths");
+    // 22.25 is exact in binary: 22.25*10 = 222.5 exactly -> half away from zero -> 223. Do NOT
+    // use values like 22.35 here: they are not representable and the test would hinge on float
+    // noise instead of on roundHalf (SPEC 10).
+    Test.assertEqualMessage(SpeedFormat.targetTenths(22.25), 223, "22.25 -> 223 (half away from zero)");
+    Test.assertEqualMessage(SpeedFormat.targetTenths(15), 150, "integer Number accepted");
+    Test.assertMessage(SpeedFormat.targetTenths(0.0) == null, "0 -> null (not configured)");
+    Test.assertMessage(SpeedFormat.targetTenths(-5.0) == null, "negative -> null");
+    Test.assertMessage(SpeedFormat.targetTenths(null) == null, "null -> null");
+    return true;
+}
+
+(:test)
 function testUnitLabel(logger as Test.Logger) as Boolean {
     Test.assertEqualMessage(SpeedFormat.unitLabel(false), "KM/H", "metric");
     Test.assertEqualMessage(SpeedFormat.unitLabel(true), "MPH", "statute");

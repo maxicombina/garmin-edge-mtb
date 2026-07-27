@@ -5,11 +5,14 @@ import Toybox.Lang;
 //
 // AppBase entry point. Named to match manifest entry="TrendArrowApp".
 //
-// v1 has NO settings (SPEC 9): metric is fixed to speed, average is the activity average, the
-// dead-band is implicit in the tenths rounding. So there is no onSettingsChanged() to forward
-// (unlike B) -- this class is just initialize() + getInitialView().
+// It keeps a reference to the view for one reason only: forwarding onSettingsChanged() (SPEC 9.4).
+// v1 shipped with NO settings and this class was literally initialize() + getInitialView(); the
+// configurable reference (ride average vs. fixed target) is what made the forwarding necessary,
+// with the same shape as Option B's GradeVamApp.
 //
 class TrendArrowApp extends Application.AppBase {
+
+    private var mView as TrendArrowView or Null = null;
 
     function initialize() {
         AppBase.initialize();
@@ -17,6 +20,17 @@ class TrendArrowApp extends Application.AppBase {
 
     // A data field returns its single view here.
     function getInitialView() {
-        return [new TrendArrowView()];
+        mView = new TrendArrowView();
+        return [mView];
+    }
+
+    // Fired when the user saves app settings from the phone (Garmin Connect Mobile / Connect IQ
+    // Store app) or from Garmin Express -- a data field cannot be configured on the device itself.
+    // NOT fired by a device units change: compute() re-reads paceUnits every tick for that.
+    function onSettingsChanged() as Void {
+        if (mView != null) {
+            mView.reloadSettings();
+        }
+        WatchUi.requestUpdate();
     }
 }

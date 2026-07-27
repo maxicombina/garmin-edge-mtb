@@ -45,31 +45,67 @@ El **MVP implementa SOLO Tier 1 con velocidad**. La arquitectura de abajo ya dej
 ```
 j-trend-arrow/
 ├── manifest.xml               # type=datafield; 13 products; minApiLevel 3.3.0; launcherIcon
-├── monkey.jungle               # mínimo (auto-discovery), igual que A y B
+├── monkey.jungle               # declara el barrel TrendCore por FUENTE (ruta relativa, §3.4)
 ├── source/
-│   ├── TrendArrowApp.mc        # AppBase: getInitialView() → [view]. SIN settings en v1 (§9) →
-│   │                           # no hace falta onSettingsChanged (a diferencia de B).
-│   ├── TrendArrowView.mc       # DataField: compute() (wrapper fino) + onUpdate() (render, §6).
-│   │                           # NO testeable, lo más chico posible (mismo principio que A/B).
-│   ├── TrendArrow.mc           # PURO. Módulo genérico: (actual, promedio) → UP/DOWN/NONE (§5.1)
-│   ├── TrendArrowTest.mc       # tests de TrendArrow (§10)
+│   ├── TrendArrowApp.mc        # AppBase: getInitialView() → [view] + onSettingsChanged (§9.4)
+│   ├── TrendArrowView.mc       # DataField: compute() (wrapper fino) + onUpdate() → delega TODO el
+│   │                           # render al barrel. 225 líneas; eran 858 antes de la migración (§3.4).
 │   ├── SpeedFormat.mc          # PURO. Adaptador Tier-1 de velocidad: m/s → string con 1 decimal (§5.2)
 │   ├── SpeedFormatTest.mc      # tests de SpeedFormat (§10)
 │   ├── TestUtil.mc             # helpers PLANOS assertNear/assertIsNumber (NO (:test) — ver B §10
-│   │                           # gotcha 2). COPIA PROPIA de este archivo — el repo prohíbe compartir
-│   │                           # código entre apps salvo decisión explícita (CLAUDE.md); no importar
-│   │                           # el TestUtil.mc de la B.
+│   │                           # gotcha 2). COPIA PROPIA: el barrel tiene la suya, namespaceada.
 │   └── (ningún módulo de buffer/filtro/EMA — no hace falta para Tier 1, ver §3.1)
+│
+│   # MIGRADO 2026-07-27 (§3.4): `TrendArrow.mc` y `TrendArrowTest.mc` ya NO viven acá — los da
+│   # `barrels/trend-core/` como `TrendCore.TrendArrow`, junto con el motor de render entero
+│   # (`TrendCore.TrendRenderer`), compartido con las Opciones K y L.
 ├── resources/
-│   ├── strings/strings.xml     # AppName, SpeedLabel (+ SpeedLabelShort, §6.10), AvgLabel — SIN settings/ (v1 no tiene, §9)
+│   ├── strings/strings.xml     # AppName, SpeedLabel (+ SpeedLabelShort, §6.10), AvgLabel — settings/ desde §9 (v1 no tenía)
 ├── resources-spa/strings/      # español
 ├── resources-<device>/drawables/  # ícono launcher, uno por device (35/36/40/56/68 px) — ya NO placeholder (§3.3)
 └── store/                      # assets de la ficha del store + el generador del ícono (§3.3)
 ```
 
-**Nota dura del repo (CLAUDE.md):** "Nada compartido entre apps salvo documentación. Si surge código común, decidir explícitamente." `TestUtil.mc` se **copia**, no se importa desde B. Si en el futuro se decide extraer algo común de verdad, esa es una decisión aparte, explícita, no implícita por comodidad.
+**Nota dura del repo (CLAUDE.md):** "Nada compartido entre apps salvo documentación. Si surge código común, decidir explícitamente." `TestUtil.mc` se **copia**, no se importa desde B. Si en el futuro se decide extraer algo común de verdad, esa es una decisión aparte, explícita, no implícita por comodidad. → **Eso pasó el 2026-07-27: ver §3.4.**
 
 Reglas de la clase (idénticas a A/B, no re-derivar): `compute(info)` ~1×/s, no dibuja; `onUpdate(dc)` dibuja, no calcula; sin orden garantizado entre ambos → todo miembro inicializado en `initialize()`.
+
+### 3.4 Migración al barrel `TrendCore` (HECHA 2026-07-27)
+
+La Opción K (cadencia) se construyó sobre un barrel con el motor de render **extraído de esta app**, y J
+quedó a propósito sin migrar. Duró un día: el primer bug que apareció (§6.13) hubo que arreglarlo **dos
+veces**, y con las dos iteraciones fueron **cuatro ediciones duplicadas** — así que J se migró.
+
+**Qué se fue de acá:** `TrendArrow.mc` + `TrendArrowTest.mc` (borrados; los da `TrendCore.TrendArrow`) y
+el motor de render entero, que era el 75 % de la View. **`TrendArrowView.mc` pasó de 858 a 225 líneas** y
+no le queda ni una línea de layout. Lo que se queda es lo que ES de la velocidad: `SpeedFormat`, los
+settings de referencia (§9), la banda muerta, la plantilla `"88.8"`, los strings y el generador
+sintético de `TEST_MODE`.
+
+**Cómo se comprobó que no cambia un píxel — la técnica importa más que el resultado.** No se validó "a
+ojo": antes de borrar la copia se compararon **las 13 funciones del motor cuerpo a cuerpo** contra las
+del barrel, normalizadas (comentarios fuera, espacios colapsados y aplicados los renombres del barrel:
+`mAvgFont`→`mRefFont`, `VALUE_TPL`→`mValueTpl`, `"--"`→`NO_DATA`, etc.). Las 13 salieron **idénticas
+carácter por carácter** (`drawTrendValue` 1430 chars normalizados, `selectFonts` 1795, …). Eso convierte
+"no debería cambiar nada" en una afirmación verificable. Vale repetirlo si algún día hay que reconciliar
+dos copias de algo.
+
+**Y después, la comprobación de cableado** (que el diff textual no cubre: podría faltar un `setUnit`):
+un probe headless (§11.1) instancia la View real, le hace `onUpdate` sobre un `BufferedBitmap` para 6
+tamaños de celda y en los dos devices, e imprime lo que el motor **eligió**. Reprodujo exactamente lo
+medido en las capturas del autor: 840 celda 125×62 → `NUMBER_MEDIUM` + `GLYPH(w=18 ascent=22)`, 830 misma
+celda → `PRIMITIVE(w=15 h=25)`, celda grande → `THAI_HOT` + primitiva `h=42`, 246×62 → `wide=true` con
+label `"VELOCIDAD / PROM"`, 82×62 → degradación a fuente de texto y label corto `"VEL"`.
+⚠️ El probe necesita un `compute()` antes del `onUpdate`, o el motor mide con la unidad VACÍA y elige
+fuentes para un grupo más angosto que el real; un `new Activity.Info()` con todo en null alcanza.
+
+**Lo que se perdió, a propósito:** el `GLYPH_PROBE` (§11.2) — su resultado ya está documentado ahí y su
+código necesitaba las internas del motor. **Lo que se salvó:** el hook `DEBUG_MEASURE`, porque el motor
+ahora reporta sus propias decisiones vía `TrendCore.TrendRenderer.debugSummary(dc)` (pública y sin
+anotación: un barrel no puede depender de las exclusiones `(:debug)` del consumidor).
+
+**Verificado:** export de los 17 targets limpio en J y en K, **J 12/12** (7 propios + los 5 del barrel,
+namespaceados, en lugar de los 5 borrados) y **K 9/9**. El `id` de la app no se tocó.
 
 ### 3.3 Ícono — CERRADO (2026-07-25). Híbrido: aro de un modelo de imagen + geometría dibujada por código
 
@@ -285,12 +321,18 @@ module SpeedFormat {
 3. curTenths = SpeedFormat.shownTenths(info.currentSpeed, mIsStatute)
 4. avgTenths = SpeedFormat.shownTenths(info.averageSpeed, mIsStatute)
 5. mCurStr = SpeedFormat.displayString(curTenths)
-6. mAvgStr = SpeedFormat.displayString(avgTenths)
-7. mArrowState = TrendArrow.classify(curTenths, avgTenths, DEAD_BAND_TENTHS)   // banda ±0,1 km/h (§5.1)
-8. mUnitLabel = SpeedFormat.unitLabel(mIsStatute)
+6. refTenths = (objetivo configurado y válido) ? mTargetTenths : avgTenths          // §9
+7. mAvgStr = SpeedFormat.displayString(refTenths)
+8. mArrowState = TrendArrow.classify(curTenths, refTenths, DEAD_BAND_TENTHS)   // banda ±0,1 km/h (§5.1)
+9. mUnitTop = SpeedFormat.unitTop(mIsStatute); mUnitBottom = SpeedFormat.unitBottom(mIsStatute)
 ```
 
-Eso es **todo** — sin buffer, sin push, sin filtro. `onUpdate()` solo dibuja `mCurStr`/`mAvgStr`/`mArrowState`/`mUnitLabel`, cero formateo por tick (mismo principio A/B: `compute()` calcula y formatea, `onUpdate()` solo dibuja).
+Eso es **todo** — sin buffer, sin push, sin filtro. `onUpdate()` solo dibuja `mCurStr`/`mAvgStr`/`mArrowState` y las dos líneas de la unidad, cero formateo por tick (mismo principio A/B: `compute()` calcula y formatea, `onUpdate()` solo dibuja).
+
+⚠️ **Dos pasos de este pseudocódigo cambiaron después de escribirlo, y esto ya refleja el código real:** la
+unidad dejó de ser un string pegado al label (`mUnitLabel = unitLabel(...)`) y pasó a las dos líneas
+apiladas al lado del número (**§6.9**; `unitLabel` sigue existiendo pero **no se usa en el render**), y el
+segundo número dejó de ser siempre el promedio: puede ser un objetivo fijo configurable (**§9**).
 
 ## 6. Render adaptativo (`onUpdate(dc)`)
 
@@ -315,6 +357,9 @@ const ARROW_GAP = 4;        // px entre la flecha y el valor actual (igual que G
 const AVG_LABEL_GAP = 4;    // px entre el prefijo "AVG"/"PROM" y el número de promedio
 const VALUE_NUDGE = 2;      // px: mismo nudge fino que A/B para centrar ópticamente el valor
 const ARROW_NUDGE = 2;      // px: mismo nudge fino que B usó para alinear la flecha con el texto
+                            // ⚠️ SUPERSEDED 2026-07-27 (§6.13): reemplazada por ARROW_INK_BIAS = 1;
+                            // el objetivo de la flecha NO es "descent/2 + nudge" (error que crece con
+                            // la fuente del número), es una constante de 1 px sobre cy.
 const VALUE_TPL = "888.8";  // plantilla de ancho estable: 3 dígitos enteros + "." + 1 decimal
                              // (cubre 0.0-999.9; la velocidad no lleva signo en la práctica)
 ```
@@ -380,7 +425,7 @@ selectFonts(dc, usableW, h, labelH):
         si ninguna entra: mAvgFont = FONT_XTINY
 ```
 
-**Label del valor actual:** `mLabel` = string cargado una vez de `Rez.Strings.SpeedLabel` en `initialize()`, en MAYÚSCULAS (mismo patrón que `mGradeLabel` en B). Se dibuja como `mLabel + " " + SpeedFormat.unitLabel(mIsStatute)`, p. ej. `"SPEED KM/H"` (igual patrón que B con `"VAM M/H"`).
+**Label del valor actual:** `mLabel` = string cargado una vez de `Rez.Strings.SpeedLabel` en `initialize()`, en MAYÚSCULAS (mismo patrón que `mGradeLabel` en B). ⚠️ **SUPERSEDED por §6.9/§6.10:** el diseño original lo dibujaba como `mLabel + " " + SpeedFormat.unitLabel(mIsStatute)`, p. ej. `"SPEED KM/H"` (igual patrón que B con `"VAM M/H"`). El código real dibuja **solo el nombre de la métrica** (`VELOCIDAD`, con degradación a `VEL` y después por la escalera de fuentes vía `selectLabel`), porque la unidad se movió a las dos líneas apiladas al lado del número.
 
 ### 6.5 Dibujo (`onUpdate`)
 
@@ -393,7 +438,10 @@ selectFonts(dc, usableW, h, labelH):
    mShowAvg = (h >= AVG_MIN_H)   // implica labelShow, porque AVG_MIN_H > LABEL_MIN_H
 4. Caché: si (w,h,mIsStatute) cambió -> selectFonts(dc, w - 2*PAD, h, labelH)  -- pasa h TOTAL y
           labelH para que selectFonts calcule postLabelH = h - labelH internamente
-5. Si labelShow: drawText(w/2, LABEL_MARGIN, FONT_GLANCE, mLabel + " " + mUnitLabel, CENTER)
+5. Si labelShow: drawText(w/2, LABEL_MARGIN, mLabelFont, mLabel, CENTER)
+     // ⚠️ SUPERSEDED: el label ya NO lleva la unidad pegada (era `mLabel + " " + mUnitLabel`).
+     // La unidad va apilada al lado del número (§6.9) y el label es solo el nombre de la
+     // métrica, con degradación largo -> corto -> fuente menor (§6.10, `selectLabel`).
 
 6. -- bandas verticales --
    postLabelH = h - labelH
@@ -415,6 +463,8 @@ selectFonts(dc, usableW, h, labelH):
        x = w/2 - totalW/2
        arrowCy = primaryCy - getFontDescent(mValueFont)/2 + ARROW_NUDGE   // mismo truco que B:
               // la flecha se alinea con los GLIFOS VISIBLES del número, no con su caja completa
+              // ⚠️ SUPERSEDED 2026-07-27 (§6.13): esta línea es HOY `primaryCy - ARROW_INK_BIAS`.
+              // La intención (alinear con la tinta, no con la caja) sigue valiendo; la fórmula no.
        if mArrowState == TrendArrow.UP:   drawUpArrow(dc, x, arrowCy, aw, ah)
        else:                              drawDownArrow(dc, x, arrowCy, aw, ah)
        dc.drawText(x + aw + ARROW_GAP, primaryCy, mValueFont, mCurStr, LEFT | VCENTER)
@@ -484,7 +534,7 @@ En **celdas full-width Y cortas** (sin alto para apilar) el campo muestra **ambo
 
 - **Gate:** `fullWidth = (w * WIDE_DEN >= screenW * WIDE_NUM)` con `WIDE_NUM=8, WIDE_DEN=10` (**celda ≥ 80 % del ancho de pantalla**, vía `System.getDeviceSettings().screenWidth`, presente en todos los devices; guarda `!= null`). **`mIsWide = fullWidth && (h < AVG_MIN_H)`** → inline solo si además es corta (no entra la línea de promedio apilada). `fullWidth && h ≥ AVG_MIN_H` → cae al apilado (que muestra el promedio como 2ª línea). Una media-columna (~50 %) nunca es inline.
 - **Fuente inline:** misma escalera numérica, mayor tamaño cuyo grupo `[flecha + gap + "888.8 / 888.8" + gap + unidad]` (plantilla `INLINE_TPL`) entra a lo ancho, tope de alto contra la banda. Fallback: si la flecha no entra, se descarta y se ajusta `[par + unidad]` (mismo idioma que §6.4).
-- **Flecha:** tendencia del **actual vs promedio** (misma `classify()`), precede a TODO el par. Mismo centrado `descent/2 + ARROW_NUDGE` que el valor apilado (§6.7). Sigue siendo DATO (va con el valor).
+- **Flecha:** tendencia del **actual vs promedio** (misma `classify()`), precede a TODO el par. Mismo centrado que el valor apilado (§6.7) — hoy `cy − ARROW_INK_BIAS`, ⚠️ ya **no** `descent/2 + ARROW_NUDGE` (§6.13). Sigue siendo DATO (va con el valor).
 - Constantes: `WIDE_NUM=8`, `WIDE_DEN=10`, `INLINE_SEP=" / "`, `INLINE_TPL="888.8 / 888.8"`. Implementado en `TrendArrowView.mc` (`selectInlineFont` + `drawTrendValue`, branch en `selectFonts`/`onUpdate`). Compila limpio (release 840+830, `-w`) + 10/10 tests. **PENDIENTE:** validación visual del autor en el sim (umbral 80 %, y que el apilado en celda ancha-alta se vea bien en las 6 resoluciones).
 
 ### 6.9 Unidad estilo NATIVO (apilada a la derecha del número — 2026-07-23)
@@ -544,6 +594,182 @@ Si cualquiera falla → primitiva. Medido: edge840 `w(↑)=17` en `FONT_LARGE` (
 
 **Constantes:** `USE_ARROW_GLYPH` (a `false` fuerza la primitiva en todos lados), `ARROW_GLYPH_UP`/`DOWN` (`\u2191`/`\u2193`; `\u25B2`/`\u25BC` para triángulos sólidos), `GLYPH_CONTROL = \uE000`, `GLYPH_MIN_W = 2`.
 
+### 6.12 La flecha-glifo es MÁS CHICA que los dígitos, y el 4/5 no es la causa (MEDIDO 2026-07-27, NO implementado)
+
+El autor lo vio en el 840 real: la flecha se ve más chica que el número. **No es una ilusión de
+posición** — el glifo se dibuja `VCENTER` sobre `cy − descent/2`, o sea centrado en los dígitos
+visibles, no arriba. Es más chica de verdad, y **el techo no es el objetivo de 4/5 sino la fuente**:
+el glifo se pide en fuente de TEXTO (§11.2 explica por qué: en la numérica el 840 lo pinta más grande
+pero `getTextWidthInPixels` devuelve **0** y no hay con qué maquetar), y la mayor fuente de texto es
+`FONT_LARGE`, con ascent **22 px**. Ese tope ya manda en casi toda la escalera.
+
+Medido en el edge840 con un probe headless (§11.1), ascents reales:
+
+| Fuente del número | ascent | primitiva (4/5) | glifo (tope `FONT_LARGE`) |
+|---|---|---|---|
+| `NUMBER_THAI_HOT` | 53 | 42 · 79 % | **22 · 41 %** |
+| `NUMBER_HOT` | 43 | 34 · 79 % | **22 · 51 %** |
+| `NUMBER_MEDIUM` | 33 | 26 · 78 % | **22 · 66 %** |
+| `NUMBER_MILD` | 28 | 22 · 78 % | 22 · 78 % |
+
+⚠️ **Consecuencia que no se había notado: la app se ve DISTINTA según la familia de fuentes.** Los
+devices que caen a la primitiva (830, 530, 1030 ×3, explore2) tienen la flecha al 79 % del número;
+los que resuelven el glifo (840, 540, 550, 850, 1040, 1050, mtb) la tienen al 41 % en celda grande.
+No es un bug de código —cada rama hace lo que dice— pero sí una inconsistencia de producto.
+
+**Subir el objetivo de 4/5 a 1/1 NO lo arregla:** haría crecer la primitiva (53 px en `THAI_HOT`) y
+dejaría el glifo clavado en 22, porque no hay fuente de texto más grande. Empeoraría la brecha entre
+familias.
+
+**Cambio anotado como posible, NO hecho (preferencia del autor, 2026-07-27):** *primitiva siempre,
+con la altura como constante* — se saca el glifo, las dos familias dibujan lo mismo y el tamaño pasa
+a ser una decisión nuestra (4/5 o completa, a gusto). Se pierde el glifo nativo, que en la práctica
+solo veía la mitad de los devices y se veía chico. Alternativa descartada por frágil: pedir el glifo
+en la fuente numérica adivinando su ancho (no medible, y varía por familia). Alternativa intermedia
+si algún día se quiere conservar el glifo: usarlo **solo en celdas chicas** (donde queda al 66-78 %) y
+primitiva en las grandes — a costa de que el trazo cambie entre campos de una misma pantalla.
+
+Por ahora **queda como está**: el 840 sigue con el glifo chico. `USE_ARROW_GLYPH = false` ya fuerza la
+primitiva en todos lados si se quiere probar el cambio sin tocar nada más.
+
+### 6.13 La flecha-glifo estaba 4,5 px ARRIBA de los dígitos (BUG MEDIDO Y CORREGIDO 2026-07-27)
+
+Hallado por el autor mirando la Opción K en el simulador (perfil 840, celda 125×62): la flecha se veía
+desplazada hacia arriba respecto del número. **No era la ilusión del punto §6.12** (ahí la flecha es
+más CHICA; esto es que además estaba más ALTA), y se confirmó midiendo la captura píxel a píxel:
+
+| | tinta (y) | alto | centro |
+|---|---|---|---|
+| dígitos `70` (`NUMBER_MEDIUM`) | 44 … 69 | 26 px | 56,5 |
+| flecha (glifo `↓` en `FONT_LARGE`) | 42 … 62 | 21 px | **52,0** |
+
+→ **4,5 px de desfase**, con la asimetría delatora: 2 px de más por arriba y **7 px de dígito
+sobrante por abajo**.
+
+**Causa: el glifo arrastra el descendente de SU PROPIA fuente, y nadie lo compensaba.** El código
+calculaba una sola `arrowCy = cy − descent(fuenteDelValor)/2 + ARROW_NUDGE` y la usaba para las dos
+ramas, pero las dos ramas no se comportan igual:
+
+- **primitiva** (`drawUpArrow`/`drawDownArrow`): derivan `top`/`bot` del alto REAL de la figura, así que
+  centrarlas en `arrowCy` centra la tinta. **Estaba bien** → el 830 y su familia se veían correctos.
+- **glifo**: es TEXTO dibujado con `VCENTER`, o sea que lo centrado es la **caja** de `FONT_LARGE`
+  (alto 31, ascent 22, **descent 9**), y el glifo no pinta ese descendente → la tinta flota
+  `descent/2 = 4,5 px` hacia arriba.
+
+Cuentas con las métricas reales del 840 (`NUMBER_MEDIUM` 42/33/9, `FONT_LARGE` 31/22/9), que
+reproducen la medición de la captura al píxel: baseline de los dígitos en `cy+12`, tinta en
+`[cy−14, cy+12]` → centro `cy−1`; baseline del glifo en `cy+4,5`, tinta en `[cy−16,5, cy+4,5]` →
+centro `cy−6`. Diferencia **5 px** calculada vs. **4,5 px** medida.
+
+**Arreglo #1 (una línea, en las DOS copias del motor):** sumarle al `y` del glifo el descendente de su
+fuente — `arrowCy + Graphics.getFontDescent(gf)/2`.
+
+#### Segunda iteración, el mismo día: el arreglo #1 era correcto pero INCOMPLETO
+
+El autor mandó una segunda captura, esta vez con **7 celdas de distintos tamaños en una pantalla** — y
+ahí se vio lo que una sola celda no podía mostrar:
+
+| celda | fuente del número | dígitos (tinta) | flecha | desfase |
+|---|---|---|---|---|
+| 121×62 (×6) | `NUMBER_MEDIUM` | y29-54 · h26 · centro **41,5** | y31-51 · h21 · centro **41,0** | **0,5 px** ✅ |
+| 244×125 | `NUMBER_THAI_HOT` | y38-79 · h42 · centro **58,5** | y44-64 · h21 · centro **54,0** | **4,5 px** ❌ |
+
+**Seis de siete perfectas, la grande igual de mal que antes.** Causa: el objetivo mismo estaba mal. El
+código apuntaba a `cy − descent(fuenteDelValor)/2`, un término que **escala con la fuente del número**
+(`MEDIUM` d=9 → −4 px; `THAI_HOT` d=14 → −7 px), mientras la compensación del glifo es fija
+(`FONT_LARGE`, +4). En la celda de 62 px los dos se cancelaban por casualidad; en la grande sobraban 3.
+
+**Y esto corrige algo que yo había afirmado de más:** dije que "la primitiva estaba bien". Estaba bien
+**en esa celda**. La primitiva usa el mismo `arrowCy`, así que en una celda grande el 830 también dibuja
+la flecha ~3,5 px arriba. El defecto era de las DOS ramas; la del glifo solo lo tenía peor.
+
+**Dónde está de verdad la tinta de los dígitos (medido, dos fuentes):** `NUMBER_MEDIUM` pinta 26 px en
+una caja de 42 (7 de aire arriba, 9 de descendente abajo) y `THAI_HOT` 42 en 67. En las dos la tinta
+queda **~1 px por encima del centro de la caja**, y ese 1 px **no escala**. O sea que el objetivo
+correcto es una CONSTANTE, no un término de fuente.
+
+**Arreglo #2 (el definitivo):** `ARROW_INK_BIAS = 1` reemplaza a `ARROW_NUDGE` y
+
+```
+var arrowCy = cy - ARROW_INK_BIAS;          // antes: cy - getFontDescent(valueFont)/2 + ARROW_NUDGE
+```
+
+Verificado por cálculo con las métricas reales del 840 para las cuatro fuentes numéricas y las dos
+ramas: el desfase queda en **≤ 0,5 px** en todos los casos (`MEDIUM` 0 · `HOT` 0,5 · `THAI_HOT` 0,5 ·
+`MILD` 0,5), que es el piso de una grilla de enteros.
+
+#### Tercera iteración: el 830, y por qué NINGUNA constante podía servir
+
+El autor miró entonces el **830** (la otra familia, la que dibuja la primitiva) y la flecha se veía
+**baja**, con el desfase escalando igual que antes:
+
+| celda | dígitos (tinta) | flecha (primitiva) | desfase |
+|---|---|---|---|
+| 121×62 (×6) | y24-52 · h29 · centro **38,0** | y28-52 · h25 · centro **40,0** | **2 px abajo** |
+| 244×125 | y26-75 · h50 · centro **50,5** | y34-76 · h43 · centro **55,0** | **4,5 px abajo** |
+
+Probando las métricas de las dos familias (`monkeydo -t`, un `(:test)` que solo llama a
+`getFontAscent/Descent/Height` — no necesita `Dc`, así que corre en las dos) apareció **el dato que
+cierra todo el asunto: las dos familias llenan el `ascent` de forma distinta.**
+
+| | `N_MEDIUM` | `N_THAI_HOT` | tinta / ascent | flecha 4/5 vs. tinta |
+|---|---|---|---|---|
+| **840** (TTF) | a=33 d=9 h=42, tinta 26 | a=53 d=14 h=67, tinta 42 | **0,79** | 26 vs 26 → **iguales** |
+| **830** (bitmap `.cft`) | a=32 d=10 h=42, tinta 29 | a=53 d=17 h=70, tinta ~49 | **0,91** | 25 vs 29 → 4 px menos |
+
+O sea que **el 4/5 histórico coincide por casualidad con el alto de la tinta en la familia TTF**, y por
+eso en el 840 la flecha parecía perfecta. En el 830 los dígitos son más altos que la flecha: **no había
+error de posición, era diferencia de ALTO.**
+
+**Y de ahí sale el límite duro: centrar es imposible de forma portable.** El centro de la tinta es
+`baseline − tinta/2`, y **`tinta` no lo da ninguna API** — varía por familia (0,79 vs 0,91) y no se
+puede derivar de `ascent`/`descent`/`height` (en las dos familias `a+d = h`, así que no hay ni una
+señal para distinguirlas). Cualquier constante es un valor horneado de una captura, que un device nuevo
+rompe. Las dos iteraciones anteriores fueron exactamente eso, y cada una falló en la otra familia.
+
+**Lo que SÍ es exacto y queryable: la baseline.** Verificado en las dos familias — la tinta de los
+dígitos **termina exactamente en la baseline** (830: y52 con baseline 52 · 840: y54 con baseline 54;
+los glifos redondos `6`/`0` se pasan 1 px, que es *overshoot* tipográfico normal).
+
+**Decisión del autor (2026-07-27, por AskUserQuestion): la flecha se apoya en la baseline**, como la
+unidad. Implementación — y el matiz importa porque las dos ramas llenan distinto:
+
+- Se ancla la **BANDA** de la flecha, no la figura: `[valueBaseY − aH, valueBaseY]` con `aH = 4/5` del
+  ascent del valor. `valueBaseY = cy + (ascent − descent)/2`, el mismo que ya usaba la unidad.
+- La **primitiva LLENA la banda** → su base cae exacta en los pies de los dígitos, en toda fuente.
+- El **glifo va CENTRADO DENTRO de la banda** (con su `+ descent/2`), **no apoyado en el piso**: está
+  topeado en `FONT_LARGE` (§6.12), así que en celda grande su tinta mide la mitad que los dígitos
+  (21 vs 42 px) y apoyarlo lo habría hundido **13 px**, leyéndose como un subíndice. Detectado por
+  cálculo ANTES de que el autor lo viera.
+
+Desfase predicho con esto (calculado con métricas reales, las dos familias × chica y grande): **830
+0 px en la base** (la primitiva coincide con los pies; 2-4 px más corta arriba, que es el alto, no la
+posición) y **840 0,5 px en celda chica y 1,5 px en la grande**. Desaparecieron las dos constantes
+(`ARROW_NUDGE` y `ARROW_INK_BIAS`): no quedó ninguna perilla vertical para la flecha.
+
+**Tres cosas que este bug enseña y valen para todo el repo** (subidas a `GARMIN_MTB_SPEC.md` §3.4):
+
+1. **Es el mismo hecho de la regla dura de centrado, un nivel más abajo:** la regla habla del
+   descendente de la fuente del NÚMERO; acá el que sobraba era el de la fuente del SÍMBOLO. Cada vez
+   que se dibuja un glifo con `VCENTER` para alinearlo con otra cosa, hay que restarle su propio aire.
+2. **Fue un defecto ASIMÉTRICO POR FAMILIA de fuentes,** o sea invisible si validás en un solo device:
+   el 830 (primitiva) lo tenía mucho más leve que el 840 (glifo). Es el segundo caso de la lista
+   de §11.2 en que "se ve bien en un device" no dice nada del otro.
+3. **Y ASIMÉTRICO POR TAMAÑO DE CELDA, que es peor porque conviven en la misma pantalla:** un error
+   proporcional a la fuente del número se esconde en la celda donde afinaste. **Regla nueva: la
+   alineación se valida en una pantalla con celdas de varios tamaños, no en una.** La captura de 7
+   celdas del autor encontró en un intento lo que la de 1 celda no podía encontrar nunca.
+
+⚠️ **Y fue el segundo cambio que hubo que aplicar DOS VECES** (barrel + la copia de J, que sigue sin
+migrar) — en realidad **cuatro ediciones duplicadas**, contando las dos iteraciones. La divergencia que
+se aceptó al montar el barrel ya cobró, el mismo día. Argumento a favor de migrar J.
+
+Verificado en cada iteración: export de los 17 targets limpio en las dos apps, **J 12/12 y K 9/9**. La
+comprobación final de que la tinta coincide es del autor con F5 — el probe headless de §11.1 mide
+fuentes y decide layout, pero **no lee píxeles** (no hay `getPixel` en Monkey C). Lo que sí se puede
+hacer, y fue lo que resolvió esto, es **medir la captura del autor píxel a píxel** (BMP + numpy, sin
+Pillow: `sips -s format bmp` y parsear el header) y comparar los centros de tinta contra las cuentas.
+
 ## 7. Extender a otras métricas Tier 1 (documentado, NO implementar en v1)
 
 Sumar FC o cadencia más adelante es, literalmente:
@@ -564,9 +790,407 @@ Esto no es una promesa de v1.1, es solo la prueba de que la arquitectura cumple 
 - **Setting de métrica objetivo, ancho de banda muerta, promedio global vs. ventana móvil:** dejados fuera del v1 a propósito (ver §7 de la spec maestra) — el v1 es 100 % hardcodeado a velocidad + promedio global de la actividad, **cero settings**, para minimizar superficie de implementación (ver §9).
 - **Temperatura:** de valor dudoso para esta feature (no es miembro de `Activity.Info`, sesgada por el calor del propio equipo) — descartada, no solo pospuesta.
 
-## 9. Settings: NINGUNO en v1 (decisión de producto — como la Opción A)
+## 9. Settings — la referencia configurable (DECIDIDO e IMPLEMENTADO 2026-07-26; v1 no tenía ninguno)
 
-A diferencia de la B (4 settings), esta app **no tiene ningún setting en v1**: métrica fija = velocidad, promedio = global de la actividad, banda muerta = implícita en el redondeo a décimas (§5.1). Mismo patrón que A §7 ("No hay — decisión de producto: sin opciones"). Esto significa: **sin `resources/settings/`, sin `properties.xml`, sin `settings.xml`, sin `onSettingsChanged` en `TrendArrowApp.mc`** — el `AppBase` es literalmente `initialize()` + `getInitialView()`, nada más.
+**Historia:** v1 salió sin settings a propósito (patrón de la A: métrica fija, promedio global, banda muerta implícita — el `AppBase` era `initialize()` + `getInitialView()` y nada más). Esta sección especifica la **primera iteración con settings**, pedida por el autor: elegir contra qué se compara la velocidad actual. Las cuatro preguntas de diseño que esta sección dejaba abiertas quedaron **resueltas con el autor el 2026-07-26**; sus respuestas están integradas abajo y marcadas con «(decisión)».
+
+### 9.1 Producto
+
+Dos referencias posibles:
+
+| modo | referencia | la flecha significa | segunda línea |
+|---|---|---|---|
+| **0 — Promedio de la salida** (default) | `Activity.Info.averageSpeed`, se mueve sola | «vas más rápido/lento que tu media» | `PROM 20.4` / `AVG 20.4` |
+| **1 — Objetivo fijo** | número que el usuario tipea en los settings | «vas por encima/debajo de tu objetivo» (ritmo pautado) | `META 25.0` / `GOAL 25.0` |
+
+- **Dos settings** (decisión): una lista con los dos modos + el número del objetivo. El estado inconsistente que esto habilita (modo objetivo con número en 0/vacío) **degrada en silencio al promedio** — un setting sin tocar jamás deja el campo inservible.
+- **El número se interpreta en la unidad del device** (`paceUnits`: km/h métrico, mph imperial) (decisión). Sin conversión. Consecuencia documentada en el rótulo del setting: si el usuario cambia las unidades del device DESPUÉS, el mismo número pasa a significar la otra unidad. Aceptado.
+- **Prefijo de la segunda línea en modo objetivo: `Meta`/`Goal`** (decisión), en MAYÚSCULAS al dibujar, mismo tratamiento que `Prom`/`Avg`.
+- **Banda muerta: la MISMA ±0,1 (`DEAD_BAND_TENTHS = 1`) en los dos modos** (decisión). Cero constantes nuevas; si en la calle la flecha resulta inquieta contra un objetivo fijo, se ensancha después (`classify` ya recibe el parámetro).
+- **Dónde se configura (verificado 2026-07-26, y B ya lo tenía anotado):** desde el TELÉFONO — Garmin Connect Mobile (device → Activities & App Management → Data Fields) o la app Connect IQ Store — o Garmin Express. **En el propio Edge NO se puede** (límite de plataforma para data fields). Al guardar, al device le llega `onSettingsChanged()` en caliente, sin reiniciar la actividad.
+
+### 9.2 Archivos nuevos (copiar el patrón de B, que ya funciona en producción)
+
+**`resources/settings/properties.xml`** — literal:
+
+```xml
+<properties>
+    <!-- Reference the arrow compares against (SPEC 9). Stored values are magnitudes, not
+         list indices. targetSpeed is in the DEVICE's speed unit (paceUnits) by decision:
+         no conversion anywhere. -->
+    <property id="referenceMode" type="number">0</property>   <!-- 0 = ride average, 1 = fixed target -->
+    <property id="targetSpeed" type="float">0.0</property>    <!-- 0/negative = not configured -->
+</properties>
+```
+
+**`resources/settings/settings.xml`** — literal:
+
+```xml
+<settings>
+    <!-- Edited from the phone (Garmin Connect Mobile / Connect IQ Store app) or Garmin
+         Express. Data fields cannot be configured on-device (platform limit; same note
+         as b-grade-vam). -->
+    <setting propertyKey="@Properties.referenceMode" title="@Strings.SetReference">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.RefAverage</listEntry>
+            <listEntry value="1">@Strings.RefTarget</listEntry>
+        </settingConfig>
+    </setting>
+    <setting propertyKey="@Properties.targetSpeed" title="@Strings.SetTargetSpeed">
+        <settingConfig type="numeric" min="0" max="99.9" />
+    </setting>
+</settings>
+```
+
+(El `max="99.9"` mantiene el objetivo dentro de la plantilla `"88.8"`; no hay pérdida real — un objetivo de tres dígitos no existe en bici.)
+
+**Schema VERIFICADO compilando (2026-07-26):** estos dos XML, con la property `float` y el `settingConfig type="numeric"` con `min`/`max` — la única combinación que B no usa y que nadie había probado en este repo — **compilan limpios en edge840 y edge830** con el SDK 9.2.0 (probe temporal, revertido). El implementador puede pegarlos tal cual.
+
+**Strings** — agregar a `resources/strings/strings.xml` (base EN):
+
+```xml
+<string id="SetReference">Compare against</string>
+<string id="RefAverage">Ride average</string>
+<string id="RefTarget">Fixed target</string>
+<string id="SetTargetSpeed">Target speed, 1 decimal (in your device speed unit, km/h or mph)</string>
+<string id="TargetLabel">Goal</string>
+```
+
+y a `resources-spa/strings/strings.xml`:
+
+```xml
+<string id="SetReference">Comparar contra</string>
+<string id="RefAverage">Promedio de la salida</string>
+<string id="RefTarget">Objetivo fijo</string>
+<string id="SetTargetSpeed">Velocidad objetivo, 1 decimal (en la unidad de tu dispositivo, km/h o mph)</string>
+<string id="TargetLabel">Meta</string>
+```
+
+⚠️ Recordatorios de plataforma ya pagados en este repo: nada de `--` dentro de comentarios XML, y el manifest **no** necesita cambios por settings.
+
+### 9.3 `SpeedFormat` — una función pura nueva (con test, §10)
+
+```monkeyc
+// Target speed typed by the user -> tenths, the SAME integer domain shownTenths uses, so
+// TrendArrow.classify compares like with like (SPEC 9). The value is ALREADY in display
+// units (device paceUnits) by decision: no conversion. null / zero / negative mean "not
+// configured" -> null, and the caller falls back to the ride average.
+function targetTenths(value as Float or Number or Null) as Number or Null {
+    if (value == null) { return null; }
+    var f = value.toFloat();
+    if (f <= 0.0) { return null; }
+    return roundHalf(f * 10.0);
+}
+```
+
+### 9.4 `TrendArrowApp.mc` — pasa a reenviar settings (deja de ser mínimo)
+
+Reemplazar la clase completa por el patrón de B (`GradeVamApp.mc`):
+
+```monkeyc
+class TrendArrowApp extends Application.AppBase {
+
+    private var mView as TrendArrowView or Null = null;
+
+    function initialize() {
+        AppBase.initialize();
+    }
+
+    function getInitialView() {
+        mView = new TrendArrowView();
+        return [mView];
+    }
+
+    // Fired when the user saves app settings from the phone / Express. NOT fired by a
+    // device units change -- compute() re-reads paceUnits every tick for that.
+    function onSettingsChanged() as Void {
+        if (mView != null) {
+            mView.reloadSettings();
+        }
+        WatchUi.requestUpdate();
+    }
+}
+```
+
+(Actualizar también el comentario de cabecera del archivo, que hoy dice «v1 has NO settings».)
+
+### 9.5 `TrendArrowView.mc` — cambios exactos
+
+Agregar `import Toybox.Application;` a los imports.
+
+**Miembros nuevos** (junto a `mAvgPrefix`):
+
+```monkeyc
+private var mTargetPrefix as String = "GOAL";        // "Meta"/"Goal" uppercased (loaded once)
+private var mRefPrefix as String = "AVG";            // ACTIVE prefix: mAvgPrefix or mTargetPrefix
+private var mUseTarget as Boolean = false;           // referenceMode == 1
+private var mTargetTenths as Number or Null = null;  // pre-rounded target, null = not usable
+```
+
+**`initialize()`**: tras cargar `mAvgPrefix`, cargar `mTargetPrefix = (WatchUi.loadResource(Rez.Strings.TargetLabel) as String).toUpper();` y llamar `reloadSettings();` al final.
+
+**Funciones nuevas** (calco de B; `readNumber` es COPIA del de `GradeVamView.mc`):
+
+```monkeyc
+// Re-read the 2 app settings (called from initialize() and from TrendArrowApp.
+// onSettingsChanged()). Never called per-tick.
+function reloadSettings() as Void {
+    mUseTarget = (readNumber("referenceMode", 0) == 1);
+    mTargetTenths = SpeedFormat.targetTenths(readFloat("targetSpeed", 0.0));
+    // Active prefix: GOAL/META only when the target is actually usable; target mode with
+    // an unset/zero number silently behaves as average mode (SPEC 9.1).
+    mRefPrefix = (mUseTarget && mTargetTenths != null) ? mTargetPrefix : mAvgPrefix;
+    mCacheW = -1;   // prefix width changed -> force font/layout re-selection (B's idiom)
+}
+
+private function readNumber(key as String, dflt as Number) as Number {
+    var v = Application.Properties.getValue(key);
+    if (v instanceof Lang.Number) { return v; }
+    if (v instanceof Lang.Float) { return v.toNumber(); }
+    return dflt;
+}
+
+private function readFloat(key as String, dflt as Float) as Float {
+    var v = Application.Properties.getValue(key);
+    if (v instanceof Lang.Float) { return v; }
+    if (v instanceof Lang.Number) { return v.toFloat(); }
+    return dflt;
+}
+```
+
+**`compute()`** — el único cambio de lógica. Donde hoy dice
+
+```monkeyc
+mAvgStr = SpeedFormat.displayString(avgTenths);
+mBothStr = mCurStr + INLINE_SEP + mAvgStr;
+mArrowState = TrendArrow.classify(curTenths, avgTenths, DEAD_BAND_TENTHS);
+```
+
+pasa a
+
+```monkeyc
+// The reference the arrow AND the second line compare against: the fixed target when
+// configured and valid, else the ride average (silent fallback, SPEC 9.1). Same
+// DEAD_BAND_TENTHS in both modes (author's decision, 2026-07-26).
+var refTenths = (mUseTarget && mTargetTenths != null) ? mTargetTenths : avgTenths;
+mAvgStr = SpeedFormat.displayString(refTenths);
+mBothStr = mCurStr + INLINE_SEP + mAvgStr;
+mArrowState = TrendArrow.classify(curTenths, refTenths, DEAD_BAND_TENTHS);
+```
+
+(`mAvgStr`/`mAvgFont`/`mAvgBandH` CONSERVAN su nombre — ahora significan «la referencia»; documentarlo en el comentario del miembro y no renombrar, para que el diff sea mínimo.)
+
+**Los 4 usos de `mAvgPrefix` fuera de `initialize()` pasan a `mRefPrefix`** — hoy son exactamente estos, y ninguno más:
+
+1. `onUpdate()`, medición de la línea secundaria: `dc.getTextWidthInPixels(mAvgPrefix, mAvgUnitFont)` → `mRefPrefix`.
+2. `onUpdate()`, dibujo del prefijo de esa línea: `dc.drawText(ax, avgCy, mAvgUnitFont, mAvgPrefix, ...)` → `mRefPrefix`.
+3. `selectLabel()`, sufijo del label ancho: `var suffix = mIsWide ? (INLINE_SEP + mAvgPrefix) : "";` → `mRefPrefix` (el label ancho pasa a decir `VELOCIDAD / META` en modo objetivo).
+4. `fitUnitFont()`, reserva de ancho `withPrefix`: `dc.getTextWidthInPixels(mAvgPrefix, u)` → `mRefPrefix`.
+
+**Nada más cambia.** Ni fuentes, ni tamaños, ni centrado, ni la unidad apilada, ni el glifo/primitiva de la flecha (§6.6/§6.11): el prefijo activo entra en las mismas mediciones de siempre y el `mCacheW = -1` de `reloadSettings()` garantiza que la escalera se re-elija con el ancho del prefijo nuevo.
+
+**Anchos MEDIDOS de los prefijos (2026-07-26, probe headless en los dos devices), porque una versión anterior de esta spec afirmaba de más que «miden igual»:**
+
+| fuente | AVG | GOAL | PROM | META |
+|---|---|---|---|---|
+| `FONT_MEDIUM` (840) | 31 | **40** | 42 | 40 |
+| `FONT_XTINY` (840) | 19 | **25** | 26 | 24 |
+| `FONT_MEDIUM` (830) | 37 | **48** | 53 | 49 |
+| `FONT_XTINY` (830) | 18 | **23** | 26 | 25 |
+
+En **español** `META` es más angosto que `PROM`: el modo objetivo nunca aprieta más que el actual. En **inglés**, en cambio, `GOAL` es **6-9 px más ancho que `AVG`** (~30 %). **No hay desborde** —`fitUnitFont` reserva el prefijo ACTIVO, así que el grupo siempre entra— pero la consecuencia real y aceptada es que **en una celda angosta y en inglés el modo objetivo puede elegir un escalón de fuente menos que el modo promedio**. Es visible solo comparando los dos modos en la misma celda chica, y es preferible a recortar el rótulo.
+
+### 9.6 Casos borde (todos con comportamiento definido)
+
+| caso | comportamiento |
+|---|---|
+| modo objetivo, número 0 / negativo / nunca tocado | promedio, prefijo `PROM`/`AVG` — indistinguible del modo 0 |
+| el usuario cambia settings EN MEDIO de una actividad | `onSettingsChanged` → `reloadSettings` → efecto inmediato al siguiente tick |
+| cambia las unidades del device con objetivo fijado | el número se reinterpreta en la unidad nueva (decisión); la flecha sigue coherente porque actual y objetivo están ambos en décimas de display |
+| tipos raros desde GCM (Number donde Float, null) | `readNumber`/`readFloat` degradan al default, como en B |
+| objetivo válido pero sin GPS aún (`curTenths == null`) | `classify` ya devuelve NONE con null; el campo muestra `--` como hoy |
+
+### 9.7 Cómo probarlo sin salir a andar
+
+En el **simulador**: correr con F5 y editar los settings en caliente desde el menú del simulador (en el 9.2.0 es la opción que edita los *App Settings*; el nombre exacto del menú puede variar entre versiones del SDK — es la misma que se usó para probar los 4 settings de B, y dispara `onSettingsChanged` de verdad). Con `TEST_MODE = true` el generador converge la media a **20,0 km/h** (§11): fijar objetivo `25.0` → la flecha debe quedar ABAJO en todos los tramos salvo el de 30,0, y la segunda línea debe decir `META 25.0` fija; volver el modo a promedio → vuelve `PROM` y la línea se mueve. En **device real**: cambiar el setting desde Garmin Connect Mobile con el campo en pantalla y verificar que cambia sin reiniciar.
+
+**Criterios de aceptación:** los de siempre (§13) más: (1) suite verde incluido `testTargetTenths`; (2) export de los 17 targets sin warnings; (3) en el sim, el ciclo completo promedio→objetivo→promedio sin tocar F5; (4) el prefijo cambia también en el label del modo ancho.
+
+### 9.8 Estado: EN PRODUCCIÓN como v0.2.2 (2026-07-27)
+
+**Camino recorrido:** subido al **canal beta** como `v0.2.1` el 2026-07-26 (la `v0.2.0` quedó quemada:
+se exportó con `TEST_MODE = true` y el portal no permite reusar el número — ver `store/RELEASES.md`),
+**probado por el autor en el teléfono con una instalación real de la store** —lo único que el simulador
+no cubre— y **promovido a producción como `v0.2.2` el 2026-07-27** (tag `j-trend-arrow/v0.2.2` sobre
+`release`). El número salta de 0.2.1 a 0.2.2 porque el stream de versión es **único por app** y el
+código que fue a prod es más nuevo que el de la beta: trae además la migración al barrel (§3.4) y la
+flecha anclada a la baseline (§6.13).
+
+Todo lo de §9.2–§9.5 está escrito y verificado por CLI: **export de los 17 targets limpio** (solo el aviso conocido del Edge 1030 con CIQ 3.2.5) y **suite 12/12** (los 11 de antes + `testTargetTenths`). Los cuatro usos de `mAvgPrefix` que §9.5 listaba se reemplazaron y `mAvgPrefix` quedó únicamente en su carga desde recursos y en la línea que elige el prefijo activo.
+
+⚠️ **Consecuencia de este release en la FICHA del portal:** hasta la v0.2.2 la ficha publicada decía
+con razón «no hay nada que configurar / Nothing to configure», porque describía la v0.1.0. **Con los
+settings en producción esa viñeta pasa a ser falsa** en los dos idiomas y hay que reescribirla en el
+portal. Es trabajo de ficha, no de código, y no lo puede hacer el asistente.
+
+**Pendiente, y solo el autor puede hacerlo:** mirar el modo objetivo en una celda angosta **en
+inglés**, que es donde el `GOAL` más ancho puede bajar un escalón de fuente (criterio (4) de arriba).
+El (3), el paseo cambiando el setting en caliente, quedó cubierto con la prueba de la beta en el
+teléfono.
+
+### 9.8.1 El default es el PROMEDIO DE LA SALIDA (requisito duro, VERIFICADO end-to-end 2026-07-26)
+
+Una instalación nueva, o un usuario que nunca abre los ajustes, tiene que comportarse **exactamente
+como la v0.1.0**: flecha contra el promedio real de la salida. Se sostiene en cuatro capas
+independientes, y las cuatro apuntan al promedio:
+
+| Capa | Qué dice |
+|---|---|
+| `properties.xml` | `referenceMode` = **0**, `targetSpeed` = **0.0** |
+| `settings.xml` | el valor **0** es `RefAverage` (y es la PRIMERA entrada de la lista) |
+| `reloadSettings()` | `readNumber("referenceMode", 0)` → el fallback si la clave no se puede leer **también** es 0 |
+| inicializadores de miembro | `mUseTarget = false`, `mTargetTenths = null`, `mRefPrefix = "AVG"` |
+
+Y hay una quinta red: `targetSpeed` = 0.0 → `targetTenths` devuelve `null` → aun con el modo en
+objetivo, la condición `mUseTarget && mTargetTenths != null` es falsa y la referencia vuelve al
+promedio. O sea: **para salir del promedio hacen falta las DOS cosas** (modo en objetivo *y* un número
+> 0), lo cual es justamente la degradación silenciosa de §9.6.
+
+**El default de `properties.xml` es de PRIMERA INSTALACIÓN, no un valor que se reimponga.** Se usa
+solo cuando la propiedad todavía no existe; una vez que hay un valor guardado, ese manda y cambiar el
+XML no lo pisa. Evidencia directa: borrando el `.SET` del simulador, la corrida siguiente volvió a
+leer `0` (probado abajo); la otra mitad (que un valor existente le gana a un XML nuevo) sale del foro
+y es coherente con eso. **Para los usuarios juega a favor:** quien viene de la v0.1.0 no tiene ningún
+valor guardado para estas claves → al actualizar le aplica el default = promedio.
+
+⚠️ **Corolario para depurar:** si el simulador muestra el modo objetivo "sin motivo", lo primero es
+mirar si hay un valor guardado de una prueba anterior — el XML ya no manda. Se limpia borrando el
+`.SET` (se regenera con los defaults). Y **la fuente de verdad de en qué modo está la app NO es el
+formulario del editor** (lo renderiza un servidor de Garmin y esa zona tiene bugs reportados con las
+entradas de lista), **es el prefijo de la segunda línea en pantalla**: `PROM` = promedio, `META` =
+objetivo.
+
+**Verificado atravesando la plataforma, no leyendo el XML** (2026-07-26): se borró el `.SET` del
+simulador para forzar una instalación limpia y un probe `(:test)` temporal leyó
+`Application.Properties.getValue` de verdad → `referenceMode=0`, `targetSpeed=0.000000`,
+`targetTenths=null`, y además `new TrendArrowView()` + `onUpdate()` pintó sin excepción con esos
+defaults. El probe se borró después (misma técnica de §11.1).
+
+⚠️ `Application.Properties.getValue` **lanza excepción** si la clave no existe, y estos lectores no
+usan `try/catch` — a propósito: es el mismo patrón que `GradeVamView` de la Opción B (líneas 162/169),
+y las claves están garantizadas porque se compilan dentro del `.prg` desde `properties.xml`. No
+divergir de B acá sin motivo.
+
+### 9.9 Cómo se prueban estos settings (VERIFICADO 2026-07-26)
+
+Tres caminos, y el orden importa porque **solo el primero es completo**.
+
+**1. Simulador — SÍ, es el camino real.** Dos piezas distintas, en dos menús distintos (verificado
+2026-07-26 inspeccionando las cadenas del binario `ConnectIQ.app/Contents/MacOS/simulator`):
+
+- **`File > App Settings Editor`** — el formulario. Sus controles son `Select an app` + `Language`
+  (⚠️ el selector de idioma es lo que permite probar `META` vs `GOAL` sin cambiar el device) y los
+  botones `Close`/`Save`, con `Settings Saved` al confirmar. Lee el schema del
+  `<app>-settings.json` que genera el compilador (existe ya: `bin/test-settings.json`, con las 2
+  claves, los `configMin/configMax` y los strings de los dos idiomas); si no lo encuentra dice
+  *"No settings file found for this app. This app may not have settings."*
+- **`Simulation > Trigger App Settings`** — dispara el evento de settings sin reiniciar la app, o sea
+  lo que ejercita `onSettingsChanged()` → `reloadSettings()` (§9.6). Vive entre `Force onHide` /
+  `Trigger Goal` / `Set Weather`. Al lado hay un `Timeout App Settings` (simula que el push falla).
+
+⚠️ **El editor es SERVER-BACKED, no local** — hallazgo que conviene saber antes de perder tiempo: el
+binario postea a `https://<host>.garmin.com/<...>/appSettings2/sdk/input` con un
+`Authorization: Bearer`, y tiene el error *"Unable to get Connect credentials. Please log in to the
+Connect IQ SDK Manager."* → **hace falta internet y estar logueado en el SDK Manager** con la cuenta
+de Garmin. Es el mismo backend que renderiza el formulario del teléfono, y explica por qué el
+formulario no acepta markdown y por qué el schema tiene tan pocos atributos (§9.10).
+
+Los valores quedan en un archivo `.SET` en el sandbox del simulador:
+
+```
+/var/folders/.../T/com.garmin.connectiq/GARMIN/APPS/SETTINGS/<NOMBRE>.SET
+```
+
+(en esta máquina ya existen `J-TEST.SET` y `B-TEST.SET`; se localizan con
+`find /var/folders -name "*.SET"`). Formato: magic `abcdabcd`, la lista de claves en texto plano
+(`targetSpeed`, `referenceMode`), magic `da7ada7a`, y los valores.
+⚠️ **El nombre del `.SET` NO sale del nombre del `.prg`:** probado el 2026-07-26 corriendo un
+`ZZPROBE.prg` — escribió `J-TEST.SET`, no `ZZPROBE.SET`. El simulador mapea por app, no por archivo.
+
+**2. Sideload + teléfono → NO SE PUEDE (RESUELTO con un canal beta, 2026-07-26).** Los settings de una app sideloadeada **no** se pueden
+editar desde Garmin Connect Mobile ni desde Garmin Express: el mecanismo de settings cuelga del
+vínculo con la Connect IQ Store, y el sideload nunca establece ese vínculo. Es limitación de
+plataforma, no un bug nuestro. Como J **ya está publicada** (v0.1.0, canal producción), la vía
+soportada es subir la versión con settings a la store e instalarla desde ahí: recién entonces
+aparecen los ajustes en el teléfono. **Decisión tomada el 2026-07-26:** para no gastar una ronda de
+review por iteración contra la ficha publicada, J estrena el desdoblamiento de ids de la Opción A —
+id **beta** `f70f3c984e4c43d496006628f3510817` en `main` (entrada del portal **sin publicar**, se
+instala por el link de `apps.garmin.com` + Connect Mobile) e id **prod**
+`140986d8c6bc4026880e117255a6ce67` pinneado en `release`. Los dos ids, el riesgo del merge y el
+procedimiento están en `store/RELEASES.md` y en `CLAUDE.md`.
+
+✅ **El canal beta hizo exactamente su trabajo** (cerrado el 2026-07-27): el autor instaló la
+`v0.2.1` desde el link de `apps.garmin.com`, editó los settings desde el teléfono y confirmó que el
+formulario real llega al device — la única verificación que ni el simulador ni el sideload podían dar.
+Con eso los settings se promovieron a producción; el estado actual está en §9.8. El párrafo de arriba
+queda como el registro de por qué existe el desdoblamiento de ids, que sigue vigente para la próxima
+iteración.
+
+⚠️ **Y antes de exportar el `.iq`: `TEST_MODE` en `false`.** Con `TEST_MODE = true` un build de
+release compila limpio pero muestra `--` eternamente (el generador sintético es `(:debug)` y el stub
+`(:release)` devuelve nulls). Pasó con el primer `.iq` beta de la v0.2.0. El workaround que documenta Garmin es copiar a mano el `.SET`
+del simulador a `GARMIN/APPS/SETTINGS/` del device por OpenMTP — **probado y descartado**: un
+`Properties.setValue` desde un probe headless se lee bien dentro de la misma corrida pero **no llega
+al `.SET` en disco** (el simulador no vuelca sin que la app termine bien), y aparte (el
+nombre que espera el firmware del device no está confirmado; si el prefijo sale mal, la app
+simplemente sigue con los defaults, así que el costo de probar es bajo y se nota al toque porque el
+prefijo de la línea secundaria pasa de `PROM` a `META`).
+
+**Receta concreta con `TEST_MODE = true`** (el perfil sintético promedia exactamente 20,0 km/h):
+poner el objetivo en **25,0** y no en 20 — contra 25 la flecha solo apunta arriba en el segmento de
+30 km/h, así que el patrón cambia de forma OBVIA respecto del modo promedio y se ve que la referencia
+cambió de verdad. Segunda señal independiente: la línea de abajo queda **clavada** (un objetivo no se
+mueve) mientras que el promedio deriva. Y para ver la cuantización de §9.10, tipear **22.37** → la
+pantalla tiene que decir **22.4**.
+
+**3. Para validar en el 840 solamente el RENDER del modo objetivo** (que `META`/`GOAL` entre y no
+desborde) no hacen falta settings: alcanza un hook `(:debug)` que clave `mUseTarget = true` y
+`mTargetTenths`, del mismo modo que `TEST_MODE`, y sideloadear ese `.prg`. Separa la pregunta
+"¿se ve bien?" (device) de la pregunta "¿el setting llega?" (simulador).
+
+### 9.10 El decimal del objetivo: por qué la UI no lo puede forzar
+
+**Decidido: 1 decimal.** Pero el schema de settings **no puede exigirlo**. La autoridad es
+`resources.xsd` del SDK (verificado 2026-07-26): `settingConfigType` acepta **solo** los atributos
+`type`, `readonly`, `required`, `min`, `max`, `maxLength`, `errorMessage`. **No existe `step` ni
+`decimals`** — un `type="numeric"` acepta cualquier float dentro de `min`/`max`, así que el usuario
+puede tipear `22.37`.
+
+Lo resuelve el código, que ya está implementado y es la razón por la que `targetTenths` existe:
+cuantiza a décimas (`roundHalf(v*10)`) y **la línea secundaria muestra el valor cuantizado**, así que
+lo que se ve en pantalla es siempre exactamente contra lo que compara la flecha (`22.37` → muestra
+`22.4` → compara 224 décimas). El título del setting lo dice: *"Target speed, 1 decimal"*.
+
+La única forma de que la UI misma imponga el decimal sería un `type="list"` con las entradas
+enumeradas (p. ej. 10,0 → 40,0 de a 0,5 = 61 entradas) — **descartado**: cuesta 61 strings, limita el
+rango y no aporta nada sobre la cuantización, que es exacta igual. **Tampoco se escribe de vuelta** el valor cuantizado a la
+propiedad, y esto se evaluó con evidencia (2026-07-26) porque es lo primero que uno quiere hacer:
+
+- *Escribirlo* funciona: `Properties.setValue` sobre una clave que YA es un setting declarado persiste
+  en el device (confirmado por un ingeniero de Garmin en el foro y verificado en hardware por quien
+  reportó — el matiz de ese hilo es que en el SIMULADOR no persiste sin matar la app con Ctrl-K).
+- *Verlo al reabrir los ajustes en el teléfono* NO funciona: hay un bug abierto que describe
+  exactamente este caso (la app corrige el valor en el device, el teléfono sigue mostrando el que
+  tipeó el usuario). Respuesta de Garmin: *"We are currently trying to see if there's an issue with
+  GCM receiving information"*. Guardar transfiere los valores solo HACIA el reloj, no de vuelta.
+- Modo de fallo peor (inferencia a partir de ese hilo, NO verificado): si el teléfono conserva
+  `10.27` cacheado y el usuario después toca el OTRO setting, al guardar empuja su bundle entero y
+  revive el `10.27`, pisando nuestro `10.3` → el número iría y vendría solo.
+
+Por eso el redondeo queda del lado del device y no se reescribe: **la pantalla del Edge ya muestra el
+valor cuantizado** con prefijo `META`/`GOAL`, que es el único lugar donde el ciclista lo mira. Lo que
+queda desalineado es el formulario del teléfono, y eso no está en nuestras manos arreglarlo de forma
+confiable.
 
 ## 10. Unit tests (obligatorio — convención del repo desde 2026-07-19)
 
@@ -664,6 +1288,26 @@ function testUnitLabel(logger as Test.Logger) as Boolean {
 }
 ```
 
+**`SpeedFormatTest.mc` — caso nuevo para la referencia configurable (§9.3):**
+
+```monkeyc
+(:test)
+function testTargetTenths(logger as Test.Logger) as Boolean {
+    Test.assertEqualMessage(SpeedFormat.targetTenths(25.0), 250, "25.0 -> 250 tenths");
+    // 22.25 is exact in binary: 22.25*10 = 222.5 exactly -> half away from zero -> 223.
+    // Do NOT use values like 22.35 here: they are not representable and the test would
+    // hinge on float noise.
+    Test.assertEqualMessage(SpeedFormat.targetTenths(22.25), 223, "22.25 -> 223 (half away)");
+    Test.assertEqualMessage(SpeedFormat.targetTenths(15), 150, "integer Number accepted");
+    Test.assertMessage(SpeedFormat.targetTenths(0.0) == null, "0 -> null (not configured)");
+    Test.assertMessage(SpeedFormat.targetTenths(-5.0) == null, "negative -> null");
+    Test.assertMessage(SpeedFormat.targetTenths(null) == null, "null -> null");
+    return true;
+}
+```
+
+La elección de referencia en sí (`refTenths = objetivo o promedio`) vive en `compute()` — View fina, no testeable por convención (§3); por eso el fallback se prueba desde la función pura (`0 → null`) más el paseo del simulador de §9.7.
+
 ## 11. Hooks de debug para el simulador (patrón A §13 / B §9 — obligatorio)
 
 - **`TEST_MODE`** (`const false` plano): con `true` + build DEBUG, `compute()` consume un generador sintético `(:debug)`. **Perfil de velocidad con decimales** (tabla de tramos, MÁS SIMPLE que la de B porque no hace falta simular ruido — Tier 1 no tiene pipeline de suavizado):
@@ -755,3 +1399,46 @@ Tres conclusiones, ninguna obvia de antemano:
 - Glifos de `FONT_SYSTEM_NUMBER_*`: verificación propia en device (edge840, 2026-07-23, ver §2) + foro Garmin (developer "Travis.ConnectIQ", "Font Specifications", discusión 251679 — fenix5xplus/vivoactive4s, no Edge, pero consistente).
 - Patrones heredados: [`apps/a-activity-timer/SPEC.md`](../a-activity-timer/SPEC.md) §5.3/6 (escalera de fuentes + caché de un solo valor, `LABEL_MIN_H`), [`apps/b-grade-vam/SPEC.md`](../b-grade-vam/SPEC.md) §6.5 (primitivas `dc` para íconos/flechas, gotcha de `fillPolygon`), §9 (hooks de debug), §10 (convención de tests).
 - Spec maestra: [`GARMIN_MTB_SPEC.md`](../../GARMIN_MTB_SPEC.md) §4 Opción J (contexto de producto, tiers de métrica, decisión de prioridad).
+
+### 6.14 El label era la mitad de grande de lo que debía en la familia bitmap (MEDIDO Y CORREGIDO 2026-07-27)
+
+El autor, mirando el 830, preguntó si "las fuentes se ven peor" y si era lo mejor que se podía hacer.
+La respuesta son **dos mitades distintas**, y confundirlas habría llevado a contestar "es limitación de
+la plataforma" cuando la mitad no lo era:
+
+**Mitad que NO es nuestra (nada que hacer).** Las fuentes del sistema son archivos distintos por
+familia. Medido contando tonos de gris dentro de la caja de los dígitos, en las capturas del autor:
+
+| | tonos distintos en los dígitos | valores |
+|---|---|---|
+| **830** (bitmap `.cft`) | **4** | `0`, `82`, `164`, `255` — cuartos exactos, o sea **2 bits por píxel** |
+| **840** (TTF) | **32** | rampa continua `0, 8, 15, 24, 32, 42, …` → antialias de 8 bits |
+
+Las dos pantallas son 246×322, así que **no es la resolución**. Y el `simulator.json` del edge830
+declara que su campo NATIVO usa `data.font = numberThaiHot`: **la misma fuente que pedimos nosotros**,
+o sea que el nativo se ve igual de duro. Meter una fuente propia (CIQ lo permite) costaría memoria en
+cada `.prg` y **dejaría de parecerse al nativo**, que es el objetivo del proyecto → descartado.
+
+**Mitad que SÍ era nuestra (bug).** `FONT_GLANCE` **no existe en la familia bitmap y resuelve en
+silencio a la fuente más chica**: en el edge830 tiene las mismas métricas que `FONT_XTINY` hasta el
+píxel (a=10 d=3 h=13), mientras `FONT_SMALL` es a=17. En el 840, en cambio, `FONT_GLANCE` es a=15 —
+más grande que `FONT_MEDIUM`. Como `selectLabel` arrancaba en `FONT_GLANCE` y solo podía BAJAR por la
+escalera, el label quedaba clavado en ascent 10 en **6 de los 13 devices**… y el mismo
+`simulator.json` dice que el nativo de ese device usa `label.font = small`. O sea que nuestro título
+era ~40 % más chico que el nativo, en la mitad de la flota.
+
+**Arreglo (`labelBaseFont()`, en el barrel → J y K a la vez):** quedarse con **el mayor entre
+`FONT_GLANCE` y `FONT_SMALL`, midiendo el ascent en runtime**. Arregla la familia entera sin nombrar
+un solo device (el idioma que ya usa la detección del glifo) y en la familia TTF no cambia nada
+(15 > 12 → sigue `GLANCE`).
+
+**Verificado con el probe headless de §11.1 antes de darlo por bueno**, porque un label más alto le
+come banda al número: en las 6 celdas típicas × 830 y 840, **ningún valor bajó un escalón de fuente**
+(830 125×62 y 244×125 conservan `42/32/10` y `70/53/17`; el 840 quedó byte por byte igual, labelF 15 /
+labelH 21). El único cambio extra: en la celda de 82 px de ancho el label degrada de `VELOCIDAD` a
+`VEL` — que es la escalera de degradación prevista y lo que hace el nativo. Probado también en
+edge530, edge1030 y edgeexplore2 (el resto de la familia): sin sorpresas.
+
+**Técnica reutilizable:** `~/Library/Application Support/Garmin/ConnectIQ/Devices/<device>/simulator.json`
+declara, por device, **qué fuente usa el campo NATIVO** (`layouts…datafields…data.font` y
+`label.font`). Es la forma barata de saber contra qué hay que parecerse, sin captura y sin device.

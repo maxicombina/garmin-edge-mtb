@@ -69,6 +69,21 @@ module SpeedFormat {
         return sign + whole.toString() + "." + dec.toString();
     }
 
+    // Target speed typed by the user -> tenths, the SAME integer domain shownTenths returns, so
+    // TrendArrow.classify compares like with like (SPEC 9.3). The value is ALREADY in display
+    // units (the device's paceUnits) by decision: no conversion happens anywhere. null, zero or
+    // negative all mean "not configured" -> null, and the caller falls back to the ride average.
+    function targetTenths(value as Float or Number or Null) as Number or Null {
+        if (value == null) {
+            return null;
+        }
+        var f = value.toFloat();
+        if (f <= 0.0) {
+            return null;
+        }
+        return roundHalf(f * 10.0);
+    }
+
     function unitLabel(statute as Boolean) as String {
         return statute ? "MPH" : "KM/H";
     }

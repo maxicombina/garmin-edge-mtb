@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<!--
+  Connect IQ manifest for the k-cadence-trend data field (Option K).
+
+  This id is K's OWN beta id: a separate app in the store from every other option. A data field's
+  settings and its slot on screen belong to the APP, so cadence had to be its own app rather than a
+  setting of Option J : otherwise you could not show speed and cadence at the same time, which is
+  the whole point.
+
+  Production submission uses the release-branch flow (see repo CLAUDE.md). NEVER edit this id with
+  the visual manifest editor (it reformats the XML). Edit by hand.
+
+  It depends on the TrendCore barrel for the classifier and the render engine, by SOURCE (see
+  monkey.jungle) so there is no separate build step.
+-->
+<iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
+    <iq:application
+        id="245d380378fd4d208ea89989b8b337a7"
+        type="datafield"
+        name="@Strings.AppName"
+        entry="CadenceTrendApp"
+        minApiLevel="3.3.0"
+        launcherIcon="@Drawables.LauncherIcon">
+        <iq:products>
+            <iq:product id="edge530"/>
+            <iq:product id="edge540"/>
+            <iq:product id="edge830"/>
+            <iq:product id="edge840"/>
+            <iq:product id="edge550"/>
+            <iq:product id="edge850"/>
+            <iq:product id="edge1030"/>
+            <iq:product id="edge1030bontrager"/>
+            <iq:product id="edge1030plus"/>
+            <iq:product id="edge1040"/>
+            <iq:product id="edge1050"/>
+            <iq:product id="edgeexplore2"/>
+            <iq:product id="edgemtb"/>
+        </iq:products>
+        <iq:permissions/>
+        <iq:languages>
+            <iq:language>eng</iq:language>
+            <iq:language>spa</iq:language>
+        </iq:languages>
+        <iq:barrels>
+            <iq:depends name="TrendCore" version="0.1.0"/>
+        </iq:barrels>
+    </iq:application>
+</iq:manifest>

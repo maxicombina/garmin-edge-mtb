@@ -113,6 +113,8 @@
   .mod .name { font-family: var(--font-mono); font-weight: 700; font-size: 0.9rem; }
   .mod .pure { display: inline-block; font-size: 0.62rem; letter-spacing: 0.08em;
     text-transform: uppercase; color: var(--up); font-weight: 700; margin-left: 6px; }
+  .mod .shared { display: inline-block; font-size: 0.62rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--accent-ink); font-weight: 700; margin-left: 6px; }
   .mod .role { font-size: 0.84rem; color: var(--ink-soft); margin-top: 4px; }
 
   /* pipeline / steps */
@@ -196,25 +198,33 @@
 
   <section>
     <div class="wrap">
-      <h2>La arquitectura: dos módulos puros y una vista fina</h2>
+      <h2>La arquitectura: lo propio y lo prestado</h2>
       <p>
         Como en la A y la B, <strong>toda la lógica vive en módulos puros y testeables</strong> — sin
         <code>Dc</code>, sin <code>Activity.Info</code>, sin estado del device. La <code>View</code> es un
-        wrapper fino que lee, formatea y dibuja. Pero acá hay <strong>mucho menos que orquestar</strong>:
-        no hay buffer de muestras ni pipeline de suavizado (eso era necesario en la B porque calculaba
-        pendiente y VAM desde cero; acá la métrica y su promedio llegan hechos).
+        wrapper fino que lee, formatea y delega el dibujo. Y acá hay <strong>mucho menos que
+        orquestar</strong>: no hay buffer de muestras ni pipeline de suavizado (eso era necesario en la B
+        porque calculaba pendiente y VAM desde cero; acá la métrica y su promedio llegan hechos).
+      </p>
+      <p>
+        La otra mitad del mapa <strong>ya no vive en esta app</strong>. El clasificador y el motor de
+        render se extrajeron a un <em>barrel</em> —el mecanismo de librería de Monkey C— para compartirlos
+        con la Opción K (cadencia) y la futura L (frecuencia cardíaca). La sección siguiente cuenta por
+        qué y cómo se comprobó que no cambió un píxel.
       </p>
       <div class="modmap" style="margin-top:16px">
-        <div class="mod"><span class="name">TrendArrow</span><span class="pure">puro</span>
+        <div class="mod"><span class="name">TrendCore.TrendArrow</span><span class="shared">barrel</span>
           <div class="role">Dos enteros ya redondeados → <code>UP</code> / <code>NONE</code> / <code>DOWN</code>. No sabe de qué métrica.</div></div>
+        <div class="mod"><span class="name">TrendCore.TrendRenderer</span><span class="shared">barrel</span>
+          <div class="role">El motor de render: mide la celda, elige fuentes, dibuja. No sabe qué métrica dibuja.</div></div>
         <div class="mod"><span class="name">SpeedFormat</span><span class="pure">puro</span>
-          <div class="role">m/s → km/h o mph, redondeo, y el string <code>"24.3"</code>.</div></div>
+          <div class="role">m/s → km/h o mph, redondeo, y el string <code>"24.3"</code>. Propio de la velocidad.</div></div>
         <div class="mod"><span class="name">TrendArrowView</span>
-          <div class="role">Wrapper fino NO testeable: lee, formatea, dibuja el valor + flecha + media.</div></div>
+          <div class="role">225 líneas: lee, formatea, pasa los valores al motor. <strong>Cero layout.</strong></div></div>
         <div class="mod"><span class="name">TrendArrowApp</span>
-          <div class="role">AppBase: entrega la View. Sin settings → ni siquiera <code>onSettingsChanged</code>.</div></div>
+          <div class="role">AppBase: entrega la View y le reenvía <code>onSettingsChanged</code> (desde la v0.2.x).</div></div>
         <div class="mod"><span class="name">TestUtil</span>
-          <div class="role">Helpers de test (copia propia — nada se comparte entre apps).</div></div>
+          <div class="role">Helpers de test. Sigue siendo copia propia: el barrel tiene la suya, namespaceada.</div></div>
       </div>
       <p style="margin-top:16px">
         Lo que cada segundo pasa por <code>compute()</code> es literalmente: leer las unidades del device,
@@ -227,6 +237,55 @@
         <li><b>Comparar</b> los dos enteros → ▲/▼/nada (<code>TrendArrow.classify</code>).</li>
         <li><b>Formatear</b> los strings de display; <code>onUpdate()</code> solo dibuja.</li>
       </ol>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>El motor se fue a un barrel, y lo decidió el costo</h2>
+      <p>
+        El repo tiene una regla de años: <strong>nada se comparte entre apps salvo documentación</strong>,
+        y si aparece código común se decide explícitamente. Esa decisión se tomó una sola vez, y fue por
+        esta app.
+      </p>
+      <p>
+        Cuando llegó la Opción K —la misma flecha, sobre la cadencia— quedó claro que era
+        <strong>el mismo campo con otra métrica</strong>. El motor de render de la J eran ~840 líneas
+        afinadas durante días contra el campo nativo del Edge; triplicarlo significaba arreglar cada bug
+        tres veces. Así que se montó <code>barrels/trend-core/</code> con el clasificador y el motor, y K
+        se construyó encima. <strong>La J, en cambio, se dejó sin migrar a propósito</strong>, para no
+        tocar una app publicada.
+      </p>
+      <p>
+        <strong>Duró un día.</strong> El primer bug del motor —la flecha desalineada, más abajo— hubo que
+        arreglarlo en las dos copias, y con dos iteraciones fueron <strong>cuatro ediciones
+        duplicadas</strong>. Ahí la J se migró: se le borraron el clasificador y el motor, y su View pasó
+        de <strong>858 líneas a 225</strong>, sin una sola línea de layout.
+      </p>
+      <div class="note">
+        <p><strong>Lo que vale de esta migración es cómo se verificó, no el resultado.</strong> Es una app
+        <em>publicada</em>: «no debería cambiar nada» no alcanzaba. Antes de borrar la copia se compararon
+        <strong>las 13 funciones del motor cuerpo a cuerpo</strong> contra las del barrel, normalizadas —
+        comentarios fuera, espacios colapsados y aplicados los renombres (<code>mAvgFont</code> →
+        <code>mRefFont</code>, <code>VALUE_TPL</code> → <code>mValueTpl</code>, <code>"--"</code> →
+        <code>NO_DATA</code>). Las 13 salieron <strong>idénticas carácter por carácter</strong>. Eso
+        convierte una impresión en un hecho verificable, y la técnica sirve cada vez que haya que
+        reconciliar dos copias de algo.</p>
+      </div>
+      <p>
+        Un diff textual no detecta lo otro que puede romperse: un <strong>cableado faltante</strong> — que
+        el motor esté completo pero la app se olvide de pasarle la unidad, por ejemplo. Para eso, un probe
+        sin pantalla instanció la View real sobre un <code>BufferedBitmap</code> en 6 tamaños de celda y en
+        los dos devices, e imprimió lo que el motor <em>eligió</em>. Reprodujo exactamente lo que ya se
+        había medido en las capturas del autor, celda por celda.
+      </p>
+      <p>
+        Detalle del barrel que conviene saber si se lo va a tocar: <strong>todo lo que hay adentro debe
+        vivir en su namespace</strong> —tests incluidos, o el compilador lo rechaza—, sus tests
+        <strong>corren desde cada app que lo consume</strong>, y el hook de medición del motor
+        (<code>debugSummary</code>) es <strong>público y sin anotación</strong> a propósito: un barrel no
+        puede depender de las exclusiones <code>(:debug)</code> de quien lo usa.
+      </p>
     </div>
   </section>
 
@@ -270,7 +329,8 @@
         actual-vs-media, igual que el número — así que va <strong>pegada al valor</strong>, como en el Cateye.
         Se dibuja con primitivas <code>dc</code>: la cobertura del carácter flecha no está garantizada en los
         13 devices, y eso se acabó verificando a fondo — con un resultado más raro de lo esperado, más abajo.
-        La de subir se reusa tal cual de la B; la de bajar es su <strong>espejo vertical exacto</strong>:
+        La de subir se reusa tal cual de la B; la de bajar es su <strong>espejo vertical exacto</strong>
+        (las dos viven hoy en el barrel, compartidas con la K):
       </p>
       <pre class="code"><span class="cm">// cabeza triangular (fillPolygon) + astil (fillRectangle)</span>
 <span class="k">function</span> drawUpArrow(dc, x0, cyMid, w, h) {
@@ -339,10 +399,26 @@
       </div>
       <p style="margin-top:16px">
         Los aprendizajes de fuentes de A/B se heredan tal cual: <code>FONT_SYSTEM_NUMBER_*</code> para los
-        dígitos, <code>FONT_GLANCE</code> para el label, y el centrado óptico por <code>descent/2</code> (las
-        fuentes numéricas reservan un descendente que los dígitos no usan). La unidad <strong>no</strong> va en
-        el label: se dibuja como el campo nativo, un <code>km</code> sobre una <code>h</code> a la derecha del
-        número, con la <code>h</code> apoyada en la misma línea base que los dígitos.
+        dígitos y el centrado óptico por <code>descent/2</code> (las fuentes numéricas reservan un
+        descendente que los dígitos no usan). La unidad <strong>no</strong> va en el label: se dibuja como el
+        campo nativo, un <code>km</code> sobre una <code>h</code> a la derecha del número, con la
+        <code>h</code> apoyada en la misma línea base que los dígitos.
+      </p>
+      <div class="note">
+        <p><strong>El label sí cambió, y por un motivo que vale contar.</strong> Durante meses se pidió
+        <code>FONT_GLANCE</code>, como en la A. Pero <strong>esa fuente no existe en la familia de
+        bitmaps</strong> (6 de los 13 devices) y ahí resuelve <em>en silencio</em> a la más chica que hay:
+        en el edge830 tiene las métricas exactas de <code>FONT_XTINY</code>, mientras
+        <code>FONT_SMALL</code> es un 70 % más grande — y el campo <em>nativo</em> de ese device usa
+        <code>small</code>, que es literalmente lo que declara su <code>simulator.json</code>. O sea que
+        nuestro título salía un 40 % más chico que el nativo en la mitad de los devices, sin error, sin
+        warning y sin que nadie lo pidiera. El arreglo no nombra un solo modelo: se queda con
+        <strong>el mayor entre <code>GLANCE</code> y <code>SMALL</code>, midiendo en runtime</strong> — la
+        familia TTF conserva <code>GLANCE</code> y nada cambia ahí.</p>
+      </div>
+      <p>
+        Todo eso —la escalera, el caché, el label, la unidad— vive hoy en el barrel, así que la K y la L lo
+        reciben hecho y afinado.
       </p>
     </div>
   </section>
@@ -427,25 +503,183 @@
 
   <section>
     <div class="wrap">
+      <h2>Centrar la flecha con los dígitos es imposible</h2>
+      <p>
+        Y no en el sentido de «difícil»: en el sentido de que <strong>la plataforma no expone el dato que
+        haría falta</strong>. Se llegó ahí en tres iteraciones, cada una empezada por el autor mirando una
+        captura, y las tres midiendo esas capturas píxel a píxel en vez de discutirlas a ojo.
+      </p>
+      <ol class="flow">
+        <li><b>«La flecha está más arriba que los números.»</b> Medido: <strong>4,5 px</strong> reales. La
+            causa era que la rama del <em>glifo</em> dibuja texto centrado verticalmente, o sea que centra la
+            <em>caja</em> de la fuente — y el glifo nunca pinta el descendente de esa caja, así que su tinta
+            flotaba media caja hacia arriba. Arreglo de una línea.</li>
+        <li><b>Con el arreglo puesto, una captura con 7 celdas de distintos tamaños:</b> seis quedaron a
+            0,5 px y <strong>la grande seguía a 4,5</strong>. El objetivo mismo estaba mal: llevaba un
+            término que <em>escala con la fuente</em> (4 px en una, 7 en la más grande) y en la celda de 62 px
+            se cancelaba <strong>por casualidad</strong>. Eso también refutó algo que yo había afirmado —«la
+            otra rama estaba bien»—: estaba bien <em>en esa celda</em>.</li>
+        <li><b>Tercera captura, ahora en el 830</b> (la otra familia de fuentes): ahí la flecha se veía
+            <strong>baja</strong>. Y el probe de métricas cerró el tema con el dato que faltaba.</li>
+      </ol>
+      <p style="margin-top:18px">
+        El dato es este: <strong>los dígitos no llenan su <code>ascent</code>, y cuánto lo llenan cambia
+        según la familia de fuentes</strong> — 0,79 en el 840 (TTF) y 0,91 en el 830 (bitmaps). O sea que la
+        altura histórica de la flecha, 4/5 del ascent, <em>coincidía por casualidad</em> con el alto de la
+        tinta en una familia y en la otra quedaba 4 px corta. <strong>No era posición: era altura.</strong>
+      </p>
+      <div class="note">
+        <p><strong>Y ese alto de tinta no lo da ninguna API</strong> ni se puede derivar: en las dos familias
+        <code>ascent + descent = height</code>, no hay ninguna señal que las distinga. Así que toda constante
+        para «centrar con la tinta» es un número horneado de una captura de un device — se probaron dos, y
+        cada una falló en la otra familia. Lo que sí es exacto y consultable es que <strong>la tinta de los
+        dígitos TERMINA en la baseline</strong>, verificado en las dos familias.</p>
+      </div>
+      <p>
+        Decisión del autor, entonces: <strong>la flecha se apoya en la baseline</strong>, como la unidad. Se
+        implementa anclando la <em>banda</em> del adorno —<code>[baseline − alto, baseline]</code>— y dejando
+        que cada rama la llene a su manera: la <strong>primitiva la llena</strong>, con su base exacta en los
+        pies de los dígitos en cualquier fuente; el <strong>glifo va centrado dentro</strong> de la banda, no
+        apoyado. Esa asimetría no es un descuido: el glifo está topado en <code>FONT_LARGE</code>, así que en
+        una celda grande mide la mitad que los dígitos y apoyarlo lo habría hundido 13 px, como un subíndice
+        — se detectó calculándolo <em>antes</em> de que el autor lo viera.
+      </p>
+      <p>
+        El resultado que más me gusta es lo que <em>se fue</em>: <strong>las dos constantes de ajuste
+        vertical de la flecha se borraron</strong>. No quedó perilla que afinar, porque no hay nada que
+        adivinar.
+      </p>
+      <div class="cards">
+        <div class="card">
+          <h3>La lección de método</h3>
+          <p>Un defecto de alineación puede ser <strong>asimétrico por tamaño de celda y por familia de
+             fuentes a la vez</strong> — o sea invisible si validás en una celda de un device. Hay que pedir
+             capturas <strong>con varios tamaños y en los dos devices</strong>: las de 7 celdas encontraron en
+             dos intentos lo que una celda nunca iba a encontrar.</p>
+        </div>
+        <div class="card">
+          <h3>Las capturas se miden</h3>
+          <p>Convertirlas y medir la tinta con numpy da centros al medio píxel. Contra las métricas reales de
+             las fuentes (leídas con un probe sin pantalla) las cuentas cierran, y el diagnóstico deja de ser
+             una opinión sobre una imagen.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <section>
+    <div class="wrap">
+      <h2>La referencia, configurable</h2>
+      <p>
+        La v0.1.0 comparaba siempre contra el promedio de la salida. Ahora se puede elegir: <strong>promedio
+        real</strong> o <strong>una velocidad objetivo fija</strong> que define el usuario. Con objetivo, el
+        campo cambia de significado — deja de informar y pasa a marcar ritmo: la flecha dice
+        <em>vas por encima / por debajo de lo que te propusiste</em>.
+      </p>
+      <p>
+        Lo interesante es <strong>lo poco que hubo que tocar</strong>. <code>TrendArrow.classify</code> recibe
+        dos enteros y no sabe qué representan: se diseñó genérico el primer día, sin un caso de uso a la vista.
+        Esa decisión se cobró sola acá. La lógica no cambió una línea; cambió <em>de dónde sale el segundo
+        número</em>:
+      </p>
+      <pre class="code"><span class="cm">// la referencia: el objetivo si está configurado y es válido, si no el promedio</span>
+<span class="k">var</span> refTenths = (mUseTarget &amp;&amp; mTargetTenths != <span class="k">null</span>) ? mTargetTenths : avgTenths;
+mAvgStr     = SpeedFormat.displayString(refTenths);
+mArrowState = TrendArrow.classify(curTenths, refTenths, DEAD_BAND_TENTHS);</pre>
+      <p>
+        Los settings se leen <strong>una vez</strong>, en <code>reloadSettings()</code>, que llama el
+        <code>onSettingsChanged()</code> del App — nunca por tick, la misma regla que la selección de fuentes.
+        Y termina con <code>mCacheW = -1</code>: el prefijo cambió de ancho, así que hay que forzar que se
+        vuelva a elegir el layout.
+      </p>
+
+      <p>
+        <strong>El default es el promedio, y cuesta salirse de él.</strong> Quien actualice y no toque nada tiene que ver <strong>exactamente</strong> la v0.1.0. Eso se apoya en
+        cuatro capas independientes —el <code>properties.xml</code> (<code>0</code>), el
+        <code>settings.xml</code> (el <code>0</code> es "promedio"), el fallback de lectura
+        (<code>readNumber(…, 0)</code>) y los inicializadores de miembro— y en una quinta red que es la que de
+        verdad lo blinda: con el objetivo en <code>0</code>, <code>targetTenths</code> devuelve
+        <code>null</code> y <strong>la referencia vuelve al promedio aunque el modo diga objetivo</strong>.
+        Hacen falta las dos cosas para salirse. Un ajuste a medio configurar no puede dejar el campo inútil.
+      </p>
+      <div class="note">
+        <p><strong>El default de <code>properties.xml</code> es de primera instalación, no un valor que se
+        reimponga:</strong> se usa solo mientras la propiedad no existe. Si el simulador aparece en modo
+        objetivo "sin motivo", lo primero es buscar un valor guardado de una prueba anterior — el XML ya no
+        manda. Y la fuente de verdad de en qué modo está la app <em>no</em> es el formulario del editor (lo
+        renderiza un servidor de Garmin y esa zona tiene bugs reportados con las listas): es el prefijo en
+        pantalla, <code>PROM</code> o <code>META</code>.</p>
+      </div>
+
+      <p>
+        <strong>Un decimal que la UI no puede exigir.</strong> El objetivo se quiere con un decimal, pero el schema de settings <strong>no lo puede imponer</strong>:
+        el <code>resources.xsd</code> del SDK admite en un <code>settingConfig</code> solo
+        <code>type</code>, <code>readonly</code>, <code>required</code>, <code>min</code>, <code>max</code>,
+        <code>maxLength</code> y <code>errorMessage</code> — no existe <code>step</code> ni
+        <code>decimals</code>. Así que el usuario puede tipear <code>22.37</code>, y lo cuantiza el código:
+        <code>targetTenths</code> redondea a décimas y <strong>la segunda línea muestra el valor
+        cuantizado</strong>. Tipeás 22.37, la pantalla dice 22.4, y contra 22.4 compara la flecha: lo que ves
+        es siempre lo que se usa.
+      </p>
+      <p>
+        La tentación es reescribir el valor redondeado a la propiedad para que el formulario del teléfono
+        también muestre 22.4. <strong>Se descartó con evidencia:</strong> escribirlo funciona (Garmin lo
+        confirma para claves que ya son settings declarados), pero <em>verlo al reabrir los ajustes</em> no —
+        hay un bug abierto donde el teléfono sigue mostrando el valor que tipeó el usuario, y si después toca
+        el otro setting empuja su copia cacheada y revive el <code>22.37</code>. El número iría y vendría solo.
+      </p>
+
+      <div class="cards">
+        <div class="card">
+          <h3>Los prefijos no miden igual</h3>
+          <p>La spec afirmaba que <code>META</code>/<code>GOAL</code> medían como <code>PROM</code>/<code>AVG</code>.
+             Medido en el 840: <code>AVG</code> 31 px y <code>GOAL</code> <strong>40</strong> — un 30 % más ancho.
+             No desborda, porque la reserva usa el prefijo activo, pero <strong>en inglés y en celda angosta el
+             modo objetivo puede elegir un escalón de fuente menos</strong>. En español no pasa
+             (<code>META</code> 40 &lt; <code>PROM</code> 42).</p>
+        </div>
+        <div class="card">
+          <h3>Sideload no alcanza</h3>
+          <p>Los settings de una app <strong>sideloadeada no se pueden editar desde el teléfono</strong>: el
+             mecanismo cuelga del vínculo con la store, que el sideload nunca establece. Por eso J estrenó un
+             <strong>id beta</strong> aparte del publicado, para instalar de la store e iterar sin gastar una
+             ronda de review por vuelta.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
       <h2>Cómo se prueba</h2>
       <p>
-        Criterio del repo: <strong>los unit tests en verde antes de la validación visual</strong>. Los dos
-        módulos puros tienen su <code>*Test.mc</code> con <code>(:test)</code> de <code>Toybox.Test</code>
-        (excluidos del release). Corren con "Monkey C: Run Tests" — <strong>y ya corrieron: 11 tests, 11 PASS</strong>.
+        Criterio del repo: <strong>los unit tests en verde antes de la validación visual</strong>. Los módulos
+        puros tienen su <code>*Test.mc</code> con <code>(:test)</code> de <code>Toybox.Test</code> (excluidos
+        del release). Corren con "Monkey C: Run Tests" — <strong>y ya corrieron: 12 tests, 12 PASS</strong>.
+      </p>
+      <p>
+        La cuenta no cambió con la migración al barrel, pero sí <em>de dónde sale</em>: son
+        <strong>7 propios y 5 del barrel</strong>, que corren desde acá namespaceados como
+        <code>TrendCore.testX</code>, en lugar de los 5 que se borraron. Vale la pena notarlo, porque
+        significa que el clasificador compartido <strong>se testea una vez por app que lo consume</strong>:
+        tres veces cuando esté la L.
       </p>
       <div class="tblwrap">
         <table>
           <thead><tr><th>Módulo</th><th>Qué fija el test</th></tr></thead>
           <tbody>
-            <tr><td><code>TrendArrow</code></td><td>arriba/abajo/igual → UP/DOWN/NONE (incluso con negativos); null en cualquiera → NONE (sin crash).</td></tr>
-            <tr><td><code>SpeedFormat</code></td><td>10 m/s → 36.0 km/h exacto y → mph; redondeo half-away; <code>shownTenths</code> (10.2 m/s → 367 décimas); <code>displayString</code> (243→"24.3", −13→"-1.3", 0→"0.0", 50→"5.0", null→"--"); label KM/H·MPH.</td></tr>
+            <tr><td><code>TrendCore.TrendArrow</code><br><span class="tag">barrel · 5</span></td><td>arriba/abajo/igual → UP/DOWN/NONE (incluso con negativos); null en cualquiera → NONE (sin crash); la banda muerta es <strong>inclusiva</strong>; y la misma aritmética sirve con décimas de km/h (esta app) y con rpm enteros (la K).</td></tr>
+            <tr><td><code>SpeedFormat</code><br><span class="tag">propio · 7</span></td><td>10 m/s → 36.0 km/h exacto y → mph; redondeo half-away; <code>shownTenths</code> (10.2 m/s → 367 décimas); <code>displayString</code> (243→"24.3", −13→"-1.3", 0→"0.0", 50→"5.0", null→"--"); label KM/H·MPH; <code>targetTenths</code> (25.0→250, 22.25→223 con valores binario-exactos a propósito, 0 y negativos → <code>null</code>).</td></tr>
           </tbody>
         </table>
       </div>
       <p style="margin-top:14px">
         Además, un <strong>review adversarial</strong> de tres lecturas independientes (conformidad con la
         spec, correctitud y casos borde, release-safety y convenciones) comparó el código contra la spec y
-        contra la Opción B, y no encontró nada. Compila limpio para <code>edge840</code> y <code>edge830</code>.
+        contra la Opción B, y no encontró nada. El <strong>export de los 17 targets compila limpio</strong>;
+        el único warning es el conocido de un Edge 1030 viejo que no llega al API mínimo del proyecto y queda
+        fuera del <code>.iq</code>.
       </p>
     </div>
   </section>
@@ -466,6 +700,15 @@
         nunca llega a un release). El esquema de exclusión es el mismo de A/B: <code>const</code> plano →
         el optimizador borra el bloque, y las funciones de debug van en pares <code>(:debug)</code>/<code>(:release)</code>.
       </p>
+      <div class="note">
+        <p><strong>Trampa que costó un <code>.iq</code>:</strong> ese "nunca llega a un release" no es una
+        preferencia de estilo. Con <code>TEST_MODE = true</code>, un build de <em>release</em>
+        <strong>compila limpio y sin warnings</strong> pero el campo muestra <code>--</code> para siempre: el
+        generador sintético es <code>(:debug)</code> y su par <code>(:release)</code> es un stub que devuelve
+        <code>[null, null, null]</code>, así que la rama <code>if (TEST_MODE)</code> toma nulls y nunca lee
+        <code>Activity.Info</code>. Pasó de verdad con el primer <code>.iq</code> beta de la v0.2.0, que hubo
+        que rehacer. Vale para las tres apps del repo, que comparten el esquema.</p>
+      </div>
     </div>
   </section>
 
@@ -473,8 +716,12 @@
     <div class="wrap">
       <h2>Qué falta</h2>
       <p>
-        Los unit tests están en verde (<strong>11/11</strong>), el export de los <strong>17 targets</strong>
-        compila sin un warning, el render iguala al nativo y los íconos son propios. Queda:
+        La <strong>v0.2.2 está en producción</strong> en la Connect IQ Store — o sea que <strong>los settings
+        ya salieron</strong>. Los unit tests están en verde (<strong>12/12</strong>), el export de los
+        <strong>17 targets</strong> compila sin un warning propio, el render iguala al nativo y los íconos son
+        propios. Antes de eso, la <code>v0.2.1</code> pasó por el <strong>canal beta</strong>, en una entrada
+        aparte con su propio id, y ahí se hizo la única prueba que faltaba: instalarla desde la store en el
+        teléfono y editar los ajustes de verdad. Queda:
       </p>
       <div class="cards">
         <div class="card">
@@ -484,21 +731,40 @@
              familia). Son dos constantes.</p>
         </div>
         <div class="card">
-          <h3>2 · Afinar en el simulador</h3>
-          <p>El umbral de la línea de promedio (<code>AVG_MIN_H</code>), el del modo inline (80 % del ancho de
-             pantalla) y los nudges de la unidad, en las 6 resoluciones. Es el paso que necesita ojo humano.</p>
+          <h3>2 · <code>GOAL</code> en celda angosta</h3>
+          <p>El caso que el probe dejó marcado: en inglés, <code>GOAL</code> es 9 px más ancho que
+             <code>AVG</code>, así que en una celda angosta el modo objetivo puede elegir un escalón de fuente
+             menos. No desborda, pero hay que verlo. El paseo cambiando el ajuste en caliente ya se hizo, en el
+             teléfono, con la beta.</p>
         </div>
         <div class="card">
-          <h3>3 · La ficha del store</h3>
-          <p>Capturas, textos EN/ES y el hero opcional. El ícono ya está: master 1024 con alpha real y el 500×500
-             sobre gris, más los 13 launchers dibujados a su tamaño.</p>
+          <h3>3 · La flecha mide distinto por familia</h3>
+          <p>Medido y todavía abierto: el glifo va en fuente de texto y su techo es <code>FONT_LARGE</code>, así
+             que en una celda grande queda al <strong>41 %</strong> del alto de los dígitos, mientras la
+             primitiva dibujada queda al <strong>79 %</strong>. O sea que el campo se ve distinto según el
+             device. El cambio preferido si se toca: <strong>primitiva siempre</strong> — una constante.</p>
         </div>
       </div>
       <p style="margin-top:16px">
-        Un pendiente que no se puede cerrar: <strong>nadie tiene un Edge 830 físico</strong> para comprobar que
-        ahí la flecha cae a la primitiva como se espera. La detección está hecha para que ese caso sea el
-        comportamiento seguro, no una apuesta.
+        Y una consecuencia nueva de compartir el motor, que conviene tener presente antes de afinar cualquier
+        cosa: <strong>los umbrales y los ajustes finos del layout ya no son de esta app</strong>. Tocar el
+        umbral de la línea de promedio, el del modo inline o el espaciado de la unidad ahora
+        <strong>cambia también la Opción K</strong>, y mañana la L. Es la contracara del beneficio: un arreglo
+        vale para las tres, y un desajuste también.
       </p>
+      <p>
+        Un pendiente que no se puede cerrar del todo: <strong>nadie tiene un Edge 830 físico</strong>. Que ahí
+        la flecha caiga a la primitiva está <em>medido</em> —el probe lee las métricas reales de las fuentes de
+        ese device y la detección da negativo, como debe—, pero es verificación de simulador, que en este repo
+        vale menos que el hardware. La detección está hecha para que ese caso sea el comportamiento seguro, no
+        una apuesta.
+      </p>
+      <div class="note">
+        <p><strong>Un pendiente que no es de código:</strong> la ficha publicada dice «no hay nada que
+        configurar». Era correcto mientras describía la v0.1.0 — y con la v0.2.2 en producción
+        <strong>dejó de serlo</strong>. Reescribir esa viñeta en el portal, en los dos idiomas, es lo que
+        queda de este release; es trabajo de ficha, no de código.</p>
+      </div>
     </div>
   </section>
 </main>
@@ -507,7 +773,7 @@
   <div class="wrap">
     <span>apps/j-trend-arrow · Opción J</span>
     <span>·</span>
-    <span>Monkey C · Connect IQ 3.3 · 13 Edge (referencia: 840)</span>
+    <span>Monkey C · Connect IQ 3.3 · 13 Edge (referencia: 840) · barrel <code>trend-core</code></span>
     <span>·</span>
     <span>La fuente de verdad es <code>SPEC.md</code>.</span>
   </div>

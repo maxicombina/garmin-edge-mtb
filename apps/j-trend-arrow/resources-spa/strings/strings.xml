@@ -8,4 +8,10 @@
     <string id="SpeedLabel">Velocidad</string>
     <string id="SpeedLabelShort">Vel</string>
     <string id="AvgLabel">Prom</string>
+
+    <string id="SetReference">Comparar contra</string>
+    <string id="RefAverage">Promedio de la salida</string>
+    <string id="RefTarget">Objetivo fijo</string>
+    <string id="SetTargetSpeed">Velocidad objetivo, 1 decimal (en la unidad de tu dispositivo, km/h o mph)</string>
+    <string id="TargetLabel">Meta</string>
 </strings>
