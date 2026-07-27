@@ -441,7 +441,7 @@
             <tr><td><code>SampleBuffer</code></td><td>integridad de la terna t/d/h; wraparound con cap 4 y con cap 64; <code>clear()</code>.</td></tr>
             <tr><td><code>RefSelect</code></td><td>con velocidad variable, distancia y tiempo eligen índices <em>distintos</em>; piso de span; borde inclusivo.</td></tr>
             <tr><td><code>EngineState</code></td><td>tabla completa de transiciones; <code>shouldPush</code> solo en <code>ON</code>.</td></tr>
-            <tr><td><code>Units</code></td><td>VAM sigue el device (m/h · ft/h ×3,281); grade sin <code>+</code> (<code>7</code>, <code>-8</code>, <code>0</code>, <code>--</code>, half-away-from-zero); histéresis <code>holdGrade</code>; el <code>%</code> lo dibuja la View aparte.</td></tr>
+            <tr><td><code>Units</code></td><td>VAM sigue el device (m/h · ft/h ×3,281); grade sin <code>+</code> (<code>7</code>, <code>-8</code>, <code>0</code>, <code>--</code>, half-away-from-zero); histéresis <code>holdGrade</code>; el <code>%</code> va pegado al número en el mismo string (<code>gradeText</code>).</td></tr>
             <tr><td><code>GradeVamEngine</code></td><td>cold start; guardas independientes; input null; PAUSED no pushea; el resume <em>vacía</em> el buffer (mata el pico fabricado de la pausa); el 0 de parado exige <em>3 ticks</em> de velocidad baja (1–2 no parpadean); reset limpia todo; 7% constante → 7±1.</td></tr>
           </tbody>
         </table>
