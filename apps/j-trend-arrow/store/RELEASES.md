@@ -28,9 +28,10 @@ Entradas, más nueva primero.
 
 ## v0.2.2 — 2026-07-27 — prod
 
-**LA DE LOS SETTINGS, EN PRODUCCIÓN.** Trae a la ficha publicada todo lo que hasta ahora vivía solo en
-el canal beta: la **referencia configurable** (promedio de la salida u objetivo fijo). Versión a tipear
-en el portal: `0.2.2`.
+**SUBIDA AL PORTAL el 2026-07-27, y la ficha reescrita.** Trae a la app publicada lo que hasta ahora
+vivía solo en el canal beta: la **referencia configurable** (promedio de la salida u objetivo fijo). El
+`.iq` salió del commit `fb5d5ff` de la rama `release`, que es el que lleva el tag
+`j-trend-arrow/v0.2.2`; versión tipeada a mano en el portal: `0.2.2`.
 
 **Por qué 0.2.2 y no 0.2.0:** el stream de versión es **único por app** (beta y prod lo comparten), y
 ya llegó a 0.2.1. Además el código que va a prod es **más nuevo** que el de esa beta: incluye la
@@ -61,10 +62,11 @@ Qué cambió respecto de la **v0.1.0**, que es lo que había publicado:
 - **Verificado:** suite **12/12** (7 propios + los 5 del barrel, namespaceados) y **export de los 17
   targets limpio**, con `TEST_MODE = false` comprobado en la rama `release` antes de exportar.
 
-⚠️ **LO QUE FALTA DE ESTE RELEASE, Y NO ES CÓDIGO: reescribir la ficha en el portal.** Hasta ahora
-decía con razón *«No hay nada que configurar: no tiene ajustes»* / *«Nothing to configure - there are no
-settings»*, porque describía la v0.1.0. **Con los settings en producción esa viñeta es falsa** en los
-dos idiomas. Recordar que el formulario del portal **no acepta markdown**.
+✅ **La ficha se reescribió** en el mismo release (2026-07-27, por el autor). La viñeta que decía *«No
+hay nada que configurar: no tiene ajustes»* / *«Nothing to configure - there are no settings»* era
+verdadera mientras describía la v0.1.0 y dejó de serlo con los settings en producción. Queda como
+recordatorio para el próximo release: **la ficha es parte del release, no un anexo** — y el formulario
+del portal **no acepta markdown**.
 
 ## v0.2.1 — 2026-07-26 — beta
 

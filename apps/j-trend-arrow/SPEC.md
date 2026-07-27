@@ -1028,10 +1028,11 @@ flecha anclada a la baseline (§6.13).
 
 Todo lo de §9.2–§9.5 está escrito y verificado por CLI: **export de los 17 targets limpio** (solo el aviso conocido del Edge 1030 con CIQ 3.2.5) y **suite 12/12** (los 11 de antes + `testTargetTenths`). Los cuatro usos de `mAvgPrefix` que §9.5 listaba se reemplazaron y `mAvgPrefix` quedó únicamente en su carga desde recursos y en la línea que elige el prefijo activo.
 
-⚠️ **Consecuencia de este release en la FICHA del portal:** hasta la v0.2.2 la ficha publicada decía
-con razón «no hay nada que configurar / Nothing to configure», porque describía la v0.1.0. **Con los
-settings en producción esa viñeta pasa a ser falsa** en los dos idiomas y hay que reescribirla en el
-portal. Es trabajo de ficha, no de código, y no lo puede hacer el asistente.
+✅ **La ficha del portal se reescribió en el mismo release** (2026-07-27, por el autor): decía «no hay
+nada que configurar / Nothing to configure», que era verdad mientras describía la v0.1.0 y dejó de
+serlo con los settings en producción. **Lección que queda para el próximo release: la ficha es parte
+del release, no un anexo** — un cambio de features la puede volver falsa sin que nada lo avise, porque
+el texto vive en el portal y no lo compila nadie.
 
 **Pendiente, y solo el autor puede hacerlo:** mirar el modo objetivo en una celda angosta **en
 inglés**, que es donde el `GOAL` más ancho puede bajar un escalón de fuente (criterio (4) de arriba).
