@@ -16,6 +16,7 @@ base.barrelPath = $(TrendCore)
 # icon (auto-discovered by the device qualifier). There is deliberately NO icon in the base
 # resources/ -- a base icon would be overridden by every device and the packager would warn.
 #
-# NOTE: the launcher icons here are PLACEHOLDERS copied from Option J. They show J's speed
-# motif, so K is indistinguishable from J in the device's field list. Redesign before publishing.
+# The launcher icons are K's own since 2026-07-27 (they were J's, copied, until then). They are
+# GENERATED, not hand-drawn: store/gen_icon.py draws all 13 plus the store assets from one geometry,
+# each at its own size. Do not edit the PNGs -- edit the script and re-run it.
 project.manifest = manifest.xml
