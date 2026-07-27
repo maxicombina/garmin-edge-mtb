@@ -1,0 +1,9 @@
+<strings>
+    <string id="AppName">Tendencia Cad.</string>
+
+    <!-- "Cadencia" is long; the renderer falls back to "Cad" in narrow cells on its own. -->
+    <string id="CadenceLabel">Cadencia</string>
+    <string id="CadenceLabelShort">Cad</string>
+
+    <string id="AvgLabel">Prom</string>
+</strings>
