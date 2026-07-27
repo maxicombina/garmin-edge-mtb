@@ -65,8 +65,16 @@ Sigue pendiente de la v0.1.0: elegir entre `↑` y `▲` mirando el sideload en 
 
 **SUBIDA al portal el 2026-07-26.** El `.iq` salió del commit `1a6417a` de la rama `release`, que es
 el que lleva el tag `j-trend-arrow/v0.1.0`; versión tipeada a mano en el portal: `0.1.0`. Ficha con
-los textos EN/ES de [`LISTING.md`](LISTING.md), categoría Cycling, seis capturas, hero 1440×720 y
-contacto `el.soldador.garmin@gmail.com`.
+textos EN+ES, categoría Cycling, seis capturas, hero 1440×720 y contacto
+`el.soldador.garmin@gmail.com`.
+
+**Los textos de la ficha NO se versionan en el repo** (decidido el 2026-07-27): el portal es la fuente
+de verdad y una copia local envejece en silencio — esta misma ficha tuvo durante días una viñeta que
+decía «no hay nada que configurar» cuando la app ya tenía ajustes. Había un `store/LISTING.md` con los
+textos y se borró; si alguna vez hace falta, está en el historial (`cba5a76`). Los dos datos que valían
+más que los textos quedaron en `CLAUDE.md` §«Flujo de release»: el formulario del portal **no acepta
+markdown**, y la marca **Cateye** no va en el título (se menciona una vez en la descripción, uso
+nominativo, con un primer párrafo alternativo sin ella por si se prefiere no arriesgar).
 
 Primera subida. Campo de datos que muestra la **velocidad actual** en grande con una **flecha ↑/↓
 al lado**, comparándola contra la **velocidad promedio de la actividad** (estilo Cateye), y el
