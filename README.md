@@ -22,7 +22,7 @@ La spec define el contexto (hardware, plataforma, restricciones), **10 opciones 
 | H | Stamina casera (modelo de depósito por FC) | device app | idea |
 | I | Test de subida (VO2max de campo + tracker de forma) | data field / device app | idea |
 | J | Flecha de tendencia estilo Cateye (actual vs. referencia) | data field | **✅ publicada · prod `v0.1.0` · beta `v0.2.1`** |
-| K | La misma flecha, sobre la **cadencia** | data field | **🛠️ implementada · 9/9 tests · sin publicar** |
+| K | La misma flecha, sobre la **cadencia** | data field | **🛠️ implementada · 9/9 tests · `v0.1.0` sin subir** |
 | L | La misma flecha, sobre la **frecuencia cardíaca** | data field | en diseño |
 
 ## Las apps
@@ -47,9 +47,9 @@ La flechita de los ciclocomputadores Cateye de los 90: velocidad actual en grand
 
 ### K — `k-cadence-trend` · implementada, sin publicar
 
-La misma flecha de J, sobre la **cadencia**. La métrica más simple de la familia: llega en rpm enteros y rpm es rpm en todos los países, así que no hay conversión ni unidades que cambien. Su única decisión de producto es el **0 de no pedalear**: en una bajada pasás minutos sin pedalear, y llamar a eso "por debajo de tu media" sería falso, así que muestra el `0` real **sin flecha**. Fue la primera app construida sobre el barrel, y su View quedó en ~130 líneas porque no tiene una sola línea de layout. J se migró al mismo barrel el 2026-07-27 y bajó de 858 líneas a 225.
+La misma flecha de J, sobre la **cadencia**. La métrica más simple de la familia: llega en rpm enteros y rpm es rpm en todos los países, así que no hay conversión ni unidades que cambien. Su única decisión de producto es el **0 de no pedalear**: en una bajada pasás minutos sin pedalear, y llamar a eso "por debajo de tu media" sería falso, así que muestra el `0` real **sin flecha**. Fue la primera app construida sobre el barrel, y su View quedó en ~130 líneas porque no tiene una sola línea de layout. J se migró al mismo barrel el 2026-07-27 y bajó de 858 líneas a 225. Le falta el **ícono propio** —hoy son los de J, copiados— y eso es lo que bloquea la subida a la store.
 
-[`source/`](apps/k-cadence-trend/source/)
+[`SPEC.md`](apps/k-cadence-trend/SPEC.md) · [walkthrough del código](apps/k-cadence-trend/docs/code-walkthrough.html) · [`RELEASES.md`](apps/k-cadence-trend/store/RELEASES.md)
 
 ## Estructura
 
