@@ -553,6 +553,44 @@ Si cualquiera falla → primitiva. Medido: edge840 `w(↑)=17` en `FONT_LARGE` (
 
 **Constantes:** `USE_ARROW_GLYPH` (a `false` fuerza la primitiva en todos lados), `ARROW_GLYPH_UP`/`DOWN` (`\u2191`/`\u2193`; `\u25B2`/`\u25BC` para triángulos sólidos), `GLYPH_CONTROL = \uE000`, `GLYPH_MIN_W = 2`.
 
+### 6.12 La flecha-glifo es MÁS CHICA que los dígitos, y el 4/5 no es la causa (MEDIDO 2026-07-27, NO implementado)
+
+El autor lo vio en el 840 real: la flecha se ve más chica que el número. **No es una ilusión de
+posición** — el glifo se dibuja `VCENTER` sobre `cy − descent/2`, o sea centrado en los dígitos
+visibles, no arriba. Es más chica de verdad, y **el techo no es el objetivo de 4/5 sino la fuente**:
+el glifo se pide en fuente de TEXTO (§11.2 explica por qué: en la numérica el 840 lo pinta más grande
+pero `getTextWidthInPixels` devuelve **0** y no hay con qué maquetar), y la mayor fuente de texto es
+`FONT_LARGE`, con ascent **22 px**. Ese tope ya manda en casi toda la escalera.
+
+Medido en el edge840 con un probe headless (§11.1), ascents reales:
+
+| Fuente del número | ascent | primitiva (4/5) | glifo (tope `FONT_LARGE`) |
+|---|---|---|---|
+| `NUMBER_THAI_HOT` | 53 | 42 · 79 % | **22 · 41 %** |
+| `NUMBER_HOT` | 43 | 34 · 79 % | **22 · 51 %** |
+| `NUMBER_MEDIUM` | 33 | 26 · 78 % | **22 · 66 %** |
+| `NUMBER_MILD` | 28 | 22 · 78 % | 22 · 78 % |
+
+⚠️ **Consecuencia que no se había notado: la app se ve DISTINTA según la familia de fuentes.** Los
+devices que caen a la primitiva (830, 530, 1030 ×3, explore2) tienen la flecha al 79 % del número;
+los que resuelven el glifo (840, 540, 550, 850, 1040, 1050, mtb) la tienen al 41 % en celda grande.
+No es un bug de código —cada rama hace lo que dice— pero sí una inconsistencia de producto.
+
+**Subir el objetivo de 4/5 a 1/1 NO lo arregla:** haría crecer la primitiva (53 px en `THAI_HOT`) y
+dejaría el glifo clavado en 22, porque no hay fuente de texto más grande. Empeoraría la brecha entre
+familias.
+
+**Cambio anotado como posible, NO hecho (preferencia del autor, 2026-07-27):** *primitiva siempre,
+con la altura como constante* — se saca el glifo, las dos familias dibujan lo mismo y el tamaño pasa
+a ser una decisión nuestra (4/5 o completa, a gusto). Se pierde el glifo nativo, que en la práctica
+solo veía la mitad de los devices y se veía chico. Alternativa descartada por frágil: pedir el glifo
+en la fuente numérica adivinando su ancho (no medible, y varía por familia). Alternativa intermedia
+si algún día se quiere conservar el glifo: usarlo **solo en celdas chicas** (donde queda al 66-78 %) y
+primitiva en las grandes — a costa de que el trazo cambie entre campos de una misma pantalla.
+
+Por ahora **queda como está**: el 840 sigue con el glifo chico. `USE_ARROW_GLYPH = false` ya fuerza la
+primitiva en todos lados si se quiere probar el cambio sin tocar nada más.
+
 ## 7. Extender a otras métricas Tier 1 (documentado, NO implementar en v1)
 
 Sumar FC o cadencia más adelante es, literalmente:
