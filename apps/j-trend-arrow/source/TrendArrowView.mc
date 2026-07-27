@@ -50,7 +50,9 @@ class TrendArrowView extends WatchUi.DataField {
     // Vertical-centering trick (master spec 3.4, A 6.7, B 6.2): number fonts reserve descent the
     // digits don't use -> center then push DOWN by descent/2; VALUE_NUDGE is A's fine 2px-up tweak.
     private const VALUE_NUDGE = 2;       // px: raise the value a touch after the descent/2 drop
-    private const ARROW_NUDGE = 2;       // px: align the arrow with the visible glyphs (B's idiom)
+    // (There is deliberately no vertical nudge constant for the arrow: it is anchored to the number's
+    // BASELINE, computed from the font. See drawTrendValue -- every constant tried here was a guess at
+    // where the digits' ink sits, and each one was wrong on some device or cell size. SPEC 6.13.)
     // The SAME descent-is-unused fact also decides which number font fits a band: gate on the font's
     // ASCENT, not its full height. A number font's height includes a descent the digits never use, so
     // the old "height <= 90% of the band" gate dropped a whole size for nothing -- that is why our
@@ -396,14 +398,30 @@ class TrendArrowView extends WatchUi.DataField {
         var x = w / 2 - totalW / 2;
         var vx = x + lead;
         dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
+        // The number's BASELINE, and the anchor for everything drawn beside it. For a VCENTREd value that
+        // is cy + (ascent - descent)/2, and the digits' feet land exactly on it -- VERIFIED on both font
+        // families off the author's screenshots (SPEC 6.13). It is the only anchor that is both queryable
+        // and exact: the digits' ink TOP is not, because how much of the ascent the digits fill differs by
+        // family (0.79 on the 840's TTF, 0.91 on the 830's bitmap fonts) and no API exposes it. Two
+        // earlier attempts at "centre on the ink" therefore had to guess, and both were wrong on one
+        // family or one cell size.
+        var valueBaseY = cy + (Graphics.getFontAscent(valueFont) - Graphics.getFontDescent(valueFont)) / 2;
+        // The arrow lives in a BAND that sits on that baseline: [valueBaseY - aH, valueBaseY], aH being 4/5
+        // of the value's ascent. Anchoring the band (not the drawn shape) is what makes the two routes
+        // agree, because they fill it differently -- author's choice, 2026-07-27.
+        var arrowCy = valueBaseY - aH / 2;
         if (paintArrow) {
-            // Both routes centre on the value's VISIBLE glyphs: the value is VCENTREd on a box
-            // whose descent the digits never use, so shift up by descent/2, then B's fine nudge.
-            var arrowCy = cy - Graphics.getFontDescent(valueFont) / 2 + ARROW_NUDGE;
             if (gf != null) {
-                dc.drawText(x + aW / 2, arrowCy, gf, glyph,
+                // Glyph: CENTRED IN the band, not sitting on its floor. The glyph is capped at FONT_LARGE
+                // (SPEC 6.12), so in a big cell its ink is half the digits' height (21 vs 42 px) and
+                // resting it on the baseline would read as a subscript. Centring needs + descent/2 because
+                // VCENTER centres the font BOX and the glyph never paints that box's descent, so its ink
+                // would otherwise float up by half of it (SPEC 6.13).
+                dc.drawText(x + aW / 2, arrowCy + Graphics.getFontDescent(gf) / 2, gf, glyph,
                             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             } else {
+                // Primitive: FILLS the band -- drawUp/DownArrow centre the shape on the y they are given,
+                // so the band centre puts its bottom exactly on the baseline, the digits' feet.
                 if (mArrowState == TrendArrow.UP) {
                     drawUpArrow(dc, x, arrowCy, aW, aH);
                 } else {
@@ -412,10 +430,9 @@ class TrendArrowView extends WatchUi.DataField {
             }
         }
         dc.drawText(vx, cy, valueFont, valueStr, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-        // Unit is baseline-aligned to the number's baseline (native look: the "h" sits on the same
-        // line as the digits' feet). numberBaseline for a VCENTREd value = cy + (ascent - descent)/2.
-        var baseY = cy + (Graphics.getFontAscent(valueFont) - Graphics.getFontDescent(valueFont)) / 2 + UNIT_BOTTOM_NUDGE;
-        drawStackedUnit(dc, vx + vW + UNIT_GAP, baseY, unitFont);
+        // Unit is baseline-aligned too (native look: the "h" sits on the same line as the digits' feet),
+        // with its own nudge so it can be trimmed without moving the arrow.
+        drawStackedUnit(dc, vx + vW + UNIT_GAP, valueBaseY + UNIT_BOTTOM_NUDGE, unitFont);
     }
 
     // Width to RESERVE for the arrow when choosing a value font: the primitive's, or the glyph's if

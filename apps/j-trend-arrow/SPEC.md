@@ -321,6 +321,9 @@ const ARROW_GAP = 4;        // px entre la flecha y el valor actual (igual que G
 const AVG_LABEL_GAP = 4;    // px entre el prefijo "AVG"/"PROM" y el número de promedio
 const VALUE_NUDGE = 2;      // px: mismo nudge fino que A/B para centrar ópticamente el valor
 const ARROW_NUDGE = 2;      // px: mismo nudge fino que B usó para alinear la flecha con el texto
+                            // ⚠️ SUPERSEDED 2026-07-27 (§6.13): reemplazada por ARROW_INK_BIAS = 1;
+                            // el objetivo de la flecha NO es "descent/2 + nudge" (error que crece con
+                            // la fuente del número), es una constante de 1 px sobre cy.
 const VALUE_TPL = "888.8";  // plantilla de ancho estable: 3 dígitos enteros + "." + 1 decimal
                              // (cubre 0.0-999.9; la velocidad no lleva signo en la práctica)
 ```
@@ -424,6 +427,8 @@ selectFonts(dc, usableW, h, labelH):
        x = w/2 - totalW/2
        arrowCy = primaryCy - getFontDescent(mValueFont)/2 + ARROW_NUDGE   // mismo truco que B:
               // la flecha se alinea con los GLIFOS VISIBLES del número, no con su caja completa
+              // ⚠️ SUPERSEDED 2026-07-27 (§6.13): esta línea es HOY `primaryCy - ARROW_INK_BIAS`.
+              // La intención (alinear con la tinta, no con la caja) sigue valiendo; la fórmula no.
        if mArrowState == TrendArrow.UP:   drawUpArrow(dc, x, arrowCy, aw, ah)
        else:                              drawDownArrow(dc, x, arrowCy, aw, ah)
        dc.drawText(x + aw + ARROW_GAP, primaryCy, mValueFont, mCurStr, LEFT | VCENTER)
@@ -493,7 +498,7 @@ En **celdas full-width Y cortas** (sin alto para apilar) el campo muestra **ambo
 
 - **Gate:** `fullWidth = (w * WIDE_DEN >= screenW * WIDE_NUM)` con `WIDE_NUM=8, WIDE_DEN=10` (**celda ≥ 80 % del ancho de pantalla**, vía `System.getDeviceSettings().screenWidth`, presente en todos los devices; guarda `!= null`). **`mIsWide = fullWidth && (h < AVG_MIN_H)`** → inline solo si además es corta (no entra la línea de promedio apilada). `fullWidth && h ≥ AVG_MIN_H` → cae al apilado (que muestra el promedio como 2ª línea). Una media-columna (~50 %) nunca es inline.
 - **Fuente inline:** misma escalera numérica, mayor tamaño cuyo grupo `[flecha + gap + "888.8 / 888.8" + gap + unidad]` (plantilla `INLINE_TPL`) entra a lo ancho, tope de alto contra la banda. Fallback: si la flecha no entra, se descarta y se ajusta `[par + unidad]` (mismo idioma que §6.4).
-- **Flecha:** tendencia del **actual vs promedio** (misma `classify()`), precede a TODO el par. Mismo centrado `descent/2 + ARROW_NUDGE` que el valor apilado (§6.7). Sigue siendo DATO (va con el valor).
+- **Flecha:** tendencia del **actual vs promedio** (misma `classify()`), precede a TODO el par. Mismo centrado que el valor apilado (§6.7) — hoy `cy − ARROW_INK_BIAS`, ⚠️ ya **no** `descent/2 + ARROW_NUDGE` (§6.13). Sigue siendo DATO (va con el valor).
 - Constantes: `WIDE_NUM=8`, `WIDE_DEN=10`, `INLINE_SEP=" / "`, `INLINE_TPL="888.8 / 888.8"`. Implementado en `TrendArrowView.mc` (`selectInlineFont` + `drawTrendValue`, branch en `selectFonts`/`onUpdate`). Compila limpio (release 840+830, `-w`) + 10/10 tests. **PENDIENTE:** validación visual del autor en el sim (umbral 80 %, y que el apilado en celda ancha-alta se vea bien en las 6 resoluciones).
 
 ### 6.9 Unidad estilo NATIVO (apilada a la derecha del número — 2026-07-23)
@@ -590,6 +595,144 @@ primitiva en las grandes — a costa de que el trazo cambie entre campos de una 
 
 Por ahora **queda como está**: el 840 sigue con el glifo chico. `USE_ARROW_GLYPH = false` ya fuerza la
 primitiva en todos lados si se quiere probar el cambio sin tocar nada más.
+
+### 6.13 La flecha-glifo estaba 4,5 px ARRIBA de los dígitos (BUG MEDIDO Y CORREGIDO 2026-07-27)
+
+Hallado por el autor mirando la Opción K en el simulador (perfil 840, celda 125×62): la flecha se veía
+desplazada hacia arriba respecto del número. **No era la ilusión del punto §6.12** (ahí la flecha es
+más CHICA; esto es que además estaba más ALTA), y se confirmó midiendo la captura píxel a píxel:
+
+| | tinta (y) | alto | centro |
+|---|---|---|---|
+| dígitos `70` (`NUMBER_MEDIUM`) | 44 … 69 | 26 px | 56,5 |
+| flecha (glifo `↓` en `FONT_LARGE`) | 42 … 62 | 21 px | **52,0** |
+
+→ **4,5 px de desfase**, con la asimetría delatora: 2 px de más por arriba y **7 px de dígito
+sobrante por abajo**.
+
+**Causa: el glifo arrastra el descendente de SU PROPIA fuente, y nadie lo compensaba.** El código
+calculaba una sola `arrowCy = cy − descent(fuenteDelValor)/2 + ARROW_NUDGE` y la usaba para las dos
+ramas, pero las dos ramas no se comportan igual:
+
+- **primitiva** (`drawUpArrow`/`drawDownArrow`): derivan `top`/`bot` del alto REAL de la figura, así que
+  centrarlas en `arrowCy` centra la tinta. **Estaba bien** → el 830 y su familia se veían correctos.
+- **glifo**: es TEXTO dibujado con `VCENTER`, o sea que lo centrado es la **caja** de `FONT_LARGE`
+  (alto 31, ascent 22, **descent 9**), y el glifo no pinta ese descendente → la tinta flota
+  `descent/2 = 4,5 px` hacia arriba.
+
+Cuentas con las métricas reales del 840 (`NUMBER_MEDIUM` 42/33/9, `FONT_LARGE` 31/22/9), que
+reproducen la medición de la captura al píxel: baseline de los dígitos en `cy+12`, tinta en
+`[cy−14, cy+12]` → centro `cy−1`; baseline del glifo en `cy+4,5`, tinta en `[cy−16,5, cy+4,5]` →
+centro `cy−6`. Diferencia **5 px** calculada vs. **4,5 px** medida.
+
+**Arreglo #1 (una línea, en las DOS copias del motor):** sumarle al `y` del glifo el descendente de su
+fuente — `arrowCy + Graphics.getFontDescent(gf)/2`.
+
+#### Segunda iteración, el mismo día: el arreglo #1 era correcto pero INCOMPLETO
+
+El autor mandó una segunda captura, esta vez con **7 celdas de distintos tamaños en una pantalla** — y
+ahí se vio lo que una sola celda no podía mostrar:
+
+| celda | fuente del número | dígitos (tinta) | flecha | desfase |
+|---|---|---|---|---|
+| 121×62 (×6) | `NUMBER_MEDIUM` | y29-54 · h26 · centro **41,5** | y31-51 · h21 · centro **41,0** | **0,5 px** ✅ |
+| 244×125 | `NUMBER_THAI_HOT` | y38-79 · h42 · centro **58,5** | y44-64 · h21 · centro **54,0** | **4,5 px** ❌ |
+
+**Seis de siete perfectas, la grande igual de mal que antes.** Causa: el objetivo mismo estaba mal. El
+código apuntaba a `cy − descent(fuenteDelValor)/2`, un término que **escala con la fuente del número**
+(`MEDIUM` d=9 → −4 px; `THAI_HOT` d=14 → −7 px), mientras la compensación del glifo es fija
+(`FONT_LARGE`, +4). En la celda de 62 px los dos se cancelaban por casualidad; en la grande sobraban 3.
+
+**Y esto corrige algo que yo había afirmado de más:** dije que "la primitiva estaba bien". Estaba bien
+**en esa celda**. La primitiva usa el mismo `arrowCy`, así que en una celda grande el 830 también dibuja
+la flecha ~3,5 px arriba. El defecto era de las DOS ramas; la del glifo solo lo tenía peor.
+
+**Dónde está de verdad la tinta de los dígitos (medido, dos fuentes):** `NUMBER_MEDIUM` pinta 26 px en
+una caja de 42 (7 de aire arriba, 9 de descendente abajo) y `THAI_HOT` 42 en 67. En las dos la tinta
+queda **~1 px por encima del centro de la caja**, y ese 1 px **no escala**. O sea que el objetivo
+correcto es una CONSTANTE, no un término de fuente.
+
+**Arreglo #2 (el definitivo):** `ARROW_INK_BIAS = 1` reemplaza a `ARROW_NUDGE` y
+
+```
+var arrowCy = cy - ARROW_INK_BIAS;          // antes: cy - getFontDescent(valueFont)/2 + ARROW_NUDGE
+```
+
+Verificado por cálculo con las métricas reales del 840 para las cuatro fuentes numéricas y las dos
+ramas: el desfase queda en **≤ 0,5 px** en todos los casos (`MEDIUM` 0 · `HOT` 0,5 · `THAI_HOT` 0,5 ·
+`MILD` 0,5), que es el piso de una grilla de enteros.
+
+#### Tercera iteración: el 830, y por qué NINGUNA constante podía servir
+
+El autor miró entonces el **830** (la otra familia, la que dibuja la primitiva) y la flecha se veía
+**baja**, con el desfase escalando igual que antes:
+
+| celda | dígitos (tinta) | flecha (primitiva) | desfase |
+|---|---|---|---|
+| 121×62 (×6) | y24-52 · h29 · centro **38,0** | y28-52 · h25 · centro **40,0** | **2 px abajo** |
+| 244×125 | y26-75 · h50 · centro **50,5** | y34-76 · h43 · centro **55,0** | **4,5 px abajo** |
+
+Probando las métricas de las dos familias (`monkeydo -t`, un `(:test)` que solo llama a
+`getFontAscent/Descent/Height` — no necesita `Dc`, así que corre en las dos) apareció **el dato que
+cierra todo el asunto: las dos familias llenan el `ascent` de forma distinta.**
+
+| | `N_MEDIUM` | `N_THAI_HOT` | tinta / ascent | flecha 4/5 vs. tinta |
+|---|---|---|---|---|
+| **840** (TTF) | a=33 d=9 h=42, tinta 26 | a=53 d=14 h=67, tinta 42 | **0,79** | 26 vs 26 → **iguales** |
+| **830** (bitmap `.cft`) | a=32 d=10 h=42, tinta 29 | a=53 d=17 h=70, tinta ~49 | **0,91** | 25 vs 29 → 4 px menos |
+
+O sea que **el 4/5 histórico coincide por casualidad con el alto de la tinta en la familia TTF**, y por
+eso en el 840 la flecha parecía perfecta. En el 830 los dígitos son más altos que la flecha: **no había
+error de posición, era diferencia de ALTO.**
+
+**Y de ahí sale el límite duro: centrar es imposible de forma portable.** El centro de la tinta es
+`baseline − tinta/2`, y **`tinta` no lo da ninguna API** — varía por familia (0,79 vs 0,91) y no se
+puede derivar de `ascent`/`descent`/`height` (en las dos familias `a+d = h`, así que no hay ni una
+señal para distinguirlas). Cualquier constante es un valor horneado de una captura, que un device nuevo
+rompe. Las dos iteraciones anteriores fueron exactamente eso, y cada una falló en la otra familia.
+
+**Lo que SÍ es exacto y queryable: la baseline.** Verificado en las dos familias — la tinta de los
+dígitos **termina exactamente en la baseline** (830: y52 con baseline 52 · 840: y54 con baseline 54;
+los glifos redondos `6`/`0` se pasan 1 px, que es *overshoot* tipográfico normal).
+
+**Decisión del autor (2026-07-27, por AskUserQuestion): la flecha se apoya en la baseline**, como la
+unidad. Implementación — y el matiz importa porque las dos ramas llenan distinto:
+
+- Se ancla la **BANDA** de la flecha, no la figura: `[valueBaseY − aH, valueBaseY]` con `aH = 4/5` del
+  ascent del valor. `valueBaseY = cy + (ascent − descent)/2`, el mismo que ya usaba la unidad.
+- La **primitiva LLENA la banda** → su base cae exacta en los pies de los dígitos, en toda fuente.
+- El **glifo va CENTRADO DENTRO de la banda** (con su `+ descent/2`), **no apoyado en el piso**: está
+  topeado en `FONT_LARGE` (§6.12), así que en celda grande su tinta mide la mitad que los dígitos
+  (21 vs 42 px) y apoyarlo lo habría hundido **13 px**, leyéndose como un subíndice. Detectado por
+  cálculo ANTES de que el autor lo viera.
+
+Desfase predicho con esto (calculado con métricas reales, las dos familias × chica y grande): **830
+0 px en la base** (la primitiva coincide con los pies; 2-4 px más corta arriba, que es el alto, no la
+posición) y **840 0,5 px en celda chica y 1,5 px en la grande**. Desaparecieron las dos constantes
+(`ARROW_NUDGE` y `ARROW_INK_BIAS`): no quedó ninguna perilla vertical para la flecha.
+
+**Tres cosas que este bug enseña y valen para todo el repo** (subidas a `GARMIN_MTB_SPEC.md` §3.4):
+
+1. **Es el mismo hecho de la regla dura de centrado, un nivel más abajo:** la regla habla del
+   descendente de la fuente del NÚMERO; acá el que sobraba era el de la fuente del SÍMBOLO. Cada vez
+   que se dibuja un glifo con `VCENTER` para alinearlo con otra cosa, hay que restarle su propio aire.
+2. **Fue un defecto ASIMÉTRICO POR FAMILIA de fuentes,** o sea invisible si validás en un solo device:
+   el 830 (primitiva) lo tenía mucho más leve que el 840 (glifo). Es el segundo caso de la lista
+   de §11.2 en que "se ve bien en un device" no dice nada del otro.
+3. **Y ASIMÉTRICO POR TAMAÑO DE CELDA, que es peor porque conviven en la misma pantalla:** un error
+   proporcional a la fuente del número se esconde en la celda donde afinaste. **Regla nueva: la
+   alineación se valida en una pantalla con celdas de varios tamaños, no en una.** La captura de 7
+   celdas del autor encontró en un intento lo que la de 1 celda no podía encontrar nunca.
+
+⚠️ **Y fue el segundo cambio que hubo que aplicar DOS VECES** (barrel + la copia de J, que sigue sin
+migrar) — en realidad **cuatro ediciones duplicadas**, contando las dos iteraciones. La divergencia que
+se aceptó al montar el barrel ya cobró, el mismo día. Argumento a favor de migrar J.
+
+Verificado en cada iteración: export de los 17 targets limpio en las dos apps, **J 12/12 y K 9/9**. La
+comprobación final de que la tinta coincide es del autor con F5 — el probe headless de §11.1 mide
+fuentes y decide layout, pero **no lee píxeles** (no hay `getPixel` en Monkey C). Lo que sí se puede
+hacer, y fue lo que resolvió esto, es **medir la captura del autor píxel a píxel** (BMP + numpy, sin
+Pillow: `sips -s format bmp` y parsear el header) y comparar los centros de tinta contra las cuentas.
 
 ## 7. Extender a otras métricas Tier 1 (documentado, NO implementar en v1)
 
