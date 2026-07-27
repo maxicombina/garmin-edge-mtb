@@ -1016,15 +1016,27 @@ En el **simulador**: correr con F5 y editar los settings en caliente desde el me
 
 **Criterios de aceptación:** los de siempre (§13) más: (1) suite verde incluido `testTargetTenths`; (2) export de los 17 targets sin warnings; (3) en el sim, el ciclo completo promedio→objetivo→promedio sin tocar F5; (4) el prefijo cambia también en el label del modo ancho.
 
-### 9.8 Estado: IMPLEMENTADO y EN LA STORE como v0.2.1 (canal beta, 2026-07-26)
+### 9.8 Estado: EN PRODUCCIÓN como v0.2.2 (2026-07-27)
 
-**Subido al canal beta como `v0.2.1`** el 2026-07-26 (la `v0.2.0` quedó quemada: se exportó con
-`TEST_MODE = true` y el portal no permite reusar el número — ver `store/RELEASES.md`). La ficha de
-producción (v0.1.0) no se tocó.
+**Camino recorrido:** subido al **canal beta** como `v0.2.1` el 2026-07-26 (la `v0.2.0` quedó quemada:
+se exportó con `TEST_MODE = true` y el portal no permite reusar el número — ver `store/RELEASES.md`),
+**probado por el autor en el teléfono con una instalación real de la store** —lo único que el simulador
+no cubre— y **promovido a producción como `v0.2.2` el 2026-07-27** (tag `j-trend-arrow/v0.2.2` sobre
+`release`). El número salta de 0.2.1 a 0.2.2 porque el stream de versión es **único por app** y el
+código que fue a prod es más nuevo que el de la beta: trae además la migración al barrel (§3.4) y la
+flecha anclada a la baseline (§6.13).
 
 Todo lo de §9.2–§9.5 está escrito y verificado por CLI: **export de los 17 targets limpio** (solo el aviso conocido del Edge 1030 con CIQ 3.2.5) y **suite 12/12** (los 11 de antes + `testTargetTenths`). Los cuatro usos de `mAvgPrefix` que §9.5 listaba se reemplazaron y `mAvgPrefix` quedó únicamente en su carga desde recursos y en la línea que elige el prefijo activo.
 
-**Pendiente, y solo el autor puede hacerlo:** los criterios (3) y (4) de arriba — el paseo por el simulador cambiando el setting en caliente, y mirar el modo objetivo en una celda angosta en inglés, que es donde el `GOAL` más ancho puede bajar un escalón de fuente.
+⚠️ **Consecuencia de este release en la FICHA del portal:** hasta la v0.2.2 la ficha publicada decía
+con razón «no hay nada que configurar / Nothing to configure», porque describía la v0.1.0. **Con los
+settings en producción esa viñeta pasa a ser falsa** en los dos idiomas y hay que reescribirla en el
+portal. Es trabajo de ficha, no de código, y no lo puede hacer el asistente.
+
+**Pendiente, y solo el autor puede hacerlo:** mirar el modo objetivo en una celda angosta **en
+inglés**, que es donde el `GOAL` más ancho puede bajar un escalón de fuente (criterio (4) de arriba).
+El (3), el paseo cambiando el setting en caliente, quedó cubierto con la prueba de la beta en el
+teléfono.
 
 ### 9.8.1 El default es el PROMEDIO DE LA SALIDA (requisito duro, VERIFICADO end-to-end 2026-07-26)
 
@@ -1116,6 +1128,13 @@ id **beta** `f70f3c984e4c43d496006628f3510817` en `main` (entrada del portal **s
 instala por el link de `apps.garmin.com` + Connect Mobile) e id **prod**
 `140986d8c6bc4026880e117255a6ce67` pinneado en `release`. Los dos ids, el riesgo del merge y el
 procedimiento están en `store/RELEASES.md` y en `CLAUDE.md`.
+
+✅ **El canal beta hizo exactamente su trabajo** (cerrado el 2026-07-27): el autor instaló la
+`v0.2.1` desde el link de `apps.garmin.com`, editó los settings desde el teléfono y confirmó que el
+formulario real llega al device — la única verificación que ni el simulador ni el sideload podían dar.
+Con eso los settings se promovieron a producción; el estado actual está en §9.8. El párrafo de arriba
+queda como el registro de por qué existe el desdoblamiento de ids, que sigue vigente para la próxima
+iteración.
 
 ⚠️ **Y antes de exportar el `.iq`: `TEST_MODE` en `false`.** Con `TEST_MODE = true` un build de
 release compila limpio pero muestra `--` eternamente (el generador sintético es `(:debug)` y el stub

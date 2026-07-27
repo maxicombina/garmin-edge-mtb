@@ -6,7 +6,7 @@ Proyecto personal. El objetivo es una familia de *data fields* y una *device app
 
 ## Estado
 
-🚴 **Dos apps en producción** (Opciones A y J) · **dos implementadas y en validación** (B y K) · el resto, en especificación — ver [`GARMIN_MTB_SPEC.md`](GARMIN_MTB_SPEC.md).
+🚴 **Dos apps en producción** (Opciones A y J, la J con ajustes desde la `v0.2.2`) · **dos implementadas y en validación** (B y K) · el resto, en especificación — ver [`GARMIN_MTB_SPEC.md`](GARMIN_MTB_SPEC.md).
 
 La spec define el contexto (hardware, plataforma, restricciones), **10 opciones de producto evaluadas (A–J)** y un roadmap incremental. De la **K** en adelante son productos pensados después, no parte de esa ronda de evaluación; la letra es una etiqueta estable, no un orden. Resumen:
 
@@ -21,7 +21,7 @@ La spec define el contexto (hardware, plataforma, restricciones), **10 opciones 
 | G | Estimador de batería restante | data field | idea |
 | H | Stamina casera (modelo de depósito por FC) | device app | idea |
 | I | Test de subida (VO2max de campo + tracker de forma) | data field / device app | idea |
-| J | Flecha de tendencia estilo Cateye (actual vs. referencia) | data field | **✅ publicada · prod `v0.1.0` · beta `v0.2.1`** |
+| J | Flecha de tendencia estilo Cateye (actual vs. referencia) | data field | **✅ publicada · prod `v0.2.2`** |
 | K | La misma flecha, sobre la **cadencia** | data field | **🛠️ implementada · 9/9 tests · `v0.1.0` sin subir** |
 | L | La misma flecha, sobre la **frecuencia cardíaca** | data field | en diseño |
 
@@ -41,7 +41,7 @@ Pendiente y VAM **juntas en una celda**, reconstruidas desde cero con el altíme
 
 ### J — `j-trend-arrow` · publicada
 
-La flechita de los ciclocomputadores Cateye de los 90: velocidad actual en grande con **↑/↓ al lado** según vayas por encima o por debajo de tu referencia, y sin flecha cuando estás en la media. Desde la `v0.2.x` la referencia es **configurable**: el promedio real de la salida o una velocidad objetivo fija. La flecha usa el **glifo nativo si el device lo tiene y una primitiva dibujada si no**, decidido midiendo en el propio device.
+La flechita de los ciclocomputadores Cateye de los 90: velocidad actual en grande con **↑/↓ al lado** según vayas por encima o por debajo de tu referencia, y sin flecha cuando estás en la media. Desde la `v0.2.2`, ya en producción, la referencia es **configurable**: el promedio real de la salida o una velocidad objetivo fija. La flecha usa el **glifo nativo si el device lo tiene y una primitiva dibujada si no**, decidido midiendo en el propio device.
 
 [`SPEC.md`](apps/j-trend-arrow/SPEC.md) · [walkthrough del código](apps/j-trend-arrow/docs/code-walkthrough.html) · [`RELEASES.md`](apps/j-trend-arrow/store/RELEASES.md)
 

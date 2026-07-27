@@ -716,10 +716,12 @@ mArrowState = TrendArrow.classify(curTenths, refTenths, DEAD_BAND_TENTHS);</pre>
     <div class="wrap">
       <h2>Qué falta</h2>
       <p>
-        La <strong>v0.1.0 ya está publicada</strong> en la Connect IQ Store. Los unit tests están en verde
-        (<strong>12/12</strong>), el export de los <strong>17 targets</strong> compila sin un warning propio, el
-        render iguala al nativo y los íconos son propios. La <strong>v0.2.1</strong> —la de los settings— ya está
-        arriba en el <strong>canal beta</strong>, en una entrada aparte con su propio id. Queda:
+        La <strong>v0.2.2 está en producción</strong> en la Connect IQ Store — o sea que <strong>los settings
+        ya salieron</strong>. Los unit tests están en verde (<strong>12/12</strong>), el export de los
+        <strong>17 targets</strong> compila sin un warning propio, el render iguala al nativo y los íconos son
+        propios. Antes de eso, la <code>v0.2.1</code> pasó por el <strong>canal beta</strong>, en una entrada
+        aparte con su propio id, y ahí se hizo la única prueba que faltaba: instalarla desde la store en el
+        teléfono y editar los ajustes de verdad. Queda:
       </p>
       <div class="cards">
         <div class="card">
@@ -729,10 +731,11 @@ mArrowState = TrendArrow.classify(curTenths, refTenths, DEAD_BAND_TENTHS);</pre>
              familia). Son dos constantes.</p>
         </div>
         <div class="card">
-          <h3>2 · Los settings, con ojo humano</h3>
-          <p>El paseo promedio → objetivo → promedio cambiando el ajuste <em>en caliente</em>, y el caso que el
-             probe dejó marcado: <code>GOAL</code> en una celda angosta y en inglés, que es 9 px más ancho que
-             <code>AVG</code>. Ninguna de las dos se puede cerrar sin mirar.</p>
+          <h3>2 · <code>GOAL</code> en celda angosta</h3>
+          <p>El caso que el probe dejó marcado: en inglés, <code>GOAL</code> es 9 px más ancho que
+             <code>AVG</code>, así que en una celda angosta el modo objetivo puede elegir un escalón de fuente
+             menos. No desborda, pero hay que verlo. El paseo cambiando el ajuste en caliente ya se hizo, en el
+             teléfono, con la beta.</p>
         </div>
         <div class="card">
           <h3>3 · La flecha mide distinto por familia</h3>
@@ -757,10 +760,10 @@ mArrowState = TrendArrow.classify(curTenths, refTenths, DEAD_BAND_TENTHS);</pre>
         una apuesta.
       </p>
       <div class="note">
-        <p><strong>Un pendiente que no es de código y es fácil de olvidar:</strong> la ficha publicada dice
-        «no hay nada que configurar», y hoy <em>es correcto</em> — describe la v0.1.0, que no tiene ajustes.
-        Pasa a ser falso el día que una v0.2.x llegue a <strong>producción</strong>, así que reescribir esa
-        viñeta en el portal, en los dos idiomas, es parte de ese release.</p>
+        <p><strong>Un pendiente que no es de código:</strong> la ficha publicada dice «no hay nada que
+        configurar». Era correcto mientras describía la v0.1.0 — y con la v0.2.2 en producción
+        <strong>dejó de serlo</strong>. Reescribir esa viñeta en el portal, en los dos idiomas, es lo que
+        queda de este release; es trabajo de ficha, no de código.</p>
       </div>
     </div>
   </section>

@@ -10,7 +10,7 @@ tenía uno solo). Cada id es una app distinta en el portal, y **ninguno de los d
 
 | Canal | id | Vive en | Entrada del portal |
 |---|---|---|---|
-| **PROD** | `140986d8c6bc4026880e117255a6ce67` | rama `release` | la publicada (v0.1.0) |
+| **PROD** | `140986d8c6bc4026880e117255a6ce67` | rama `release` | la publicada (v0.2.2) |
 | **BETA** | `f70f3c984e4c43d496006628f3510817` | rama `main` | entrada **sin publicar**, se instala por el link de `apps.garmin.com` + Connect Mobile |
 
 El id beta se generó el 2026-07-26 con `uuidgen | tr -d '-' | tr 'A-Z' 'a-z'` porque los **settings de
@@ -18,12 +18,53 @@ una app sideloadeada no se pueden editar desde el teléfono** (cuelgan del vínc
 `SPEC.md` §9.9), así que probarlos exige una instalación real de la store — y hacerlo contra la ficha
 publicada costaba una ronda de review por iteración.
 
-⚠️ **En el próximo release de PROD:** la línea del id cambió en `main`, así que `git merge main` va a
-llevar el id **beta** a `release` **sin conflicto** (cambió de un solo lado). Justo después del merge
-hay que commitear el swap de vuelta al id de prod tocando solo `apps/j-trend-arrow/manifest.xml`, como
-hizo `6ad6be8` con la A. El aviso está también en el comentario del `manifest.xml` y en `CLAUDE.md`.
+✅ **La trampa del merge YA SE PISÓ Y SE RESOLVIÓ en la v0.2.2** (2026-07-27): el `git merge main`
+llevó el id **beta** a `release` sin conflicto, como estaba avisado, y el commit siguiente lo devolvió
+a `140986d8…` tocando solo `apps/j-trend-arrow/manifest.xml`. **Sigue vigente para cada release
+futuro** — cada vez que la línea del id se toque en `main`, el merge la va a arrastrar sin conflicto.
+Verificar el id en `release` **antes** de exportar el `.iq`, no después.
 
 Entradas, más nueva primero.
+
+## v0.2.2 — 2026-07-27 — prod
+
+**LA DE LOS SETTINGS, EN PRODUCCIÓN.** Trae a la ficha publicada todo lo que hasta ahora vivía solo en
+el canal beta: la **referencia configurable** (promedio de la salida u objetivo fijo). Versión a tipear
+en el portal: `0.2.2`.
+
+**Por qué 0.2.2 y no 0.2.0:** el stream de versión es **único por app** (beta y prod lo comparten), y
+ya llegó a 0.2.1. Además el código que va a prod es **más nuevo** que el de esa beta: incluye la
+migración al barrel y la flecha re-anclada, que son posteriores. Numerarlo 0.2.0 habría dejado el prod
+con número menor que una beta que contiene menos.
+
+Qué cambió respecto de la **v0.1.0**, que es lo que había publicado:
+
+- **La referencia de la flecha es configurable** (`SPEC.md` §9): dos ajustes editables desde el
+  teléfono — *Comparar contra* (promedio de la salida | objetivo fijo) y *Velocidad objetivo* — con el
+  prefijo de la segunda línea pasando de `PROM` a `META` en modo objetivo. **El default es el promedio
+  de la salida**, así que quien actualice y no toque nada ve exactamente lo de antes.
+- **Verificado en el teléfono, no solo en el simulador:** la `v0.2.1` se subió al canal beta y el autor
+  la instaló desde el link de `apps.garmin.com` para comprobar que el formulario real llega al device y
+  dispara `onSettingsChanged`. Eso es lo que habilitó este release.
+- **El motor de render se fue a un barrel** (`barrels/trend-core`, `SPEC.md` §3.4), compartido con la
+  Opción K. La View pasó de 858 a 225 líneas. **No cambia un píxel**, y no es una impresión: antes de
+  borrar la copia se compararon las 13 funciones del motor cuerpo a cuerpo, normalizadas, y salieron
+  idénticas carácter por carácter.
+- **La flecha se ancla a la BASELINE del número** (`SPEC.md` §6.13), en lugar de a una constante. Se
+  fueron las dos perillas de ajuste vertical. Arregla un desfase real que en celda grande era de 4,5 px
+  y que era **asimétrico por familia de fuentes**: los dígitos llenan 0,79 del ascent en la familia TTF
+  y 0,91 en la de bitmaps, y ese alto no lo expone ninguna API.
+- **El label ya no se pide como `FONT_GLANCE` a secas** (`SPEC.md` §6.14): esa fuente **no existe** en
+  la familia de bitmaps y resolvía en silencio a la más chica, dejando el título ~40 % más chico que el
+  nativo en 6 de los 13 devices. Ahora se queda con el mayor entre `GLANCE` y `SMALL` midiendo en
+  runtime, sin nombrar un solo modelo.
+- **Verificado:** suite **12/12** (7 propios + los 5 del barrel, namespaceados) y **export de los 17
+  targets limpio**, con `TEST_MODE = false` comprobado en la rama `release` antes de exportar.
+
+⚠️ **LO QUE FALTA DE ESTE RELEASE, Y NO ES CÓDIGO: reescribir la ficha en el portal.** Hasta ahora
+decía con razón *«No hay nada que configurar: no tiene ajustes»* / *«Nothing to configure - there are no
+settings»*, porque describía la v0.1.0. **Con los settings en producción esa viñeta es falsa** en los
+dos idiomas. Recordar que el formulario del portal **no acepta markdown**.
 
 ## v0.2.1 — 2026-07-26 — beta
 
