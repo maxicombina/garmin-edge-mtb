@@ -20,6 +20,7 @@ Toda decisión tomada en conversación se escribe **en el mismo turno** en que s
 - **Producto / diseño / fisiología / fórmulas** → `GARMIN_MTB_SPEC.md` (en la opción afectada, o resolviendo la pregunta abierta correspondiente).
 - **Convenciones de trabajo, estructura del repo, tooling, proceso** → este `CLAUDE.md`.
 - **Estado del proyecto** (fase alcanzada, qué está hecho/pendiente) → sección "Estado actual" de este `CLAUDE.md`.
+- **`README.md` (la portada del repo) → SE ACTUALIZA SIEMPRE que cambie algo que él afirma** (regla dura, 2026-07-27, pedida por el autor tras encontrarlo sin la Opción J). Es lo primero que ve cualquiera, incluido el propio autor dentro de seis meses, y envejece en silencio porque nada lo compila. Disparadores concretos: **una app nueva** (fila en la tabla de opciones + su sección "Las apps"), **un cambio de estado** (implementada / publicada / beta / prod y el número de versión), **una feature visible** (p. ej. que la referencia de J pasó a ser configurable), o **una convención nueva** que valga para todo el repo. Chequeo rápido: que la tabla liste las MISMAS opciones que `GARMIN_MTB_SPEC.md` §4, que los estados coincidan con cada `apps/<app>/store/RELEASES.md`, y que los links no apunten a archivos que ya no existen.
 - Si el asistente dispone de **memoria persistente de sesión**, reflejar también ahí los cambios de estado y decisiones relevantes.
 
 ## Idioma
