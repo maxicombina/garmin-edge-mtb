@@ -5,28 +5,36 @@ repo, sección «Versionado por app»). La versión **no vive en el paquete** (`
 es la versión del *formato* del manifest, no de la app): se tipea a mano en el portal de Connect IQ al
 subir el `.iq`. Este archivo dice qué número tipear y qué cambió.
 
-**Los ids de esta app.** Hoy hay **uno solo**, el de beta, porque nunca se subió nada a producción.
-Cada id es una app distinta en el portal y **no se cambia nunca**:
+**Los ids de esta app.** Cada id es una app distinta en el portal y **no se cambia nunca**:
 
 | Canal | id | Vive en | Entrada del portal |
 |---|---|---|---|
-| **BETA** | `245d380378fd4d208ea89989b8b337a7` | rama `main` | todavía **no existe** |
-| **PROD** | — | rama `release` | — |
+| **PROD** | `ec5d354d6b804c569088bbce765472b8` | rama `release` | `v0.1.0` |
+| **BETA** | `245d380378fd4d208ea89989b8b337a7` | rama `main` | **nunca se usó** |
 
-Cuando K vaya a producción hay que generar su id de prod (`uuidgen | tr -d '-' | tr 'A-Z' 'a-z'`),
-aplicarlo **a mano** en `manifest.xml` del lado de `release` (nunca con el editor visual del manifest,
-que reformatea el XML) y anotarlo acá. El delta de `release` sobre `main` es exactamente eso y nada
-más, así que el merge `main→release` no da conflicto: solo `release` toca esa línea.
+El id de prod se generó el 2026-07-28 con `uuidgen | tr -d '-' | tr 'A-Z' 'a-z'` y se aplicó **a mano**
+en `manifest.xml` del lado de `release` (nunca con el editor visual del manifest, que reformatea el
+XML). Ese es el **único** delta de `release` sobre `main` en esta app, así que el merge `main→release`
+nunca da conflicto en esa línea: solo `release` la toca.
+
+⚠️ **Y por eso, después de TODO merge `main→release`, hay que verificar el id antes de exportar el
+`.iq`.** El merge trae el id de **beta** sin conflicto (la línea cambió de un solo lado) y el `.iq` no
+avisa: sale firmado y funcional, pero apuntando a la app equivocada del portal. Es la comprobación que
+separa un release bueno de uno subido al lugar errado. Pasó y se resolvió en J v0.2.2.
+
+El id de **beta** quedó reservado y sin usar: K se subió **directo a producción** (decisión del autor
+el 2026-07-28) porque el mecanismo de settings que estrena es el mismo de J, ya validado en un teléfono
+real. Sigue disponible si algún día conviene un canal de pruebas.
 
 Entradas, más nueva primero.
 
-## v0.1.0 — 2026-07-27 — beta
+## v0.1.0 — 2026-07-28 — prod
 
-**Número REGISTRADO, todavía SIN SUBIR** — pero ya **sin bloqueantes**: el código está verde y desde el
-2026-07-27 la app tiene **ícono propio**. Cuando se suba, va al **canal beta** con el id `245d3803…`,
-como entrada **sin publicar**, y se instala por el link de `apps.garmin.com` + Connect Mobile. Lo que
-falta antes de subir es de mano del autor: mirarla andar en el simulador y decidir los assets de la
-ficha.
+**Primer release, y va DIRECTO a producción** — sin pasar por el canal beta, decisión del autor. K
+estrena settings, que fue justo el motivo por el que J necesitó un canal beta; acá el riesgo es bajo
+porque **el mecanismo es el mismo de J y ya se validó en un teléfono real** (el formulario del portal
+llega al device y dispara `onSettingsChanged`), y lo único distinto es que el objetivo de K es un entero
+de rpm en vez de un número con unidad. Tag: `k-cadence-trend/v0.1.0` sobre `release`.
 
 Primera versión. Data field que muestra la **cadencia actual** en grande con una **flecha ▲/▼ al
 lado**, comparándola contra la **cadencia promedio de la actividad** (estilo Cateye, igual que la
@@ -59,13 +67,22 @@ Opción J pero sobre cadencia), y el promedio en una línea secundaria cuando la
   `TIEMPO` pero no en `VELOCIDAD`, así que K lo lleva y J no. Medido de una captura: 23×19 px con 3 px de
   hueco. Para esto el barrel estrenó un hook —reserva la caja y llama de vuelta— **sin enterarse de qué
   dibuja**.
-- **Ícono propio** (`../SPEC.md` §3.4), que era el bloqueante de la subida: **cuerpo de pedal
-  CUADRADO**, con la misma raya ámbar y la misma flecha blanca que J adentro. Todo generado por
-  `gen_icon.py` (solo numpy): master 1024, `store-icon-500` y los 13 launchers, cada uno dibujado a su
-  tamaño. **Lo que distingue a K de J a 35 px es la silueta —cuadrado contra redondo—, no el detalle**,
-  que a ese tamaño no existe. Y **no es un plato a propósito**: en la prueba a ciegas de J, 7 de 7
-  observadores leyeron los tacos del neumático como «engranaje/ajustes», y un plato es literalmente un
-  engranaje.
+- **Ícono propio: una BIELA** (`../SPEC.md` §3.4), aro cobalto con dos brazos y un pedal en cada punta,
+  inclinados 18° como los del glifo del campo nativo, y adentro la misma raya ámbar y la misma flecha
+  blanca que J. Todo generado por `gen_icon.py` (solo numpy): master 1024 con brillo, `store-icon-500`
+  y los 13 launchers, cada uno dibujado a su tamaño y planos. **Hubo un diseño anterior —un pedal
+  cuadrado— y se descartó porque no decía cadencia.** Y **no es un plato a propósito**: en la prueba a
+  ciegas del ícono de J, 7 de 7 observadores leyeron los tacos del neumático como «engranaje/ajustes»,
+  y un plato es literalmente un engranaje.
+- **Con esto queda fijado el SISTEMA de la familia** (`../SPEC.md` §3.4.1), que manda sobre los íconos
+  que vengan: el **interior es constante** —raya ámbar del promedio + flecha cruzándola, lo único que
+  la prueba a ciegas demostró que se entiende— y la **silueta exterior es la métrica** (rueda =
+  velocidad, biela = cadencia, corazón = frecuencia cardíaca), porque a 35 px la silueta es lo único
+  que sobrevive.
+- **Assets de la ficha listos:** `hero-image-1440x720.png` con la composición de A y J (ícono a la
+  izquierda, capturas como tarjetas a la derecha) y **tres capturas por debajo del límite de 150 KB del
+  portal**. Los tres generadores quedan en `store/` (`gen_icon.py`, `gen_hero.py`,
+  `opt_screenshots.py`), así que los assets se rehacen con un comando.
 - **13 devices** (`edge530/540/830/840/550/850/1030 ×3/1040/1050/explore2/mtb`), `eng` + `spa`,
   CIQ 3.3.0, sin permisos.
 - **Verificado (2026-07-27):** **10/10 tests PASS** con `monkeydo -t` en el edge840 — 5 propios de
@@ -74,10 +91,21 @@ Opción J pero sobre cadencia), y el promedio en una línea secundaria cuando la
   `006-B2924-00` (CIQ 3.2.5), que no llega al `minApiLevel` del proyecto y queda fuera del `.iq`:
   esperado, pasa en las cuatro apps del repo.
 
-⚠️ **Antes de exportar el `.iq`, verificar que `TEST_MODE` esté en `false`** en
-`source/CadenceTrendView.mc`. Con `true` el build de release **compila limpio y sin warnings** pero el
-campo muestra `--` para siempre (el generador sintético es `(:debug)` y su stub `(:release)` devuelve
-nulls, así que nunca lee `Activity.Info`). Le costó a J un número de versión quemado.
+⚠️ **`TEST_MODE` verificado en `false` en el `.iq` de este release**, y hay que repetir la comprobación
+en cada uno. Con `true` el build de release **compila limpio y sin warnings** pero el campo muestra `--`
+para siempre (el generador sintético es `(:debug)` y su stub `(:release)` devuelve nulls, así que nunca
+lee `Activity.Info`). Le costó a J un número de versión quemado. El `.iq` de este release se exportó
+desde un **worktree limpio de `release`**, que es la forma barata de que un `true` suelto en el árbol de
+trabajo del día no se cuele en el paquete.
 
-Pendiente también, para cuando se suba: los assets de la ficha (capturas, hero 1440×720, textos EN+ES)
-y el contacto `el.soldador.garmin@gmail.com`, que es el que usan las fichas de este repo.
+**Lo que pone el autor en el portal al subir el `.iq`:** el número de versión (`0.1.0`, se tipea a mano)
+y **los TEXTOS de la ficha** (título y descripción EN+ES), que van directo ahí porque los textos de
+ficha **no se versionan en el repo** (decisión del 2026-07-27, ver `CLAUDE.md` §«Flujo de release»);
+⚠️ el formulario **no acepta markdown**. Contacto: `el.soldador.garmin@gmail.com`, el mismo de todas las
+fichas de este repo. Assets: `store/store-icon-500.png`, `store/hero-image-1440x720.png` y las tres
+`store/cadence-trend-*.png`.
+
+⚠️ **La ficha es parte del release, no un anexo.** Es el único texto del proyecto que nada compila, así
+que un cambio de features la puede volver falsa en silencio — le pasó a J, cuya ficha afirmó durante
+días que no había nada que configurar cuando ya tenía ajustes. La de K **tiene que mencionar los dos
+settings desde el día uno**, porque están en esta misma v0.1.0.

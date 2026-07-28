@@ -632,10 +632,13 @@ mArrowState = TrendCore.TrendArrow.classify(CadenceFormat.trendValue(curRpm),
       </p>
       <div class="cards">
         <div class="card">
-          <h3>1 · Los assets de la ficha</h3>
-          <p>El ícono ya está (abajo). Faltan las capturas, el hero y los textos EN+ES para el portal —
-             y recordar que su formulario <strong>no acepta markdown</strong>. Es lo último antes de
-             subirla al canal beta como <code>v0.1.0</code>.</p>
+          <h3>1 · Los textos de la ficha</h3>
+          <p>El ícono, el hero y las capturas ya están (abajo). Falta solo el <strong>texto</strong>: título
+             y descripción en inglés y castellano, que van directo al portal porque en este repo los textos
+             de ficha <strong>no se versionan</strong>. Su formulario <strong>no acepta markdown</strong>.
+             Es lo único que queda para completar la subida de la <code>v0.1.0</code>, y tienen que
+             <strong>mencionar los dos ajustes</strong> — están en esta misma versión, y a la J le pasó
+             publicar una ficha que afirmaba que no había nada que configurar.</p>
         </div>
         <div class="card">
           <h3>2 · Mirarlo andar</h3>
@@ -652,63 +655,125 @@ mArrowState = TrendCore.TrendArrow.classify(CadenceFormat.trendValue(curRpm),
         </div>
       </div>
       <p style="margin-top:16px">
-        La versión <strong><code>v0.1.0</code> está registrada</strong> en
-        <code>store/RELEASES.md</code> para la primera subida al canal beta, pero todavía
-        <strong>no se subió nada</strong>.
+        La <strong><code>v0.1.0</code> es un release de PRODUCCIÓN</strong> (tag
+        <code>k-cadence-trend/v0.1.0</code> sobre <code>release</code>; changelog en
+        <code>store/RELEASES.md</code>) y <strong>fue directo a prod, sin canal beta</strong>. Eso merece una
+        nota, porque K estrena ajustes y fue justo lo que obligó a la J a tener un canal beta: los ajustes de
+        una app <strong>sideloadeada no se pueden editar desde el teléfono</strong>, así que probarlos exige
+        una instalación de la store. Acá el mecanismo es <strong>el mismo de la J y ya está validado en un
+        teléfono real</strong>, así que la ronda de review previa no compraba información nueva. K tiene un
+        id de beta reservado por si algún día hace falta.
       </p>
     </div>
   </section>
 
   <section>
     <div class="wrap">
-      <h2>El ícono: la silueta es el mensaje</h2>
+      <h2>El ícono, y el sistema de una familia</h2>
       <p>
-        A 35 píxeles no hay detalle. Lo único que sobrevive es la <strong>silueta</strong>, y ese es todo
-        el razonamiento detrás del ícono de K: <strong>J es redondo, K es cuadrado</strong> — un cuerpo de
-        pedal de plataforma visto de frente. Adentro lleva <em>exactamente</em> lo mismo que J: la raya
-        ámbar de tu media, cruzada por la flecha blanca.
+        A 35 píxeles no hay detalle: lo único que sobrevive es la <strong>silueta</strong>. Ese hecho es
+        todo el sistema, y quedó fijado con este ícono porque la flecha de tendencia va a repetirse en más
+        métricas — o sea que esto es una <strong>familia</strong>, no un ícono suelto.
+      </p>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>Parte</th><th>Qué dice</th><th>Cómo</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Constante</strong></td><td>«esto es tendencia contra tu promedio»</td><td>cara oscura + <strong>raya ámbar</strong> (tu promedio) + <strong>flecha blanca</strong> cruzándola</td></tr>
+            <tr><td><strong>Variable</strong></td><td><strong>qué métrica es</strong></td><td>la <strong>silueta exterior</strong>: aro de rueda = velocidad, <strong>biela = cadencia</strong>, corazón = frecuencia cardíaca</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">
+        El de K es una <strong>biela</strong>: aro cobalto con dos brazos en diagonal y un pedal en cada
+        punta, <strong>inclinados 18°</strong> — la misma inclinación medida en el glifo que el campo nativo
+        dibuja junto al rótulo, así que el ícono y lo que se ve en pantalla son el mismo objeto.
       </p>
       <p>
-        Que el interior sea idéntico no es pereza, es lo que dijo la evidencia. El ícono de J
-        <strong>se testeó a ciegas</strong> con siete observadores que no sabían qué había querido decir
-        el autor, y el resultado fue contundente en las dos direcciones:
+        <strong>Hubo un ícono anterior y se descartó.</strong> Era un cuerpo de pedal <em>cuadrado</em>, y su
+        razonamiento no era malo: la silueta cuadrada lo distinguía de J y no podía leerse como engranaje.
+        Pero <strong>no decía cadencia</strong> — su único trabajo era «no soy la J». En cuanto quedó claro
+        que esto es una familia, esa no alcanzaba: la silueta tiene que ganarse el lugar diciendo la
+        métrica.
+      </p>
+      <p>
+        Que el interior se conserve idéntico entre hermanas tampoco es pereza, lo dijo la evidencia. El ícono
+        de J <strong>se testeó a ciegas</strong> con siete observadores que no sabían qué había querido decir
+        el autor:
       </p>
       <div class="cards">
         <div class="card">
           <h3>El objeto no se lee</h3>
-          <p><strong>0 de 7</strong> vieron un neumático en el ícono de J. Así que gastar el dibujo en
-             representar un objeto —una biela, un pedal— no compra nada.</p>
+          <p><strong>0 de 7</strong> vieron un neumático en el de J. Gastar el dibujo en representar un objeto
+             no compra nada por sí solo.</p>
         </div>
         <div class="card">
           <h3>La flecha y la raya sí</h3>
-          <p><strong>7 de 7</strong> llegaron a «una línea de referencia que la flecha cruza». Eso es lo
-             que comunica, y por eso se conserva intacto en K.</p>
+          <p><strong>7 de 7</strong> llegaron a «una línea de referencia que la flecha cruza». Eso es lo que
+             comunica, así que es la parte que no se toca.</p>
         </div>
         <div class="card">
           <h3>Y un plato sería un engranaje</h3>
           <p><strong>7 de 7</strong> leyeron los tacos del neumático de J como «engranaje / tuerca /
-             <em>ajustes</em>» — el peor falso amigo en una lista de campos, y lo que le costó los tacos.
-             Un plato, el motivo obvio para cadencia, <em>es</em> un engranaje. Descartado por eso.</p>
+             <em>ajustes</em>» — el peor falso amigo en una lista de campos. Un plato, el motivo obvio para
+             cadencia, <em>es</em> un engranaje. La biela no tiene dientes.</p>
         </div>
       </div>
       <p style="margin-top:16px">
-        Se dibuja entero por código (<code>store/gen_icon.py</code>, solo numpy): el master de 1024, el
-        ícono de la ficha y los 13 launchers, <strong>cada uno a su tamaño</strong> — reducir el master a
-        35 px deja una mancha, lección que costó los íconos de la Opción A.
+        Se dibuja entero por código (<code>store/gen_icon.py</code>, solo numpy): el master de 1024 con
+        brillo, el ícono de la ficha y los 13 launchers, <strong>cada uno a su tamaño</strong> y planos —
+        reducir el master a 35 px deja una mancha, lección que costó los primeros íconos de la Opción A.
       </p>
       <div class="note">
-        <p><strong>Un pozo pisado dos veces, en dos formas distintas.</strong> El primer intento le sumaba
-        al degradado una banda especular, y a 500 px se veía como una <em>cuña de borde duro</em> en la
-        esquina: un rayón, no un reflejo. El script de J ya advertía de eso en su versión con arco. La
-        diferencia es que un aro redondo tiene una curva sobre la que apoyar el brillo y un marco cuadrado
-        no, así que acá no había nada que suavizar: <strong>se sacó la banda y quedó una sola rampa
-        diagonal</strong>. Se detectó mirando el PNG generado, no razonándolo.</p>
+        <p><strong>Costo aceptado y medido:</strong> con los brazos largos —la variante que el autor eligió,
+        por ser la silueta más distintiva— el aro queda más chico que el de J, así que a 35 px el interior de
+        K tiene menos cuerpo que el de su hermana. Y una consecuencia anotada y <em>no</em> ejecutada: con
+        este sistema J queda como la hermana sin metáfora, porque su aro liso dejó de leerse como rueda
+        cuando le sacaron los tacos. Devolverle una silueta propia es cambiar el ícono de una app publicada,
+        así que se decide con tiempo y no dentro de un release.</p>
       </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>El hero, o cuatro maneras de arruinar un borde</h2>
       <p>
-        Lo honesto: el cuadrado <strong>no grita «pedal»</strong>. Su trabajo es gritar «no soy la J». Y lo
-        que ningún dibujo va a explicar es que la raya sea <em>tu media</em> — eso lo cargan el nombre y la
-        ficha.
+        La ficha lleva un <strong>hero</strong> de 1440×720 con la misma composición que las de A y J: el
+        ícono grande a la izquierda sobre un degradado navy, y capturas del campo a la derecha como tarjetas
+        con esquinas redondeadas y sombra. Las funciones de composición son <strong>las de J,
+        copiadas</strong> — y ahí está la lección, porque la primera versión las escribió «parecidas» y el
+        resultado se veía mal justo en un sitio: <strong>el borde entre la tarjeta blanca y el fondo
+        azul</strong>, que es exactamente donde el autor lo notó.
       </p>
+      <ol class="flow">
+        <li><b>La máscara redondeada era binaria.</b> Alpha 0 o 1 y nada en medio, así que el arco salía en
+            <em>escalera</em> y el salto entero de blanco a navy —unos 240 niveles— caía en un píxel. La de J
+            tiene <b>antialias por supersampling ×4</b>. Era la causa principal: medido después,
+            <b>64 píxeles intermedios en la esquina contra 87 de J</b>; antes, casi cero.</li>
+        <li><b>Ampliar una captura la vuelve blanda.</b> Estirar de 486 a 600 px duplica unos píxeles y no
+            otros, los trazos quedan desparejos y eso se lee como borroso: los grises por píxel de borde
+            pasaban de <b>0,53</b> (J) a <b>0,99</b>. Regla: <b>ampliar nunca, reducir sí</b> — y es por eso
+            que el hero de J se ve nítido, porque sus capturas son de 1000 px y las <em>baja</em>. Con las
+            capturas grandes, el de K quedó en <b>0,52</b>.</li>
+        <li><b>La sombra era demasiado cerrada.</b> Muchas pasadas de caja de radio 1 pegadas al borde leen
+            como un contorno oscuro. La de J es <em>una</em> caja ancha, desplazada hacia abajo y aplicada al
+            lienzo <em>antes</em> de pegar la tarjeta.</li>
+        <li><b>El degradado era más oscuro y plano</b> que el de J, lo que endurecía el contraste contra el
+            blanco de la tarjeta.</li>
+      </ol>
+      <div class="note">
+        <p><strong>Y el límite que el portal no perdona: 150 KB por captura.</strong> Las de la ficha
+        llegaron en RGB de 1535 px pesando ~780 KB. La receta de J las deja en 118-139 KB: reducir a 1000 px
+        promediando bloques, y pasarlas a <strong>escala de grises</strong> — PNG de tipo de color 0, un byte
+        por píxel en vez de tres. Es sin pérdida, porque el campo es negro sobre blanco. <em>Esa es la
+        diferencia entre las capturas de J y las que llegaron para K: tipo 0 contra tipo 2.</em></p>
+        <p style="margin-top:10px">⚠️ Con un detalle que costó una vuelta: la guarda de «¿hay color?» mira
+        una <strong>proporción</strong>, no el máximo. Decidiendo por el máximo, una captura quedó marcada
+        como color y en 324 KB — cuando su separación máxima entre canales era 13, la media 0,29 y solo el
+        0,003 % de los píxeles pasaba de 8. Era ruido del generador. <strong>Un máximo lo decide un puñado
+        de píxeles; una proporción describe la imagen.</strong></p>
+      </div>
     </div>
   </section>
 </main>

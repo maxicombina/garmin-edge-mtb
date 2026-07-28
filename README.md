@@ -2,11 +2,11 @@
 
 Aplicaciones Connect IQ para **Garmin Edge** (830 / 840) orientadas a MTB (XC / senderos técnicos).
 
-Proyecto personal. El objetivo es una familia de *data fields* y una *device app* que aporten métricas útiles durante la rodada, calculadas on-device y sin depender de potenciómetro. Hay **dos apps publicadas** en la Connect IQ Store, **dos más implementadas** sin publicar, y el resto en especificación.
+Proyecto personal. El objetivo es una familia de *data fields* y una *device app* que aporten métricas útiles durante la rodada, calculadas on-device y sin depender de potenciómetro. Hay **tres apps publicadas** en la Connect IQ Store, **una más implementada** sin publicar, y el resto en especificación.
 
 ## Estado
 
-🚴 **Dos apps en producción** (Opciones A y J, la J con ajustes desde la `v0.2.2`) · **dos implementadas y en validación** (B y K) · el resto, en especificación — ver [`GARMIN_MTB_SPEC.md`](GARMIN_MTB_SPEC.md).
+🚴 **Tres apps en producción** (Opciones A, J y K; J y K con ajustes) · **una implementada y en validación** (B) · el resto, en especificación — ver [`GARMIN_MTB_SPEC.md`](GARMIN_MTB_SPEC.md).
 
 La spec define el contexto (hardware, plataforma, restricciones), **10 opciones de producto evaluadas (A–J)** y un roadmap incremental. De la **K** en adelante son productos pensados después, no parte de esa ronda de evaluación; la letra es una etiqueta estable, no un orden. Resumen:
 
@@ -22,7 +22,7 @@ La spec define el contexto (hardware, plataforma, restricciones), **10 opciones 
 | H | Stamina casera (modelo de depósito por FC) | device app | idea |
 | I | Test de subida (VO2max de campo + tracker de forma) | data field / device app | idea |
 | J | Flecha de tendencia estilo Cateye (actual vs. referencia) | data field | **✅ publicada · prod `v0.2.3`** |
-| K | La misma flecha, sobre la **cadencia** | data field | **🛠️ implementada · 10/10 tests · `v0.1.0` sin subir** |
+| K | La misma flecha, sobre la **cadencia** | data field | **✅ publicada · prod `v0.1.0`** |
 | L | La misma flecha, sobre la **frecuencia cardíaca** | data field | en diseño |
 
 ## Las apps
@@ -45,9 +45,9 @@ La flechita de los ciclocomputadores Cateye de los 90: velocidad actual en grand
 
 [`SPEC.md`](apps/j-trend-arrow/SPEC.md) · [walkthrough del código](apps/j-trend-arrow/docs/code-walkthrough.html) · [`RELEASES.md`](apps/j-trend-arrow/store/RELEASES.md)
 
-### K — `k-cadence-trend` · implementada, sin publicar
+### K — `k-cadence-trend` · publicada · prod `v0.1.0`
 
-La misma flecha de J, sobre la **cadencia**. La métrica más simple de la familia: llega en rpm enteros y rpm es rpm en todos los países, así que no hay conversión ni unidades que cambien. Su única decisión de producto es el **0 de no pedalear**: en una bajada pasás minutos sin pedalear, y llamar a eso "por debajo de tu media" sería falso, así que muestra el `0` real **sin flecha**. Fue la primera app construida sobre el barrel, y su View quedó en ~130 líneas porque no tiene una sola línea de layout. J se migró al mismo barrel el 2026-07-27 y bajó de 858 líneas a 225. Lleva la **referencia configurable** de J (promedio de la salida u objetivo fijo, acá un entero de rpm) y el **glifo de la biela junto al nombre**, como el campo nativo. Su ícono es un **cuerpo de pedal cuadrado**, con la misma raya ámbar y la misma flecha que J adentro: a 35 px lo que distingue una app de la otra es la silueta, no el detalle.
+La misma flecha de J, sobre la **cadencia**. La métrica más simple de la familia: llega en rpm enteros y rpm es rpm en todos los países, así que no hay conversión ni unidades que cambien. Su única decisión de producto es el **0 de no pedalear**: en una bajada pasás minutos sin pedalear, y llamar a eso "por debajo de tu media" sería falso, así que muestra el `0` real **sin flecha**. Fue la primera app construida sobre el barrel, y su View quedó en ~130 líneas porque no tiene una sola línea de layout. J se migró al mismo barrel el 2026-07-27 y bajó de 858 líneas a 225. Lleva la **referencia configurable** de J (promedio de la salida u objetivo fijo, acá un entero de rpm) y el **glifo de la biela junto al nombre**, como el campo nativo. Su ícono es una **biela** con un pedal en cada punta, y con él quedó fijado el sistema de la familia: el **interior es constante** —la raya ámbar del promedio cruzada por la flecha— y la **silueta exterior dice la métrica**, porque a 35 px la silueta es lo único que sobrevive.
 
 [`SPEC.md`](apps/k-cadence-trend/SPEC.md) · [walkthrough del código](apps/k-cadence-trend/docs/code-walkthrough.html) · [`RELEASES.md`](apps/k-cadence-trend/store/RELEASES.md)
 

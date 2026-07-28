@@ -96,9 +96,13 @@ k-cadence-trend/
 ├── docs/code-walkthrough.html  # explicación del código (regla del repo: se mantiene al día)
 └── store/
     ├── RELEASES.md             # versionado de ESTA app (fuente de verdad del número)
-    ├── gen_icon.py             # dibuja TODO el ícono: master + ficha + los 13 launchers (§3.4)
+    ├── gen_icon.py             # dibuja TODO el ícono: master + ficha + los 13 launchers (§3.4.3)
+    ├── gen_hero.py             # compone el hero 1440×720 (§3.4.4)
+    ├── opt_screenshots.py      # deja las capturas bajo los 150 KB del portal (§3.4.5)
     ├── icon-master-1024.png    # master RGBA con alpha real, para regenerar
-    └── store-icon-500.png      # 500×500 opaco sobre gris #E6E6E6, para la ficha del portal
+    ├── store-icon-500.png      # 500×500 opaco sobre gris #E6E6E6, para la ficha del portal
+    ├── hero-image-1440x720.png # hero de la ficha
+    └── cadence-trend-arrow-*.png  # capturas de la ficha (y las tarjetas del hero)
 ```
 
 **No hay `TestUtil.mc` propio**, a diferencia de J: los helpers `assertNear`/`assertIsNumber` son para
@@ -148,46 +152,127 @@ próxima compilación de cualquier consumidor. Los cuatro gotchas están en `CLA
 para esta app es que **los tests `(:test)` del barrel SÍ corren desde acá** y aparecen namespaceados
 (`TrendCore.testX`) junto a los propios — ver §7.
 
-### 3.4 Ícono — HECHO (2026-07-27). Cuerpo de pedal CUADRADO, todo dibujado por código
+### 3.4 Ícono y assets de la ficha — CERRADOS (2026-07-28). Una BIELA, y el sistema de la familia
 
-**Motivo:** cuerpo de **pedal de plataforma visto de frente** — marco **cuadrado** redondeado cobalto
-`#0070F0`, cara azul muy oscuro `#0E1A38` y, dentro, **la misma raya ámbar y la misma flecha blanca
-que J**. Sin texto, sin números, sin dientes.
+**Motivo final: una BIELA vista de frente** — aro cobalto `#0070F0` con dos brazos en diagonal y un
+**pedal en cada punta**, y dentro, sobre cara azul muy oscuro `#0E1A38`, **la misma raya ámbar y la
+misma flecha blanca que J**. Sin texto, sin números, sin dientes.
 
-**Todo sale de [`store/gen_icon.py`](store/gen_icon.py)** (requiere **solo numpy**, no Pillow): el
-master 1024 RGBA, el `store-icon-500` opaco sobre gris, y los 13 launchers, **cada uno dibujado a su
-tamaño** (35/36/40/56/68) porque reducir el master deja una mancha borrosa a 35 px — lección de la
-Opción A. Los launchers van **planos** (sin brillo) y sin filete interior abajo de 56 px. **No editar
-los PNG: editar el script y re-correrlo.**
+⚠️ **Hubo un ícono anterior, un cuerpo de pedal CUADRADO, y se descartó** (2026-07-28, el autor: *«el
+logo no me gusta»*). Su razonamiento no era malo —la silueta cuadrada distinguía de J y no podía leerse
+como engranaje— pero **no decía cadencia**: su único trabajo era «no soy la J». Cuando el autor confirmó
+que la flecha de tendencia se va a repetir en más métricas, o sea que **esto es una FAMILIA**, el criterio
+cambió: la silueta tiene que ganarse su lugar diciendo cuál es la métrica.
 
-**Las tres decisiones, y por qué:**
+### 3.4.1 EL SISTEMA DE LA FAMILIA (lo importante de esta sección)
 
-1. **La geometría interior es IDÉNTICA a la de J, a propósito.** La prueba a ciegas de J (7
-   observadores sin contexto) encontró que **el objeto no se lee nunca** — 0 de 7 vieron un
-   neumático — pero que **la raya cruzada por la flecha sí**: 7 de 7 llegaron a «línea de referencia
-   que la flecha cruza». Eso es lo que hace de familia, así que se conserva tal cual.
-2. **Lo que distingue a K de J a 35 px es la SILUETA, no el detalle:** cuadrado contra redondo. A ese
-   tamaño el detalle no existe; la silueta sí. Verificado mirando los dos launchers de 35 px lado a
-   lado.
-3. **NO es un plato, que sería el motivo obvio de cadencia.** En esa misma prueba a ciegas, **7 de 7
-   leyeron los tacos del neumático de J como «engranaje / tuerca / ajustes»** — el peor falso amigo
-   posible en una lista de campos de datos, y lo que le costó los tacos a J. **Un plato es literalmente
-   un engranaje**, así que habría resucitado el problema. Un cuadrado no puede leerse como engranaje.
+Vale más que este ícono, porque manda sobre los que vengan (la Opción L y las que sigan):
 
-⚠️ **Honestidad sobre lo que comunica:** el cuadrado **no grita «pedal»**. Su trabajo es gritar «no soy
-la J». Que el objeto no se identifique ya lo sabemos por la prueba a ciegas de J; lo que el ícono tiene
-que lograr es ser reconocible como parte de la familia y distinguible de su hermana en la lista del
-device. **Lo que ningún dibujo puede explicar es que la raya sea tu media** — eso lo cargan el nombre
-y la ficha.
+| | |
+|---|---|
+| **CONSTANTE** — dice «esto es tendencia contra tu promedio» | cara oscura + **raya ámbar** (= tu promedio) + **flecha blanca** cruzándola |
+| **VARIABLE** — dice **qué métrica es** | la **SILUETA EXTERIOR**, en cobalto: aro de rueda = velocidad, **biela = cadencia**, corazón = frecuencia cardíaca |
 
-**Un pozo que este ícono volvió a pisar** (y que el comentario del script de J ya advertía, en su
-versión de arco): el primer intento sumaba una **banda especular** sobre el degradado y a 500 px se veía
-como una **cuña de borde duro** en la esquina — un rayón, no un reflejo. En una silueta cuadrada la
-banda no tiene una curva de la cual agarrarse, así que no hay forma de suavizarla: **se sacó y quedó
-una sola rampa diagonal.** Verificado mirando el PNG, no asumido.
+**Por qué la métrica va en la silueta y NUNCA en un detalle interior:** a 35 px el detalle no existe,
+la silueta sí. Está verificado mirando los launchers de 35 px de J y K lado a lado.
 
-**Pendiente relacionado:** este ícono **no pasó por la prueba a ciegas** que sí hizo el de J. Vale
-hacerla antes de subir la app si se quiere el mismo nivel de evidencia — la técnica está en J §3.3.
+**Y por qué el interior se conserva idéntico entre hermanas:** la prueba a ciegas del ícono de J (7
+observadores sin contexto) dio que **el objeto no se lee nunca** —0 de 7 vieron un neumático— pero que
+**la raya cruzada por la flecha sí**: 7 de 7 llegaron a «línea de referencia que la flecha cruza». O sea
+que el interior es lo único que comunica algo, así que no se toca.
+
+⚠️ **NO usar un plato para cadencia**, que es el motivo obvio: en esa misma prueba, **7 de 7 leyeron los
+tacos del neumático de J como «engranaje / tuerca / ajustes»** — el peor falso amigo en una lista de
+campos de datos, y lo que le costó los tacos a J. **Un plato es literalmente un engranaje.** La biela no
+tiene dientes, así que esquiva el problema y además sí dice cadencia.
+
+⚠️ **Consecuencia para la Opción J, anotada y NO ejecutada:** con este sistema, J queda como la hermana
+sin metáfora — su aro liso dejó de leerse como rueda cuando le sacamos los tacos. Si la familia crece,
+tendría sentido devolverle una silueta de rueda propia. **Es un cambio de ícono en una app publicada**,
+así que se decide con tiempo, no dentro de un release (el autor, 2026-07-28: «deja ya con la J, así está
+bien»).
+
+### 3.4.2 Geometría, y por qué los pedales van inclinados 18°
+
+**Los dos pedales están inclinados 18°, bajando hacia la izquierda y paralelos entre sí.** No es
+capricho: es la inclinación **medida en el glifo de la biela que el campo NATIVO dibuja** junto al rótulo
+`CADENCIA` (12-18°, §6.3). Con eso el ícono y el glifo de la pantalla pasan a ser **el mismo objeto**.
+Sin inclinar, los pedales leen como pestañas — se probaron las dos y el autor eligió mirando.
+
+Variante elegida sobre tres mockups: **brazo largo** (`A2`), que es la que da la silueta más distintiva.
+Costo aceptado y medido: con los brazos largos el aro es más chico que el de J, así que **a 35 px el
+interior de K tiene menos cuerpo que el de su hermana**.
+
+### 3.4.3 Los tres generadores de `store/` (solo numpy, ni Pillow)
+
+| Script | Qué produce |
+|---|---|
+| [`gen_icon.py`](store/gen_icon.py) | `icon-master-1024.png` (RGBA, con brillo), `store-icon-500.png` (opaco sobre gris) y los **13 launchers**, cada uno **dibujado a su tamaño** (35/36/40/56/68), **planos** y sin filete interior abajo de 56 px |
+| [`gen_hero.py`](store/gen_hero.py) | `hero-image-1440x720.png`: ícono a la izquierda sobre degradado navy, capturas a la derecha como tarjetas |
+| [`opt_screenshots.py`](store/opt_screenshots.py) | deja las capturas de la ficha bajo el **límite de 150 KB** del portal |
+
+**No editar los PNG a mano: editar el script y re-correrlo.** Reducir el master a 35 px deja una mancha
+borrosa — lección de la Opción A, y el motivo de dibujar cada tamaño por separado.
+
+### 3.4.4 El hero: cuatro cosas que salieron mal y sus reglas
+
+Las funciones de composición son **las del hero de J, copiadas**. La primera versión las escribió
+«parecidas» y el resultado se veía mal justo donde el autor lo notó: **el borde entre la tarjeta blanca y
+el fondo azul**. Cada error dejó una regla:
+
+1. **La máscara redondeada era BINARIA** (alpha 0 o 1). En un arco eso deja **escalera**, con el salto
+   entero de blanco a navy —unos 240 niveles— metido en un píxel. La de J tiene **antialias por
+   supersampling ×4**. *Era la causa principal.* Medido después del arreglo: **64 píxeles intermedios en
+   la esquina contra 87 de J**; antes, prácticamente cero.
+2. **Ampliar las capturas las vuelve blandas.** La primera versión estiraba una captura de 486 px a 600.
+   A factor fraccionario unos píxeles se duplican y otros no, los trazos quedan desparejos y eso se lee
+   como borroso: **medido, los grises por píxel de borde pasaban de 0,53 (J) a 0,99**. **Regla: ampliar
+   nunca, reducir sí** — reducir desde una imagen grande es antialias limpio, y es *por eso* que el hero
+   de J se ve nítido (sus capturas son de 1000 px y las **baja**). Con las capturas grandes del autor el
+   hero quedó en **0,52 contra 0,53 de J**.
+3. **La sombra era demasiado cerrada** (muchas pasadas de caja de radio 1 pegadas al borde) y leía como
+   un **contorno oscuro**. La de J es **una** caja de semiancho 18, desplazada hacia abajo y aplicada al
+   lienzo **antes** de pegar la tarjeta.
+4. **El degradado era más oscuro y plano** que el de J, lo que endurecía el contraste contra el blanco.
+   Ahora son los colores y la caída elíptica de J.
+
+**Y una quinta, que MEJORA al hero de J en vez de copiarlo** (la destapó una auditoría del script de J):
+J mezcla directamente los valores de 8 bits, que están **codificados en gamma sRGB**. Mezclar en gamma un
+blanco de 255 contra un navy de ~30 da un resultado **más oscuro que el físicamente correcto** — al 50 %
+sale **142** cuando debería salir **189** — y eso ensucia exactamente el filo donde la tarjeta se
+encuentra con el fondo. El hero de K **mezcla en LUZ LINEAL** (sRGB → lineal → mezcla → sRGB), y solo lo
+paga en los píxeles de alpha fraccionario, o sea los arcos: el interior sale idéntico. Es la única parte
+donde este script se aparta del de J a propósito.
+
+**Y dos detalles de estas capturas en particular**, que no son del simulador sino renders de ficha: traen
+su **propio marco redondeado y margen blanco**, así que el hero **recorta al contenido** (el margen sobre
+el navy se vería como un recuadro blanco); y ese marco propio es **casi invisible** (medido: 248 contra
+251 del interior) con un radio que **varía muchísimo entre imágenes** (15 px en una, 59 en otra), razón
+por la cual **no se intenta hacerlo coincidir** con la máscara y se usa un radio propio y consistente.
+
+**Cuántas tarjetas:** el script prueba de más a menos y toma la mayor cantidad que deje tarjetas con
+cuerpo (≥ 420 px). Con estas proporciones da **dos** — el mismo número al que llegó J.
+
+### 3.4.5 El límite de 150 KB del portal
+
+**El portal de Connect IQ acepta como máximo 150 KB por captura.** Las de la ficha llegaron en RGB de
+1535 px pesando ~780 KB, cinco veces el límite. `opt_screenshots.py` las deja en 118-139 KB con la receta
+de J:
+
+1. **Reducir a 1000 px** de ancho promediando bloques.
+2. **Pasar a escala de grises**, o sea **PNG de tipo de color 0: un byte por píxel en vez de tres**. Ahí
+   está el grueso del ahorro, y es **sin pérdida** porque el campo es negro sobre blanco. *Esa es la
+   diferencia que el autor notó entre las capturas de J y las de K: tipo 0 contra tipo 2.*
+3. **Si aun así no entra, bajar el ancho por pasos.**
+
+⚠️ **La guarda de «¿hay color?» mira una PROPORCIÓN, no el máximo.** El primer intento decía «si algún
+píxel separa más de 12 niveles entre R, G y B, hay color», y con eso una captura quedó marcada como color
+y en **324 KB** — cuando su separación máxima era 13, la **media 0,29** y solo el **0,003 %** de los
+píxeles pasaba de 8: ruido del generador, no color. **Un máximo lo decide un puñado de píxeles; una
+proporción describe la imagen.**
+
+**Pendiente relacionado:** este ícono **no pasó por la prueba a ciegas** que sí hizo el de J. Vale hacerla
+antes de subir la app si se quiere el mismo nivel de evidencia — la técnica está en J §3.3.
 
 ## 4. Entradas — `Activity.Info`
 
@@ -340,12 +425,22 @@ y las tres apps lo heredan de una vez — que es el motivo de que el barrel exis
 
 ### 6.3 El glifo de la biela junto al label (2026-07-27) — y el hook nuevo del barrel
 
-> ⏳ **ESTADO: TERCERA ITERACIÓN, hecha con capturas del device y pendiente de la mirada del autor
-> (2026-07-28).** Rechazó la segunda (*«no se ve igual, aún no te queda bien bien»*) y mandó **dos
-> capturas del 840 real con el glifo a DOS TAMAÑOS**: 23×18 px en una celda chica y 30×26 px en una
-> celda ancha. Se extrajeron los dos mapas de píxeles y la geometría se ajustó contra **los dos a la
-> vez**: coincide en el **87 %** de los píxeles del chico y el **96 %** del grande (91,9 % de promedio).
+> ✅ **ESTADO: CERRADO (2026-07-28), en cuatro vueltas y todas corregidas por el autor mirando.** Cada
+> intento fallido dejó una lección, así que valen más que el resultado:
 >
+> 1. **Un diámetro completo** cruzando el aro → **leía como un signo de prohibido**: un diámetro llena
+>    el aro.
+> 2. **Un brazo largo casi horizontal** tangente al techo → no existe en el nativo.
+> 3. **Una sola biela**, del centro hacia abajo-derecha → el autor: *«la biela superior izquierda no
+>    está, falta la línea»*. El glifo quedaba manco.
+> 4. **La buena: DOS bielas sobre la misma diagonal, con la diagonal INTERRUMPIDA en el centro del
+>    aro** — dos trazos cortos con un hueco donde iría el eje. Eso explica de una vez por qué el
+>    diámetro entero y la biela sola se veían mal. Más los **dos pedales inclinados y paralelos**.
+>
+> Ajustado contra **dos capturas ampliadas del 840 real** a la vez: coincide en el **87 %** de los
+> píxeles del mapa chico y el **96 %** del grande. Validado a ojo por el autor en el simulador.
+>
+
 > 🔑 **LECCIÓN DE MEDICIÓN, y es la más reutilizable de todo esto: hacen falta DOS tamaños.** Con una
 > sola captura no se puede distinguir **una fracción de una constante** — cualquier medida encaja como
 > «tantos píxeles» y como «tanto por ciento del alto», y las dos dan resultados distintos al escalar.
@@ -499,10 +594,10 @@ aplicando sin un solo caso especial nuevo.
 ⚠️ **Cómo se prueban estos settings, y por qué eso cambia el plan de subida.** Los settings de una app
 **sideloadeada no se pueden editar desde el teléfono**: el mecanismo cuelga del vínculo con la Connect
 IQ Store, que el sideload nunca establece (limitación de plataforma; el detalle está en la SPEC de J
-§9.9). O sea que **probarlos de verdad exige una instalación real de la store** — y por eso K los
-estrena teniendo ya un **id de beta propio**, igual que J. En el simulador sí se pueden editar (menú
-`Settings` del simulador, no `File`), que alcanza para ver el cambio de `PROM` a `META` en caliente y
-la degradación silenciosa.
+§9.9). O sea que **probarlos de verdad exige una instalación real de la store**. K tiene un id de beta
+propio reservado para eso, igual que J, pero **no se usó**: fue directo a prod (§10) porque el mecanismo
+ya venía validado de J. En el simulador sí se pueden editar (menú `Settings` del simulador, no `File`),
+que alcanza para ver el cambio de `PROM` a `META` en caliente y la degradación silenciosa.
 
 ## 8. Unit tests — 10 en total (5 propios + 5 del barrel)
 
@@ -569,19 +664,25 @@ invisible en una celda de un device.
 
 ## 10. Estado y pendientes
 
-**Al 2026-07-27:** implementada, **9/9 tests PASS**, **export de los 17 targets limpio** (único
-warning: el Edge 1030 con part number `006-B2924-00`, CIQ 3.2.5, que no llega al `minApiLevel` del
-proyecto y queda fuera del `.iq` — esperado, pasa en las cuatro apps). **Sin publicar**; versión
-`v0.1.0` registrada en [`store/RELEASES.md`](store/RELEASES.md) para la primera subida al canal beta.
+**Al 2026-07-28: EN PRODUCCIÓN como `v0.1.0`** (tag `k-cadence-trend/v0.1.0` sobre `release`, id de prod
+`ec5d354d…`; detalle en [`store/RELEASES.md`](store/RELEASES.md)). **10/10 tests PASS** y **export de los
+17 targets limpio** (único warning: el Edge 1030 con part number `006-B2924-00`, CIQ 3.2.5, que no llega
+al `minApiLevel` del proyecto y queda fuera del `.iq` — esperado, pasa en las cuatro apps).
+
+**Fue directo a prod, sin canal beta** (decisión del autor). K estrena settings, que es justo lo que
+obligó a J a tener un canal beta —los ajustes de una app sideloadeada no se pueden editar desde el
+teléfono, §7—, pero acá el mecanismo es **el mismo de J y ya está validado en un teléfono real**, así que
+la ronda de review previa no compraba información nueva. El id de beta de K queda reservado y sin usar.
 
 | # | Pendiente | De quién |
 |---|---|---|
-| 1 | ~~Íconos propios~~ — **HECHO el 2026-07-27** (§3.4): pedal cuadrado, los 13 launchers + los assets de tienda, todo generado por código. Ya no bloquea la subida. | ✅ |
-| 2 | ⛔ **EL GLIFO DE LA BIELA TODAVÍA NO COINCIDE con el nativo** (§6.3). El autor lo miró en el simulador el 2026-07-27 y lo rechazó; **espera una captura ampliada suya** para medir. Constantes a mover: `ICON_H_NUM`/`ICON_DY_NUM` en el barrel (alto y cuánto baja) y las fracciones de `drawCadenceIcon` (forma). | asistente, con captura |
+| 1 | ~~Íconos propios~~ — **CERRADO el 2026-07-28** (§3.4): **biela** con los pedales a 18°, los 13 launchers + master + ícono de ficha, todo generado por código. El primer diseño (pedal cuadrado) se descartó por no decir cadencia. | ✅ |
+| 1b | ~~Assets de la ficha~~ — **hero** a la par del de J (nitidez medida) y **tres capturas bajo los 150 KB** del portal (§3.4.4, §3.4.5). | ✅ |
+| 2 | ~~El glifo de la biela no coincidía con el nativo~~ — **CERRADO el 2026-07-28** (§6.3), en cuatro vueltas y con capturas ampliadas del 840 real: coincide en el **87 %** de los píxeles del tamaño chico y el **96 %** del grande, y el autor lo validó a ojo en el simulador. Las perillas quedan documentadas por si hace falta: `ICON_H_NUM`/`ICON_DY_NUM` en el barrel y las fracciones de `drawCadenceIcon`. | ✅ |
 | 3 | ~~«En el 830 con seis campos se ven cosas raras»~~ — **DIAGNOSTICADO Y ARREGLADO el 2026-07-28**: era el glifo de ESPACIO ausente en la fuente numérica de la familia bitmap, no el glifo de la biela (§6.3 y `GARMIN_MTB_SPEC.md` §3.4.1). | ✅ |
 | 4 | **Resto de la validación visual en el simulador** (F5, `TEST_MODE = true`): que la flecha siga al promedio, que los dos tramos de 0 no muestren flecha, el layout en celdas de varios tamaños, y el paseo *promedio → objetivo → promedio* cambiando el setting en caliente, que en el simulador sí se puede (§7). | autor |
 | 5 | **Validación en device real** con sensor de cadencia: que nuestro promedio coincida con el nativo, y de paso cerrar §4.1 (¿incluye los ceros?). | autor |
-| 6 | **Assets de la ficha** del store (capturas, hero, textos) cuando se decida subirla. | ambos |
+| 6 | **Los TEXTOS de la ficha** (título y descripción EN+ES) — lo único que falta para completar la subida de la `v0.1.0`. Van directo al portal: por decisión del 2026-07-27 los textos de ficha **no se versionan en el repo** (ver `CLAUDE.md` §«Flujo de release»). El formulario **no acepta markdown**. ⚠️ Tienen que **mencionar los dos settings**: están en esta misma versión, y a J le pasó publicar una ficha que decía que no había nada que configurar. | autor |
 | 7 | **Prueba a ciegas del ícono** (opcional, §3.4): el de J la pasó y cambió el diseño; el de K no. | asistente, si se pide |
 
 **No es un pendiente de esta app:** la **Opción L** (frecuencia cardíaca) está **en pausa** esperando
