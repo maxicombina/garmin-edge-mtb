@@ -32,7 +32,17 @@ module TrendCore {
 
     // Separator between the current and reference values in the wide inline layout. Apps need it to
     // build their inline template, so it lives here rather than inside the class.
-    const INLINE_SEP = " / ";
+    //
+    // NO SPACES, and that is a BUG FIX, not a style choice (2026-07-28). It used to be " / " and on the
+    // edge830 family the wide layout rendered "95 [] / [] 81": the value line is drawn in a NUMBER font,
+    // and the number fonts of the bitmap family HAVE NO SPACE GLYPH -- each space came out as the shared
+    // notdef BOX. (Same notdef box that the arrow-glyph probe detects, see arrowGlyphFont.) The slash
+    // itself is present in both families, so "/" alone is safe everywhere.
+    //
+    // It shipped: Option J had this in production, visible on 6 of the 13 devices, and nobody saw it
+    // until Option K was looked at on an 830. The lesson is the repo's own rule, one notch further:
+    // a NUMBER font is not just missing letters and arrows, it can be missing the SPACE.
+    const INLINE_SEP = "/";
     // What a metric with no data shows. The arrow is suppressed on it: no data is not a trend.
     const NO_DATA = "--";
 
@@ -46,6 +56,29 @@ module TrendCore {
         private const AVG_BAND_PCT = 35;     // % of the post-label height reserved to the reference line
         private const ARROW_GAP = 4;         // px between the arrow and the value
         private const AVG_LABEL_GAP = 4;     // px between the "AVG"/"PROM" prefix and the reference number
+        // Optional glyph before the label, native style: the Edge draws a small pictogram in front of
+        // some field names (a stopwatch on TIEMPO, a heart on ZONA, a crank on CADENCIA) and none on
+        // others (VELOCIDAD, DISTANCIA). Measured off the author's 246x322 capture: the cadence glyph is
+        // 23x19 px next to a 12 px cap height, and it leaves 3 px before the text.
+        private const ICON_GAP = 3;          // px between the label glyph and the label text
+        private const ICON_MIN_H = 15;       // below this the glyph turns to mush -- drop it instead
+                                             // (checked by rendering the geometry at 13 px)
+        // The glyph is TALLER THAN THE TEXT and straddles it: on the native field it starts above the
+        // capitals and ends BELOW the baseline. Measured on the 840 capture: glyph 19 px tall against a
+        // 12 px cap height, starting 3 px below the font box top and ending 4 px under the baseline.
+        // Expressed against the label's ASCENT (which the API gives; cap height it does not):
+        // 134, NOT the 112 the native's own ratio suggests, and the reason is quantisation, twice over:
+        //   * at 112 the edge840 came out at 16 px, SMALLER than the smallest native sample (18), and
+        //     below ~18 px the crank arm and the pedals dissolve into the ring. The author saw exactly
+        //     that: "the upper left crank is not there".
+        //   * at 120 the 840 landed on 18 and the 830 on 20, and the author noticed the tilted pedal
+        //     "looks much better on the 830" -- the same drawing, two pixels of size apart.
+        // 134 puts the 840 on 20 as well. COST, and it is the thing to watch: the taller the glyph, the
+        // further it pokes into the value band below (measured in Option K's SPEC 6.3).
+        private const ICON_H_NUM = 134;      // glyph height = ascent * 134/100
+        private const ICON_H_DEN = 100;
+        private const ICON_DY_NUM = 18;      // glyph top = label top + ascent * 18/100
+        private const ICON_DY_DEN = 100;
         // Native-style unit: a small "km/h" drawn to the right of the number as "km" over "h", the two
         // lines CENTRED on each other and the bottom line's baseline on the digits' baseline -- measured
         // off the native VELOCIDAD field (2026-07-25, edge840 sim @246x322: digits ink 27px tall, unit
@@ -104,6 +137,11 @@ module TrendCore {
         private var mInlineTpl as String = "888 / 888";
         private var mUnitTop as String = "";
         private var mUnitBottom as String = "";
+        // Optional label glyph, supplied by the app as a Method. The renderer NEVER knows what it
+        // draws -- it only reserves a box and calls back. That is what keeps this class free of any
+        // metric-specific drawing (the rule this barrel is built on).
+        private var mIconCb as Lang.Method or Null = null;
+        private var mIconAspect as Float = 1.0;       // width / height of the glyph's box
 
         // --- Live display state, refreshed every tick by setValues ---
         private var mCurStr as String = $.TrendCore.NO_DATA;
@@ -118,6 +156,9 @@ module TrendCore {
         private var mLabelH as Number = 0;            // 0 if the label is not shown
         private var mLabelText as String = "";        // long or short name, whichever fits (see selectLabel)
         private var mLabelFont as Graphics.FontType = Graphics.FONT_GLANCE;
+        private var mIconW as Number = 0;             // 0 = no label glyph this cell (absent or dropped)
+        private var mIconH as Number = 0;
+        private var mIconDy as Number = 0;            // px from the label's top to the glyph's top
         private var mShowRef as Boolean = false;
         private var mPrimaryBandH as Number = 0;      // height of the current-value band (below the label)
         private var mRefBandH as Number = 0;          // height of the reference band (below the primary band)
@@ -180,6 +221,19 @@ module TrendCore {
             invalidate();
         }
 
+        // Optional glyph drawn in front of the label, native style (see ICON_GAP). `cb` is a Method the
+        // app owns; it is invoked as cb.invoke(dc, x, y, w, h) with the colour already set, and must
+        // paint inside that box. `aspect` is width/height, so the renderer can reserve the width from
+        // the label font's ascent without knowing the shape. Pass null to remove it.
+        //
+        // The callback MUST be a plain public method on the app's side: a barrel cannot depend on the
+        // consumer's (:debug)/(:release) exclusions.
+        function setLabelIcon(cb as Lang.Method or Null, aspect as Float) as Void {
+            mIconCb = cb;
+            mIconAspect = aspect;
+            invalidate();
+        }
+
         // Width-stable all-8 templates: one for the single value, one for the inline "cur / ref" pair.
         function setTemplates(valueTpl as String, inlineTpl as String) as Void {
             mValueTpl = valueTpl;
@@ -232,6 +286,7 @@ module TrendCore {
                  + " unitBlockW=" + unitBlockWidth(dc, mUnitFont)
                  + " refF h=" + dc.getFontHeight(mRefFont)
                  + " label=\"" + mLabelText + "\" labelF a=" + Graphics.getFontAscent(mLabelFont)
+                 + " icon=" + mIconW + "x" + mIconH + "+dy" + mIconDy
                  + " labelH=" + mLabelH + " showRef=" + mShowRef + " wide=" + mIsWide
                  + " arrowFits=" + mArrowFits
                  // Which arrow route this cell resolved to, so the console answers "glyph or primitive?"
@@ -279,7 +334,23 @@ module TrendCore {
             // its font were picked in selectFonts: long name if it fits, else short, else shrunk.
             if (mLabelH > 0) {
                 dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-                dc.drawText(w / 2, LABEL_MARGIN, mLabelFont, mLabelText, Graphics.TEXT_JUSTIFY_CENTER);
+                if (mIconW > 0 && mIconCb != null) {
+                    // Group [glyph + gap + text] centred as a unit, like Option B centres [ramp + label].
+                    var tw = dc.getTextWidthInPixels(mLabelText, mLabelFont);
+                    var gx = w / 2 - (mIconW + ICON_GAP + tw) / 2;
+                    // The glyph STRADDLES the text: it starts a little below the font box top and its
+                    // box is taller than the ascent, so it ends BELOW the baseline -- which is what the
+                    // native field does and what makes it read as an object next to the word instead of
+                    // a letter squeezed into the line. It can therefore poke a pixel or two into the
+                    // value band below; the value is centred in its band with slack, so that is fine
+                    // (and the native does the same).
+                    mIconCb.invoke(dc, gx, LABEL_MARGIN + mIconDy, mIconW, mIconH);
+                    dc.setColor(fg, Graphics.COLOR_TRANSPARENT);   // the callback may have changed it
+                    dc.drawText(gx + mIconW + ICON_GAP, LABEL_MARGIN, mLabelFont, mLabelText,
+                                Graphics.TEXT_JUSTIFY_LEFT);
+                } else {
+                    dc.drawText(w / 2, LABEL_MARGIN, mLabelFont, mLabelText, Graphics.TEXT_JUSTIFY_CENTER);
+                }
             }
 
             // Wide (full-width, short) cell: both values inline on one line, "[arrow] cur / ref [unit]".
@@ -562,26 +633,79 @@ module TrendCore {
         //     shrunk down the text ladder (last resort; may still clip in an absurdly narrow cell).
         //     Wide mode names both columns ("VELOCIDAD / PROM"). Mirrors what the native field does. ---
         private function selectLabel(dc as Graphics.Dc, usableW as Number) as Void {
-            var suffix = mIsWide ? ($.TrendCore.INLINE_SEP + mRefPrefix) : "";
+            // The LABEL keeps the spaced separator: it is drawn in a TEXT font, which does have a space
+            // in both font families, and "CADENCIA / PROM" reads better than "CADENCIA/PROM". Only the
+            // value line, which is drawn in a number font, has to do without (see INLINE_SEP).
+            var suffix = mIsWide ? (" / " + mRefPrefix) : "";
             var longText = mLabelLong + suffix;
             var shortText = mLabelShort + suffix;
             mLabelFont = labelBaseFont();
-            if (dc.getTextWidthInPixels(longText, mLabelFont) <= usableW) {
-                mLabelText = longText;
-                return;
-            }
-            mLabelText = shortText;
-            if (dc.getTextWidthInPixels(shortText, mLabelFont) <= usableW) {
-                return;
-            }
-            for (var i = 0; i < mTextLadder.size(); i++) {
-                var f = mTextLadder[i];
-                if (dc.getTextWidthInPixels(shortText, f) <= usableW) {
-                    mLabelFont = f;
-                    return;
+            // Reserve the glyph while choosing, using the BIGGEST font it could take: the ladder only
+            // ever shrinks from here, so this is an upper bound and the reservation can never end up too
+            // small. Reserving during the walk (instead of after) is what lets a cell keep the LONG name
+            // plus the glyph, which is what the native field does.
+            var reserve = iconReserve(labelBaseFont());
+            var avail = usableW - reserve;
+            mLabelText = longText;
+            var picked = false;
+            if (dc.getTextWidthInPixels(longText, mLabelFont) <= avail) {
+                picked = true;
+            } else {
+                mLabelText = shortText;
+                if (dc.getTextWidthInPixels(shortText, mLabelFont) <= avail) {
+                    picked = true;
+                } else {
+                    for (var i = 0; i < mTextLadder.size() && !picked; i++) {
+                        var f = mTextLadder[i];
+                        if (dc.getTextWidthInPixels(shortText, f) <= avail) {
+                            mLabelFont = f;
+                            picked = true;
+                        }
+                    }
+                    if (!picked) {
+                        mLabelFont = Graphics.FONT_XTINY;
+                    }
                 }
             }
-            mLabelFont = Graphics.FONT_XTINY;
+            // Now size the glyph to the font actually chosen, and drop it if the real group does not
+            // fit (same graceful degradation as Option B's ramp: the label matters more than the
+            // decoration). Dropping leaves exactly the pre-icon behaviour.
+            sizeIcon(mLabelFont);
+            if (mIconW > 0
+                && dc.getTextWidthInPixels(mLabelText, mLabelFont) + mIconW + ICON_GAP > usableW) {
+                mIconW = 0;
+                mIconH = 0;
+            }
+        }
+
+        // Width to keep free for the label glyph at `f`, gap included; 0 when there is no glyph or it
+        // would be too small to read.
+        private function iconReserve(f as Graphics.FontType) as Number {
+            if (mIconCb == null) {
+                return 0;
+            }
+            var a = Graphics.getFontAscent(f);
+            if (a < ICON_MIN_H) {
+                return 0;
+            }
+            var h = (a * ICON_H_NUM) / ICON_H_DEN;
+            return ((h * mIconAspect) + 0.5).toNumber() + ICON_GAP;
+        }
+
+        private function sizeIcon(f as Graphics.FontType) as Void {
+            mIconW = 0;
+            mIconH = 0;
+            mIconDy = 0;
+            if (mIconCb == null) {
+                return;
+            }
+            var a = Graphics.getFontAscent(f);
+            if (a < ICON_MIN_H) {
+                return;      // mush at this size; the label alone is better than a smudge
+            }
+            mIconH = (a * ICON_H_NUM) / ICON_H_DEN;
+            mIconW = ((mIconH * mIconAspect) + 0.5).toNumber();
+            mIconDy = (a * ICON_DY_NUM) / ICON_DY_DEN;
         }
 
         // The BIGGEST font a label may use, decided by MEASURING, not by naming devices.

@@ -770,6 +770,28 @@ fuentes y decide layout, pero **no lee píxeles** (no hay `getPixel` en Monkey C
 hacer, y fue lo que resolvió esto, es **medir la captura del autor píxel a píxel** (BMP + numpy, sin
 Pillow: `sips -s format bmp` y parsear el header) y comparar los centros de tinta contra las cuentas.
 
+### 6.15 El modo ancho imprimía cajas *notdef* en la familia bitmap (BUG DE PRODUCCIÓN, corregido en v0.2.3)
+
+**Síntoma:** en una celda a pantalla completa y baja —donde §6.8 dibuja `actual / promedio` en una sola
+línea— los devices de la familia de fuentes **bitmap** (830, 530, 1030 ×3, Explore 2) mostraban
+`24.3 ⃞/⃞ 21.7`. Las dos cajas eran **los espacios del separador**.
+
+**Causa:** esa línea se dibuja como **UN SOLO STRING EN FUENTE NUMÉRICA**, y **las fuentes numéricas de
+esa familia no tienen el glifo de espacio**: cada espacio salía como la caja *notdef* compartida de la
+fuente — la misma caja que la detección del glifo de la flecha usa como señal de «este símbolo no existe»
+(§11.2). El mecanismo ya estaba documentado; lo que faltaba era saber que **el espacio es uno de los
+ausentes**.
+
+**Arreglo (en el barrel, así que K lo hereda):** `TrendCore.INLINE_SEP` pasa de `" / "` a `"/"`. El
+**label** conserva el separador con espacios (`VELOCIDAD / PROM`) porque va en **fuente de TEXTO**, que sí
+lo tiene. Costo en los devices TTF: el par se lee un poco más junto.
+
+⚠️ **Por qué se escapó hasta producción, que es lo reutilizable:** el defecto aparecía **solo en el layout
+ancho**, **solo en 6 de los 13 devices**, y **el label de la misma línea se veía perfecto**. Tres filtros
+encadenados. Lo destapó el autor mirando la **Opción K** en el simulador de un 830 — no esta app, que lo
+tenía publicado. Corolario para la próxima: cuando una regla dice «esta fuente no tiene tal familia de
+glifos», **el espacio cuenta como glifo**.
+
 ## 7. Extender a otras métricas Tier 1 (documentado, NO implementar en v1)
 
 Sumar FC o cadencia más adelante es, literalmente:
@@ -1016,22 +1038,24 @@ En el **simulador**: correr con F5 y editar los settings en caliente desde el me
 
 **Criterios de aceptación:** los de siempre (§13) más: (1) suite verde incluido `testTargetTenths`; (2) export de los 17 targets sin warnings; (3) en el sim, el ciclo completo promedio→objetivo→promedio sin tocar F5; (4) el prefijo cambia también en el label del modo ancho.
 
-### 9.8 Estado: EN PRODUCCIÓN como v0.2.2 (2026-07-27)
+### 9.8 Estado: EN PRODUCCIÓN como v0.2.3 (2026-07-28)
 
 **Camino recorrido:** subido al **canal beta** como `v0.2.1` el 2026-07-26 (la `v0.2.0` quedó quemada:
 se exportó con `TEST_MODE = true` y el portal no permite reusar el número — ver `store/RELEASES.md`),
 **probado por el autor en el teléfono con una instalación real de la store** —lo único que el simulador
 no cubre— y **promovido a producción como `v0.2.2` el 2026-07-27** (tag `j-trend-arrow/v0.2.2` sobre
-`release`). El número salta de 0.2.1 a 0.2.2 porque el stream de versión es **único por app** y el
+`release`), y **corregido con la `v0.2.3` el 2026-07-28** (bugfix de las cajas *notdef* del modo ancho,
+§6.15). El número salta de 0.2.1 a 0.2.2 porque el stream de versión es **único por app** y el
 código que fue a prod es más nuevo que el de la beta: trae además la migración al barrel (§3.4) y la
 flecha anclada a la baseline (§6.13).
 
 Todo lo de §9.2–§9.5 está escrito y verificado por CLI: **export de los 17 targets limpio** (solo el aviso conocido del Edge 1030 con CIQ 3.2.5) y **suite 12/12** (los 11 de antes + `testTargetTenths`). Los cuatro usos de `mAvgPrefix` que §9.5 listaba se reemplazaron y `mAvgPrefix` quedó únicamente en su carga desde recursos y en la línea que elige el prefijo activo.
 
-⚠️ **Consecuencia de este release en la FICHA del portal:** hasta la v0.2.2 la ficha publicada decía
-con razón «no hay nada que configurar / Nothing to configure», porque describía la v0.1.0. **Con los
-settings en producción esa viñeta pasa a ser falsa** en los dos idiomas y hay que reescribirla en el
-portal. Es trabajo de ficha, no de código, y no lo puede hacer el asistente.
+✅ **La ficha del portal se reescribió en el mismo release** (2026-07-27, por el autor): decía «no hay
+nada que configurar / Nothing to configure», que era verdad mientras describía la v0.1.0 y dejó de
+serlo con los settings en producción. **Lección que queda para el próximo release: la ficha es parte
+del release, no un anexo** — un cambio de features la puede volver falsa sin que nada lo avise, porque
+el texto vive en el portal y no lo compila nadie.
 
 **Pendiente, y solo el autor puede hacerlo:** mirar el modo objetivo en una celda angosta **en
 inglés**, que es donde el `GOAL` más ancho puede bajar un escalón de fuente (criterio (4) de arriba).

@@ -1,0 +1,10 @@
+<properties>
+    <!-- Reference the arrow compares against. Same two settings as Option J, and the same shape:
+         stored values are magnitudes, not list indices.
+
+         targetCadence is a WHOLE rpm. Cadence needs no unit decision at all (rpm is rpm everywhere),
+         which makes this simpler than J's target speed: there is no device unit to interpret it in
+         and nothing to quantise. 0 means "not configured" and falls back to the ride average. -->
+    <property id="referenceMode" type="number">0</property>
+    <property id="targetCadence" type="number">0</property>
+</properties>

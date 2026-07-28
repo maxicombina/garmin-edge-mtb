@@ -6,4 +6,11 @@
     <string id="CadenceLabelShort">Cad</string>
 
     <string id="AvgLabel">Prom</string>
+
+    <string id="SetReference">Comparar contra</string>
+    <string id="RefAverage">Promedio de la salida</string>
+    <string id="RefTarget">Objetivo fijo</string>
+    <string id="SetTargetCadence">Cadencia objetivo en rpm, número entero</string>
+
+    <string id="TargetLabel">Meta</string>
 </strings>

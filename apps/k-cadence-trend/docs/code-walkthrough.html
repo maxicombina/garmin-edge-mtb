@@ -199,9 +199,9 @@
              suavizado, sin filtro, sin estado entre ticks. <code>compute()</code> son cuatro pasos.</p>
         </div>
         <div class="card">
-          <h3>Una decisión, y una sola</h3>
-          <p>Todo lo demás estaba resuelto. Lo único que hubo que pensar de verdad es qué hacer con el
-             <strong><code>0</code> de no pedalear</strong> — y resultó ser lo más interesante del
+          <h3>Una decisión propia</h3>
+          <p>Todo lo demás venía resuelto de la J. Lo único que hubo que pensar de cero es qué hacer con
+             el <strong><code>0</code> de no pedalear</strong> — y resultó ser lo más interesante del
              código.</p>
         </div>
       </div>
@@ -246,7 +246,7 @@
         <div class="mod"><span class="name">CadenceTrendView</span>
           <div class="role">130 líneas: lee <code>Activity.Info</code>, formatea, delega el dibujo.</div></div>
         <div class="mod"><span class="name">CadenceTrendApp</span>
-          <div class="role">AppBase: entrega la View. Sin settings → ni <code>onSettingsChanged</code>.</div></div>
+          <div class="role">AppBase: entrega la View y le reenvía <code>onSettingsChanged</code>.</div></div>
       </div>
       <p style="margin-top:18px">
         El reparto tiene una regla de oro: <strong>el barrel no sabe qué métrica dibuja, y no debe
@@ -413,11 +413,160 @@
 
   <section>
     <div class="wrap">
+      <h2>La biela junto al nombre</h2>
+      <p>
+        El campo nativo del Edge <strong>antepone un pictograma al nombre de algunas métricas y no de
+        otras</strong>: un cronómetro en <code>TIEMPO</code>, un corazón en <code>ZONA</code>, una
+        <strong>biela en <code>CADENCIA</code></strong> — y nada en <code>VELOCIDAD</code>,
+        <code>DISTANCIA</code> o <code>TEMPERATURA</code>. Por eso K lleva glifo y la J no.
+      </p>
+      <p>
+        Está <strong>medida de una captura ampliada del 840 real</strong>, no inventada: 23×19 px al lado
+        de una mayúscula de 12, con 3 px de hueco antes del texto. Se dibuja con primitivas
+        (<code>drawCircle</code> + dos <code>drawLine</code> + dos <code>fillRectangle</code>), por la
+        misma razón que la flecha: un glifo de fuente que falte es <em>invisible</em>, no una caja.
+      </p>
+      <p>
+        <strong>Y salió mal dos veces antes de salir bien</strong>, las dos encontradas por el autor
+        poniendo su captura al lado de la nuestra. Vale contarlas porque ninguna era un descuido:
+      </p>
+      <div class="cards">
+        <div class="card">
+          <h3>La diagonal está cortada al medio</h3>
+          <p>Son <strong>dos bielas sobre la misma diagonal, con un hueco en el centro</strong> donde iría
+             el eje. Eso explica los tres intentos fallidos: un <strong>diámetro completo</strong> llena el
+             aro y lee como un <em>signo de prohibido</em>; un brazo largo horizontal no existe; y con una
+             sola biela el glifo queda manco — el autor lo vio al instante.</p>
+        </div>
+        <div class="card">
+          <h3>Los pedales van inclinados</h3>
+          <p>Y paralelos entre sí: son <strong>dos plataformas en la misma perspectiva</strong>. Ese
+             ángulo es la mitad de lo que los hace leer como pedales y no como guiones — y es la razón
+             de que se dibujen como líneas gruesas y no como rectángulos.</p>
+        </div>
+        <div class="card">
+          <h3>No cabe en el renglón: lo atraviesa</h3>
+          <p>Yo lo había encajado dentro de la altura de las mayúsculas, y quedaba chico y apretado. El
+             nativo lo dibuja <strong>más alto que el texto</strong>: empieza por encima de las
+             mayúsculas y <strong>termina por debajo de la línea base</strong>. Es lo que lo hace leer
+             como un objeto al lado de la palabra y no como una letra más.</p>
+        </div>
+      </div>
+      <p style="margin-top:16px">
+        La altura se expresa contra el <strong>ascent</strong> del label, que es lo que la API da — la
+        altura de mayúscula no la da nadie: alto = <code>ascent × 1,20</code>, techo del glifo = techo del
+        label <code>+ ascent × 0,18</code>.
+      </p>
+      <div class="note">
+        <p><strong>Ese 1,20 no es la proporción del nativo, que sería 1,12 — está subido a propósito, y
+        la razón es cuantización.</strong> Con la proporción fiel, en el 840 el glifo salía de
+        <strong>16 px</strong>: más chico que la muestra nativa más chica que teníamos (18), y por debajo
+        de ~18 px <strong>la biela y los pedales se disuelven contra el aro</strong>. El autor lo describió
+        tal cual — «la biela superior izquierda no está». Con 1,20 el 840 cae en 18, el tamaño chico del
+        propio nativo. <strong>Regla: copiar la proporción no alcanza si el resultado cae por debajo del
+        tamaño donde la forma se puede resolver en píxeles enteros. Hay que mirar el tamaño final en cada
+        device.</strong></p>
+      </div>
+      <div class="note">
+        <p><strong>La lección de medición, que es la más reutilizable de todo esto: hacen falta DOS
+        tamaños.</strong> El autor mandó el glifo nativo en una celda chica (23×18 px) y en una ancha
+        (30×26), y la geometría se ajustó contra los dos mapas de píxeles <em>a la vez</em> —
+        <strong>87 %</strong> de coincidencia en el chico, <strong>96 %</strong> en el grande. Con una
+        sola captura no se puede distinguir <strong>una fracción de una constante</strong>: la misma
+        medida encaja como «N píxeles» y como «N % del alto», y al escalar dan cosas distintas. Ese fue
+        el error de fondo de los primeros intentos.</p>
+      </div>
+      <p>
+        Lo interesante está en <strong>dónde vive el layout</strong>. El label lo dibuja el barrel, así
+        que había que darle soporte <strong>sin que el barrel se enterara de qué dibuja</strong> — la regla
+        sobre la que está construido. La solución es un <code>setLabelIcon(callback, aspecto)</code>: el
+        motor <strong>reserva una caja y llama de vuelta</strong>, y la app pone la geometría. Sigue sin
+        saber de cadencia, y mañana la J o la L pueden tener su propio glifo sin tocarlo.
+      </p>
+      <div class="cards">
+        <div class="card">
+          <h3>La reserva va antes, no después</h3>
+          <p>El ancho del glifo se reserva <em>mientras</em> se elige el label, no una vez elegido. Eso es
+             lo que permite que una celda conserve el nombre largo <strong>y</strong> el glifo, como hace
+             el nativo.</p>
+        </div>
+        <div class="card">
+          <h3>Si no entra, se cae el glifo</h3>
+          <p>Nunca el texto: el nombre importa más que la decoración — el mismo criterio que la rampa de
+             la Opción B. Y tirarlo deja exactamente el comportamiento que había antes de existir.</p>
+        </div>
+        <div class="card">
+          <h3>Difiere por familia de fuentes</h3>
+          <p>El tamaño sale del ascent del label: <strong>25×20 en el 830</strong> y
+             <strong>20×18 en el 840</strong>, cuya fuente de label es más chica. Debajo de 15 px no se
+             dibuja: a 13 la geometría se vuelve una mancha, comprobado renderizándola.</p>
+        </div>
+      </div>
+      <div class="note">
+        <p>Los dos números de arriba están <strong>medidos, no derivados</strong>: un probe sin pantalla
+        instancia la vista real y imprime lo que el motor eligió, en los dos devices. En el 830 devuelve
+        exactamente las medidas del nativo. El 840, que es el más chico de los dos, es el primer caso a
+        mirar en el simulador.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>La referencia, configurable (y más simple que en la J)</h2>
+      <p>
+        Los mismos dos ajustes que la J: <strong>comparar contra el promedio de la salida o contra un
+        objetivo fijo</strong>. Con objetivo, el campo deja de informar y pasa a marcar ritmo, y el prefijo
+        de la segunda línea cambia de <code>PROM</code> a <code>META</code>.
+      </p>
+      <p>
+        Y por tercera vez, <strong>la lógica no cambió una línea</strong>:
+        <code>TrendArrow.classify</code> recibe dos enteros y no sabe qué comparan. Solo cambia de dónde
+        sale el segundo número. Ese diseño genérico se decidió el primer día de la J sin un segundo caso
+        de uso a la vista, y ya se pagó tres veces.
+      </p>
+      <pre class="code"><span class="cm">// la referencia: el objetivo si está configurado y es usable, si no el promedio</span>
+<span class="k">var</span> refRpm = (mUseTarget &amp;&amp; mTargetRpm != <span class="k">null</span>) ? mTargetRpm : avgRpm;
+mRefStr     = CadenceFormat.displayString(refRpm);
+mArrowState = TrendCore.TrendArrow.classify(CadenceFormat.trendValue(curRpm),
+                                            CadenceFormat.trendValue(refRpm),
+                                            DEAD_BAND_RPM);</pre>
+      <p>
+        Acá la cadencia vuelve a ser la métrica fácil: el objetivo es <strong>un entero de rpm</strong>. No
+        hay unidad del device que interpretar —la J tuvo que decidir que el número se lee en la unidad del
+        dispositivo, sin convertir— y no hay <strong>nada que cuantizar</strong>: la J redondea a décimas y
+        muestra el valor cuantizado porque el usuario puede tipear 22,37.
+      </p>
+      <div class="note">
+        <p><strong>Pero el formulario no puede exigir un entero.</strong> El esquema de settings del SDK
+        admite <code>type</code>, <code>min</code>, <code>max</code> y poco más: no existe
+        <code>step</code> ni <code>decimals</code>. Así que el título lo pide en palabras y el código
+        <strong>redondea a la defensiva</strong> — media hacia arriba, nunca truncando, para que 84,6
+        valga 85 y no 84. Un detalle fácil de arruinar: la función toma el valor
+        <strong>crudo</strong> de las propiedades, porque pasarlo antes por un conversor a entero lo
+        truncaría y anularía el redondeo. El orden importa.</p>
+      </div>
+      <p>
+        <strong>Y el default cuesta abandonarlo, a propósito.</strong> Modo objetivo con el número sin
+        configurar, en cero o negativo se comporta <em>exactamente</em> como el modo promedio, y el prefijo
+        sigue diciendo <code>PROM</code>. Hacen falta las dos cosas para salirse. Un ajuste a medio
+        configurar no puede dejar el campo inservible.
+      </p>
+      <p>
+        Un regalo del diseño: el objetivo pasa por el <strong>mismo <code>trendValue</code></strong> que
+        todo lo demás, así que la regla del <code>0</code> de no pedalear sigue valiendo sin un solo caso
+        especial nuevo.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
       <h2>Cómo se prueba</h2>
       <p>
         Criterio del repo: <strong>los unit tests en verde antes de la validación visual</strong>. Acá
-        son <strong>9, y los 9 pasan</strong> — corridos con <code>monkeydo -t</code> en el edge840. Y hay
-        algo que vale la pena mirar dos veces: <strong>4 son de esta app y 5 son del barrel</strong>, que
+        son <strong>10, y los 10 pasan</strong> — corridos con <code>monkeydo -t</code> en el edge840. Y hay
+        algo que vale la pena mirar dos veces: <strong>5 son de esta app y 5 son del barrel</strong>, que
         corren desde acá namespaceados como <code>TrendCore.testX</code>. O sea que el clasificador
         compartido se testea <em>una vez por app consumidora</em>.
       </p>
@@ -428,6 +577,7 @@
             <tr><td><code>testCadenceDisplayString</code></td><td><code>84</code>→<code>"84"</code>, <strong><code>0</code>→<code>"0"</code></strong> (no <code>--</code>), <code>120</code>→3 dígitos, <code>null</code>→<code>"--"</code>.</td></tr>
             <tr><td><code>testCadenceTrendValueCoasting</code></td><td><code>84</code>→<code>84</code>; <strong><code>0</code>→<code>null</code></strong>; <code>null</code>→<code>null</code>; <code>-5</code>→<code>null</code> (guarda defensiva: no es físico, pero tampoco debe dar flecha).</td></tr>
             <tr><td><code>testCadenceCoastingProducesNoArrow</code></td><td>Las dos piezas juntas: <code>0</code> contra media 80 → <strong>NONE, no DOWN</strong>; 90→UP; 70→DOWN; ±3 dentro de la banda. El test que protege la asimetría.</td></tr>
+            <tr><td><code>testCadenceTargetRpm</code></td><td>El objetivo de los ajustes: entero → sí mismo; <strong><code>0</code>, negativo y ausente → <code>null</code></strong>, o sea vuelve al promedio; <code>84.6</code>→<strong>85</strong> (redondea, no trunca); y algo que no es número → <code>null</code>, sin tirar el campo.</td></tr>
             <tr><td><code>testCadenceUnitParts</code></td><td><code>"rpm"</code> arriba y <strong>vacío abajo</strong>: una sola línea de unidad.</td></tr>
             <tr><td><code>TrendCore.*</code> (5)</td><td>Del barrel: arriba/abajo/igual, negativos, <code>null</code> en cualquiera → NONE sin crash, banda <strong>inclusiva</strong> (±3 no da flecha, ±4 sí) y la misma aritmética con décimas y con rpm.</td></tr>
           </tbody>
@@ -482,11 +632,10 @@
       </p>
       <div class="cards">
         <div class="card">
-          <h3>1 · Íconos propios</h3>
-          <p>Los 13 launchers son <strong>los de la J, byte-idénticos</strong>: en la lista de campos del
-             Edge esta app es indistinguible de aquélla salvo por el nombre. Bloquea la subida a la
-             store, no el desarrollo. Motivo natural: biela, plato o pedal — que además rompe la silueta
-             circular del ícono de J.</p>
+          <h3>1 · Los assets de la ficha</h3>
+          <p>El ícono ya está (abajo). Faltan las capturas, el hero y los textos EN+ES para el portal —
+             y recordar que su formulario <strong>no acepta markdown</strong>. Es lo último antes de
+             subirla al canal beta como <code>v0.1.0</code>.</p>
         </div>
         <div class="card">
           <h3>2 · Mirarlo andar</h3>
@@ -505,7 +654,60 @@
       <p style="margin-top:16px">
         La versión <strong><code>v0.1.0</code> está registrada</strong> en
         <code>store/RELEASES.md</code> para la primera subida al canal beta, pero todavía
-        <strong>no se subió nada</strong>: sin ícono propio no tiene sentido.
+        <strong>no se subió nada</strong>.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>El ícono: la silueta es el mensaje</h2>
+      <p>
+        A 35 píxeles no hay detalle. Lo único que sobrevive es la <strong>silueta</strong>, y ese es todo
+        el razonamiento detrás del ícono de K: <strong>J es redondo, K es cuadrado</strong> — un cuerpo de
+        pedal de plataforma visto de frente. Adentro lleva <em>exactamente</em> lo mismo que J: la raya
+        ámbar de tu media, cruzada por la flecha blanca.
+      </p>
+      <p>
+        Que el interior sea idéntico no es pereza, es lo que dijo la evidencia. El ícono de J
+        <strong>se testeó a ciegas</strong> con siete observadores que no sabían qué había querido decir
+        el autor, y el resultado fue contundente en las dos direcciones:
+      </p>
+      <div class="cards">
+        <div class="card">
+          <h3>El objeto no se lee</h3>
+          <p><strong>0 de 7</strong> vieron un neumático en el ícono de J. Así que gastar el dibujo en
+             representar un objeto —una biela, un pedal— no compra nada.</p>
+        </div>
+        <div class="card">
+          <h3>La flecha y la raya sí</h3>
+          <p><strong>7 de 7</strong> llegaron a «una línea de referencia que la flecha cruza». Eso es lo
+             que comunica, y por eso se conserva intacto en K.</p>
+        </div>
+        <div class="card">
+          <h3>Y un plato sería un engranaje</h3>
+          <p><strong>7 de 7</strong> leyeron los tacos del neumático de J como «engranaje / tuerca /
+             <em>ajustes</em>» — el peor falso amigo en una lista de campos, y lo que le costó los tacos.
+             Un plato, el motivo obvio para cadencia, <em>es</em> un engranaje. Descartado por eso.</p>
+        </div>
+      </div>
+      <p style="margin-top:16px">
+        Se dibuja entero por código (<code>store/gen_icon.py</code>, solo numpy): el master de 1024, el
+        ícono de la ficha y los 13 launchers, <strong>cada uno a su tamaño</strong> — reducir el master a
+        35 px deja una mancha, lección que costó los íconos de la Opción A.
+      </p>
+      <div class="note">
+        <p><strong>Un pozo pisado dos veces, en dos formas distintas.</strong> El primer intento le sumaba
+        al degradado una banda especular, y a 500 px se veía como una <em>cuña de borde duro</em> en la
+        esquina: un rayón, no un reflejo. El script de J ya advertía de eso en su versión con arco. La
+        diferencia es que un aro redondo tiene una curva sobre la que apoyar el brillo y un marco cuadrado
+        no, así que acá no había nada que suavizar: <strong>se sacó la banda y quedó una sola rampa
+        diagonal</strong>. Se detectó mirando el PNG generado, no razonándolo.</p>
+      </div>
+      <p>
+        Lo honesto: el cuadrado <strong>no grita «pedal»</strong>. Su trabajo es gritar «no soy la J». Y lo
+        que ningún dibujo va a explicar es que la raya sea <em>tu media</em> — eso lo cargan el nombre y la
+        ficha.
       </p>
     </div>
   </section>

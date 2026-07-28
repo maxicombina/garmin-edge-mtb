@@ -22,10 +22,11 @@ Entradas, más nueva primero.
 
 ## v0.1.0 — 2026-07-27 — beta
 
-**Número REGISTRADO, todavía SIN SUBIR.** El código está listo y verde, pero el `.iq` no se exportó ni
-se subió al portal: falta el **ícono propio** (ver abajo). Cuando se suba, va al **canal beta** con el
-id `245d3803…`, como entrada **sin publicar**, y se instala por el link de `apps.garmin.com` +
-Connect Mobile.
+**Número REGISTRADO, todavía SIN SUBIR** — pero ya **sin bloqueantes**: el código está verde y desde el
+2026-07-27 la app tiene **ícono propio**. Cuando se suba, va al **canal beta** con el id `245d3803…`,
+como entrada **sin publicar**, y se instala por el link de `apps.garmin.com` + Connect Mobile. Lo que
+falta antes de subir es de mano del autor: mirarla andar en el simulador y decidir los assets de la
+ficha.
 
 Primera versión. Data field que muestra la **cadencia actual** en grande con una **flecha ▲/▼ al
 lado**, comparándola contra la **cadencia promedio de la actividad** (estilo Cateye, igual que la
@@ -47,19 +48,31 @@ Opción J pero sobre cadencia), y el promedio en una línea secundaria cuando la
   que dibuja es el mismo que se afinó pixel a pixel contra el campo nativo del Edge, así que la
   paridad con el nativo, la flecha glifo-o-primitiva, la unidad estilo nativo y el modo inline de
   celdas anchas se heredan hechos.
+- **Referencia configurable, como J** (`../SPEC.md` §7): dos ajustes editables desde el teléfono —
+  *Comparar contra* (promedio de la salida | objetivo fijo) y *Cadencia objetivo* — con el prefijo de la
+  segunda línea pasando de `PROM` a `META`. **El default es el promedio**, y con el objetivo sin
+  configurar o en 0 se comporta igual que el promedio, en silencio. Más simple que en J: el objetivo es
+  **un entero de rpm**, sin unidad del device que interpretar y sin nada que cuantizar. La lógica no
+  cambió una línea: el clasificador ya era genérico.
+- **Glifo de la BIELA junto al label**, como el campo nativo (`../SPEC.md` §6.3): aro + biela en diagonal
+  + un pedal en cada punta, dibujado con primitivas. El nativo pone pictograma en `CADENCIA` y en
+  `TIEMPO` pero no en `VELOCIDAD`, así que K lo lleva y J no. Medido de una captura: 23×19 px con 3 px de
+  hueco. Para esto el barrel estrenó un hook —reserva la caja y llama de vuelta— **sin enterarse de qué
+  dibuja**.
+- **Ícono propio** (`../SPEC.md` §3.4), que era el bloqueante de la subida: **cuerpo de pedal
+  CUADRADO**, con la misma raya ámbar y la misma flecha blanca que J adentro. Todo generado por
+  `gen_icon.py` (solo numpy): master 1024, `store-icon-500` y los 13 launchers, cada uno dibujado a su
+  tamaño. **Lo que distingue a K de J a 35 px es la silueta —cuadrado contra redondo—, no el detalle**,
+  que a ese tamaño no existe. Y **no es un plato a propósito**: en la prueba a ciegas de J, 7 de 7
+  observadores leyeron los tacos del neumático como «engranaje/ajustes», y un plato es literalmente un
+  engranaje.
 - **13 devices** (`edge530/540/830/840/550/850/1030 ×3/1040/1050/explore2/mtb`), `eng` + `spa`,
-  CIQ 3.3.0, **sin settings** y sin permisos.
-- **Verificado (2026-07-27):** **9/9 tests PASS** con `monkeydo -t` en el edge840 — 4 propios de
+  CIQ 3.3.0, sin permisos.
+- **Verificado (2026-07-27):** **10/10 tests PASS** con `monkeydo -t` en el edge840 — 5 propios de
   `CadenceFormat` + los 5 del barrel, que corren namespaceados (`TrendCore.testX`) desde esta app — y
   **export de los 17 targets limpio**. El único warning es el conocido del Edge 1030 con part number
   `006-B2924-00` (CIQ 3.2.5), que no llega al `minApiLevel` del proyecto y queda fuera del `.iq`:
   esperado, pasa en las cuatro apps del repo.
-
-⚠️ **Bloqueante de la subida: los íconos launcher son los de la Opción J, copiados y byte-idénticos.**
-O sea que en la lista de campos del Edge esta app es **indistinguible de J** salvo por el nombre. Hay
-que dibujarle un motivo propio antes de subirla (biela/plato o pedal es el candidato natural: además
-rompe la silueta circular del de J). Ver [`../SPEC.md`](../SPEC.md) §3.4, que ya lista lo aprendido en
-J para no repetirlo.
 
 ⚠️ **Antes de exportar el `.iq`, verificar que `TEST_MODE` esté en `false`** en
 `source/CadenceTrendView.mc`. Con `true` el build de release **compila limpio y sin warnings** pero el

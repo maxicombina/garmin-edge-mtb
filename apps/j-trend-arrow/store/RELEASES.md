@@ -26,11 +26,38 @@ Verificar el id en `release` **antes** de exportar el `.iq`, no después.
 
 Entradas, más nueva primero.
 
+## v0.2.3 — 2026-07-28 — prod
+
+**BUGFIX, y de los que dan vergüenza: en 6 de los 13 devices el modo ancho mostraba dos cuadraditos.**
+Nada más cambia; el `.iq` sale del commit de `release` que lleva el tag `j-trend-arrow/v0.2.3`. Versión a
+tipear en el portal: `0.2.3`.
+
+**Qué se veía:** en una celda a pantalla completa y baja, donde el campo dibuja `actual / promedio` en
+una sola línea, los devices de la familia de fuentes **bitmap** (830, 530, los tres 1030, Explore 2)
+mostraban `24.3 ⃞/⃞ 21.7`. Las cajas eran **los espacios del separador**.
+
+**Por qué:** esa línea se dibuja como **un solo string en fuente numérica**, y **las fuentes numéricas de
+la familia bitmap no tienen el glifo de espacio** — cada espacio salía como la caja *notdef* de la
+fuente. El `/` sí está en las dos familias. Arreglado quitándole los espacios al separador del valor; el
+**label** conserva los suyos (`VELOCIDAD / PROM`) porque va en fuente de TEXTO, que sí lo tiene. Regla y
+detalle en `GARMIN_MTB_SPEC.md` §3.4.1.
+
+**Cómo se nos escapó, que es la parte que vale:** el defecto aparecía **solo en el layout ancho**, **solo
+en esa familia**, y **el label de la misma línea se veía perfecto**. Lo destapó el autor mirando la
+Opción K en el simulador de un 830 — no la J.
+
+- **Consecuencia visible en los devices TTF** (840, 540, 550, 850, 1040, 1050, MTB): el par ahora se lee
+  `24.3/21.7` en vez de `24.3 / 21.7`, un poco más junto. Es el precio de que funcione en los trece.
+- El arreglo vive en el **barrel**, así que la Opción K nace ya sin el bug.
+- **Verificado:** suite **12/12 en edge840 y en edge830** (las dos familias), export de los 17 targets
+  limpio, `TEST_MODE = false` y el id de producción comprobados antes de exportar.
+
 ## v0.2.2 — 2026-07-27 — prod
 
-**LA DE LOS SETTINGS, EN PRODUCCIÓN.** Trae a la ficha publicada todo lo que hasta ahora vivía solo en
-el canal beta: la **referencia configurable** (promedio de la salida u objetivo fijo). Versión a tipear
-en el portal: `0.2.2`.
+**SUBIDA AL PORTAL el 2026-07-27, y la ficha reescrita.** Trae a la app publicada lo que hasta ahora
+vivía solo en el canal beta: la **referencia configurable** (promedio de la salida u objetivo fijo). El
+`.iq` salió del commit `fb5d5ff` de la rama `release`, que es el que lleva el tag
+`j-trend-arrow/v0.2.2`; versión tipeada a mano en el portal: `0.2.2`.
 
 **Por qué 0.2.2 y no 0.2.0:** el stream de versión es **único por app** (beta y prod lo comparten), y
 ya llegó a 0.2.1. Además el código que va a prod es **más nuevo** que el de esa beta: incluye la
@@ -61,10 +88,11 @@ Qué cambió respecto de la **v0.1.0**, que es lo que había publicado:
 - **Verificado:** suite **12/12** (7 propios + los 5 del barrel, namespaceados) y **export de los 17
   targets limpio**, con `TEST_MODE = false` comprobado en la rama `release` antes de exportar.
 
-⚠️ **LO QUE FALTA DE ESTE RELEASE, Y NO ES CÓDIGO: reescribir la ficha en el portal.** Hasta ahora
-decía con razón *«No hay nada que configurar: no tiene ajustes»* / *«Nothing to configure - there are no
-settings»*, porque describía la v0.1.0. **Con los settings en producción esa viñeta es falsa** en los
-dos idiomas. Recordar que el formulario del portal **no acepta markdown**.
+✅ **La ficha se reescribió** en el mismo release (2026-07-27, por el autor). La viñeta que decía *«No
+hay nada que configurar: no tiene ajustes»* / *«Nothing to configure - there are no settings»* era
+verdadera mientras describía la v0.1.0 y dejó de serlo con los settings en producción. Queda como
+recordatorio para el próximo release: **la ficha es parte del release, no un anexo** — y el formulario
+del portal **no acepta markdown**.
 
 ## v0.2.1 — 2026-07-26 — beta
 
