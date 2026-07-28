@@ -594,10 +594,10 @@ aplicando sin un solo caso especial nuevo.
 ⚠️ **Cómo se prueban estos settings, y por qué eso cambia el plan de subida.** Los settings de una app
 **sideloadeada no se pueden editar desde el teléfono**: el mecanismo cuelga del vínculo con la Connect
 IQ Store, que el sideload nunca establece (limitación de plataforma; el detalle está en la SPEC de J
-§9.9). O sea que **probarlos de verdad exige una instalación real de la store** — y por eso K los
-estrena teniendo ya un **id de beta propio**, igual que J. En el simulador sí se pueden editar (menú
-`Settings` del simulador, no `File`), que alcanza para ver el cambio de `PROM` a `META` en caliente y
-la degradación silenciosa.
+§9.9). O sea que **probarlos de verdad exige una instalación real de la store**. K tiene un id de beta
+propio reservado para eso, igual que J, pero **no se usó**: fue directo a prod (§10) porque el mecanismo
+ya venía validado de J. En el simulador sí se pueden editar (menú `Settings` del simulador, no `File`),
+que alcanza para ver el cambio de `PROM` a `META` en caliente y la degradación silenciosa.
 
 ## 8. Unit tests — 10 en total (5 propios + 5 del barrel)
 
@@ -664,10 +664,15 @@ invisible en una celda de un device.
 
 ## 10. Estado y pendientes
 
-**Al 2026-07-27:** implementada, **9/9 tests PASS**, **export de los 17 targets limpio** (único
-warning: el Edge 1030 con part number `006-B2924-00`, CIQ 3.2.5, que no llega al `minApiLevel` del
-proyecto y queda fuera del `.iq` — esperado, pasa en las cuatro apps). **Sin publicar**; versión
-`v0.1.0` registrada en [`store/RELEASES.md`](store/RELEASES.md) para la primera subida al canal beta.
+**Al 2026-07-28: EN PRODUCCIÓN como `v0.1.0`** (tag `k-cadence-trend/v0.1.0` sobre `release`, id de prod
+`ec5d354d…`; detalle en [`store/RELEASES.md`](store/RELEASES.md)). **10/10 tests PASS** y **export de los
+17 targets limpio** (único warning: el Edge 1030 con part number `006-B2924-00`, CIQ 3.2.5, que no llega
+al `minApiLevel` del proyecto y queda fuera del `.iq` — esperado, pasa en las cuatro apps).
+
+**Fue directo a prod, sin canal beta** (decisión del autor). K estrena settings, que es justo lo que
+obligó a J a tener un canal beta —los ajustes de una app sideloadeada no se pueden editar desde el
+teléfono, §7—, pero acá el mecanismo es **el mismo de J y ya está validado en un teléfono real**, así que
+la ronda de review previa no compraba información nueva. El id de beta de K queda reservado y sin usar.
 
 | # | Pendiente | De quién |
 |---|---|---|
@@ -677,7 +682,7 @@ proyecto y queda fuera del `.iq` — esperado, pasa en las cuatro apps). **Sin p
 | 3 | ~~«En el 830 con seis campos se ven cosas raras»~~ — **DIAGNOSTICADO Y ARREGLADO el 2026-07-28**: era el glifo de ESPACIO ausente en la fuente numérica de la familia bitmap, no el glifo de la biela (§6.3 y `GARMIN_MTB_SPEC.md` §3.4.1). | ✅ |
 | 4 | **Resto de la validación visual en el simulador** (F5, `TEST_MODE = true`): que la flecha siga al promedio, que los dos tramos de 0 no muestren flecha, el layout en celdas de varios tamaños, y el paseo *promedio → objetivo → promedio* cambiando el setting en caliente, que en el simulador sí se puede (§7). | autor |
 | 5 | **Validación en device real** con sensor de cadencia: que nuestro promedio coincida con el nativo, y de paso cerrar §4.1 (¿incluye los ceros?). | autor |
-| 6 | **Los TEXTOS de la ficha** (título y descripción EN+ES). Van directo al portal: por decisión del 2026-07-27 los textos de ficha **no se versionan en el repo** (ver `CLAUDE.md` §«Flujo de release»). El formulario **no acepta markdown**. | autor |
+| 6 | **Los TEXTOS de la ficha** (título y descripción EN+ES) — lo único que falta para completar la subida de la `v0.1.0`. Van directo al portal: por decisión del 2026-07-27 los textos de ficha **no se versionan en el repo** (ver `CLAUDE.md` §«Flujo de release»). El formulario **no acepta markdown**. ⚠️ Tienen que **mencionar los dos settings**: están en esta misma versión, y a J le pasó publicar una ficha que decía que no había nada que configurar. | autor |
 | 7 | **Prueba a ciegas del ícono** (opcional, §3.4): el de J la pasó y cambió el diseño; el de K no. | asistente, si se pide |
 
 **No es un pendiente de esta app:** la **Opción L** (frecuencia cardíaca) está **en pausa** esperando
