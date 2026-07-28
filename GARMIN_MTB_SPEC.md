@@ -87,6 +87,26 @@ Aprendizajes de la Opción A en el Edge 840, aplicables a **todas** las apps del
 - **Cadencia:** un data field CIQ muestrea `Activity.Info` ~1×/s → hasta ~1 s de atraso visual vs el campo nativo. Cosmético (el FIT graba bien).
 - **Sideload en Mac:** Edge 540/840/1040+ usan **MTP** (Garmin quitó el modo disco) → no montan en Finder. Funciona **OpenMTP** (probado en Mac M4): copiar el `.prg` a `GARMIN/Apps/` y el device lo consume al reiniciar. La alternativa sin cable es la IQ Store (OTA).
 
+### 3.4.1 Las fuentes numéricas de la familia bitmap NO TIENEN EL GLIFO DE ESPACIO (2026-07-28)
+
+**Medido en el simulador del edge830, y ya había llegado a producción sin que nadie lo viera.** El modo
+ancho de la Opción J dibuja `actual / promedio` como **un solo string en fuente numérica**; con el
+separador `" / "` el 830 mostraba `95 ⃞/⃞ 81` — **cada espacio salía como la caja *notdef*** compartida de
+la fuente. El `/` sí está en las dos familias; el **espacio** no está en la numérica de la familia
+bitmap.
+
+- **Es la misma caja notdef** que usa la detección del glifo de la flecha para decidir si un símbolo
+  existe (`apps/j-trend-arrow/SPEC.md` §11.2): en esa familia los glifos ausentes de la fuente numérica
+  comparten una caja de 22 px. O sea que el mecanismo ya estaba documentado; lo que faltaba era saber
+  que **el espacio es uno de los ausentes**.
+- **Regla, un paso más allá de la que ya teníamos:** de una `FONT_SYSTEM_NUMBER_*` no hay que esperar
+  solo «no tiene letras ni flechas» — **puede no tener el espacio**. Cualquier string que vaya en fuente
+  numérica se arma **sin espacios**; si hace falta separación visual, se dibuja como piezas aparte o se
+  usa un separador verificado (`/`, `.`, `,`, `:`, `-` sí están).
+- **Cómo pasó desapercibido:** el defecto solo aparece en el layout ancho, solo en 6 de los 13 devices,
+  y el **label** de la misma línea (que sí lleva espacios) se ve perfecto porque va en **fuente de
+  texto**. Se descubrió mirando la Opción K en un 830 — la J lo tenía igual, publicada.
+
 ## 4. Opciones de producto evaluadas
 
 Ordenadas de menor a mayor complejidad. La visión es **incremental**: cada opción puede construirse sobre la anterior dentro del mismo proyecto.

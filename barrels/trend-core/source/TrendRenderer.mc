@@ -32,7 +32,17 @@ module TrendCore {
 
     // Separator between the current and reference values in the wide inline layout. Apps need it to
     // build their inline template, so it lives here rather than inside the class.
-    const INLINE_SEP = " / ";
+    //
+    // NO SPACES, and that is a BUG FIX, not a style choice (2026-07-28). It used to be " / " and on the
+    // edge830 family the wide layout rendered "95 [] / [] 81": the value line is drawn in a NUMBER font,
+    // and the number fonts of the bitmap family HAVE NO SPACE GLYPH -- each space came out as the shared
+    // notdef BOX. (Same notdef box that the arrow-glyph probe detects, see arrowGlyphFont.) The slash
+    // itself is present in both families, so "/" alone is safe everywhere.
+    //
+    // It shipped: Option J had this in production, visible on 6 of the 13 devices, and nobody saw it
+    // until Option K was looked at on an 830. The lesson is the repo's own rule, one notch further:
+    // a NUMBER font is not just missing letters and arrows, it can be missing the SPACE.
+    const INLINE_SEP = "/";
     // What a metric with no data shows. The arrow is suppressed on it: no data is not a trend.
     const NO_DATA = "--";
 
@@ -603,7 +613,10 @@ module TrendCore {
         //     shrunk down the text ladder (last resort; may still clip in an absurdly narrow cell).
         //     Wide mode names both columns ("VELOCIDAD / PROM"). Mirrors what the native field does. ---
         private function selectLabel(dc as Graphics.Dc, usableW as Number) as Void {
-            var suffix = mIsWide ? ($.TrendCore.INLINE_SEP + mRefPrefix) : "";
+            // The LABEL keeps the spaced separator: it is drawn in a TEXT font, which does have a space
+            // in both font families, and "CADENCIA / PROM" reads better than "CADENCIA/PROM". Only the
+            // value line, which is drawn in a number font, has to do without (see INLINE_SEP).
+            var suffix = mIsWide ? (" / " + mRefPrefix) : "";
             var longText = mLabelLong + suffix;
             var shortText = mLabelShort + suffix;
             mLabelFont = labelBaseFont();
