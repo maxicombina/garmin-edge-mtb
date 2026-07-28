@@ -535,7 +535,7 @@ En **celdas full-width Y cortas** (sin alto para apilar) el campo muestra **ambo
 - **Gate:** `fullWidth = (w * WIDE_DEN >= screenW * WIDE_NUM)` con `WIDE_NUM=8, WIDE_DEN=10` (**celda ≥ 80 % del ancho de pantalla**, vía `System.getDeviceSettings().screenWidth`, presente en todos los devices; guarda `!= null`). **`mIsWide = fullWidth && (h < AVG_MIN_H)`** → inline solo si además es corta (no entra la línea de promedio apilada). `fullWidth && h ≥ AVG_MIN_H` → cae al apilado (que muestra el promedio como 2ª línea). Una media-columna (~50 %) nunca es inline.
 - **Fuente inline:** misma escalera numérica, mayor tamaño cuyo grupo `[flecha + gap + "888.8 / 888.8" + gap + unidad]` (plantilla `INLINE_TPL`) entra a lo ancho, tope de alto contra la banda. Fallback: si la flecha no entra, se descarta y se ajusta `[par + unidad]` (mismo idioma que §6.4).
 - **Flecha:** tendencia del **actual vs promedio** (misma `classify()`), precede a TODO el par. Mismo centrado que el valor apilado (§6.7) — hoy `cy − ARROW_INK_BIAS`, ⚠️ ya **no** `descent/2 + ARROW_NUDGE` (§6.13). Sigue siendo DATO (va con el valor).
-- Constantes: `WIDE_NUM=8`, `WIDE_DEN=10`, `INLINE_SEP=" / "`, `INLINE_TPL="888.8 / 888.8"`. Implementado en `TrendArrowView.mc` (`selectInlineFont` + `drawTrendValue`, branch en `selectFonts`/`onUpdate`). Compila limpio (release 840+830, `-w`) + 10/10 tests. **PENDIENTE:** validación visual del autor en el sim (umbral 80 %, y que el apilado en celda ancha-alta se vea bien en las 6 resoluciones).
+- Constantes: `WIDE_NUM=8`, `WIDE_DEN=10`, `INLINE_SEP="/"` (**sin espacios desde la v0.2.3 — antes era `" / "` y en la familia de fuentes bitmap los espacios salían como cajas *notdef*; ver §6.15**), `INLINE_TPL="88.8/88.8"`. Implementado en `TrendArrowView.mc` (`selectInlineFont` + `drawTrendValue`, branch en `selectFonts`/`onUpdate`). Compila limpio (release 840+830, `-w`) + 10/10 tests. **PENDIENTE:** validación visual del autor en el sim (umbral 80 %, y que el apilado en celda ancha-alta se vea bien en las 6 resoluciones).
 
 ### 6.9 Unidad estilo NATIVO (apilada a la derecha del número — 2026-07-23)
 
@@ -1006,7 +1006,7 @@ mArrowState = TrendArrow.classify(curTenths, refTenths, DEAD_BAND_TENTHS);
 
 1. `onUpdate()`, medición de la línea secundaria: `dc.getTextWidthInPixels(mAvgPrefix, mAvgUnitFont)` → `mRefPrefix`.
 2. `onUpdate()`, dibujo del prefijo de esa línea: `dc.drawText(ax, avgCy, mAvgUnitFont, mAvgPrefix, ...)` → `mRefPrefix`.
-3. `selectLabel()`, sufijo del label ancho: `var suffix = mIsWide ? (INLINE_SEP + mAvgPrefix) : "";` → `mRefPrefix` (el label ancho pasa a decir `VELOCIDAD / META` en modo objetivo).
+3. `selectLabel()`, sufijo del label ancho: `var suffix = mIsWide ? (" / " + mAvgPrefix) : "";` → `mRefPrefix` (⚠️ **ese separador es un `" / "` literal y NO `INLINE_SEP`**: el label va en fuente de TEXTO, que sí tiene espacio, así que conserva los suyos — §6.15) (el label ancho pasa a decir `VELOCIDAD / META` en modo objetivo).
 4. `fitUnitFont()`, reserva de ancho `withPrefix`: `dc.getTextWidthInPixels(mAvgPrefix, u)` → `mRefPrefix`.
 
 **Nada más cambia.** Ni fuentes, ni tamaños, ni centrado, ni la unidad apilada, ni el glifo/primitiva de la flecha (§6.6/§6.11): el prefijo activo entra en las mismas mediciones de siempre y el `mCacheW = -1` de `reloadSettings()` garantiza que la escalera se re-elija con el ancho del prefijo nuevo.
