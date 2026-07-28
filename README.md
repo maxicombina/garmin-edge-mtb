@@ -21,7 +21,7 @@ La spec define el contexto (hardware, plataforma, restricciones), **10 opciones 
 | G | Estimador de batería restante | data field | idea |
 | H | Stamina casera (modelo de depósito por FC) | device app | idea |
 | I | Test de subida (VO2max de campo + tracker de forma) | data field / device app | idea |
-| J | Flecha de tendencia estilo Cateye (actual vs. referencia) | data field | **✅ publicada · prod `v0.2.2`** |
+| J | Flecha de tendencia estilo Cateye (actual vs. referencia) | data field | **✅ publicada · prod `v0.2.3`** |
 | K | La misma flecha, sobre la **cadencia** | data field | **🛠️ implementada · 10/10 tests · `v0.1.0` sin subir** |
 | L | La misma flecha, sobre la **frecuencia cardíaca** | data field | en diseño |
 

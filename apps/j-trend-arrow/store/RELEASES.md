@@ -26,6 +26,32 @@ Verificar el id en `release` **antes** de exportar el `.iq`, no después.
 
 Entradas, más nueva primero.
 
+## v0.2.3 — 2026-07-28 — prod
+
+**BUGFIX, y de los que dan vergüenza: en 6 de los 13 devices el modo ancho mostraba dos cuadraditos.**
+Nada más cambia; el `.iq` sale del commit de `release` que lleva el tag `j-trend-arrow/v0.2.3`. Versión a
+tipear en el portal: `0.2.3`.
+
+**Qué se veía:** en una celda a pantalla completa y baja, donde el campo dibuja `actual / promedio` en
+una sola línea, los devices de la familia de fuentes **bitmap** (830, 530, los tres 1030, Explore 2)
+mostraban `24.3 ⃞/⃞ 21.7`. Las cajas eran **los espacios del separador**.
+
+**Por qué:** esa línea se dibuja como **un solo string en fuente numérica**, y **las fuentes numéricas de
+la familia bitmap no tienen el glifo de espacio** — cada espacio salía como la caja *notdef* de la
+fuente. El `/` sí está en las dos familias. Arreglado quitándole los espacios al separador del valor; el
+**label** conserva los suyos (`VELOCIDAD / PROM`) porque va en fuente de TEXTO, que sí lo tiene. Regla y
+detalle en `GARMIN_MTB_SPEC.md` §3.4.1.
+
+**Cómo se nos escapó, que es la parte que vale:** el defecto aparecía **solo en el layout ancho**, **solo
+en esa familia**, y **el label de la misma línea se veía perfecto**. Lo destapó el autor mirando la
+Opción K en el simulador de un 830 — no la J.
+
+- **Consecuencia visible en los devices TTF** (840, 540, 550, 850, 1040, 1050, MTB): el par ahora se lee
+  `24.3/21.7` en vez de `24.3 / 21.7`, un poco más junto. Es el precio de que funcione en los trece.
+- El arreglo vive en el **barrel**, así que la Opción K nace ya sin el bug.
+- **Verificado:** suite **12/12 en edge840 y en edge830** (las dos familias), export de los 17 targets
+  limpio, `TEST_MODE = false` y el id de producción comprobados antes de exportar.
+
 ## v0.2.2 — 2026-07-27 — prod
 
 **SUBIDA AL PORTAL el 2026-07-27, y la ficha reescrita.** Trae a la app publicada lo que hasta ahora
