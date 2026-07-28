@@ -9,7 +9,7 @@
 > la más simple que hay: Garmin la entrega en **rpm enteros** y *rpm es rpm en todos los países*, así
 > que no hay conversión de unidades, ni décimas, ni dos grafías de unidad — nada del aparato que
 > necesitó la velocidad en J. (2) El **render no vive acá**: lo aporta el barrel
-> [`barrels/trend-core/`](../../barrels/trend-core/), extraído de J. La View son ~130 líneas y no
+> [`barrels/trend-core/`](../../barrels/trend-core/), extraído de J. La View son ~240 líneas y no
 > tiene **ni una línea de layout**.
 >
 > **Lo que hay que leer antes de tocar código:** la sección «Barrels» del [`CLAUDE.md`](../../CLAUDE.md)
@@ -51,7 +51,7 @@ en la pantalla junto a las otras.
 ### 1.2 Vehículo de aprendizaje
 
 Primera app del repo **construida sobre un barrel** (el mecanismo de librería de Monkey C). El
-resultado medido es el argumento a favor: la View de K son ~130 líneas contra las 858 que tenía la de
+resultado medido es el argumento a favor: la View de K son ~240 líneas contra las 858 que tenía la de
 J antes de la extracción. Ver §3.2.
 
 ## 2. Plataforma (heredada de A/B/J — no re-verificar)
@@ -85,7 +85,7 @@ k-cadence-trend/
 ├── source/
 │   ├── CadenceTrendApp.mc      # AppBase: getInitialView() -> [view] + onSettingsChanged (§7)
 │   ├── CadenceTrendView.mc     # DataField: compute() lee y formatea, onUpdate() delega el render
-│   │                           # entero al barrel. ~130 líneas, cero layout.
+│   │                           # entero al barrel. ~240 líneas, cero layout.
 │   ├── CadenceFormat.mc        # PURO. displayString / trendValue / targetRpm / unit* (§5.1, §7)
 │   └── CadenceFormatTest.mc    # 5 tests (§8)
 ├── resources/
@@ -112,7 +112,7 @@ hace falta, el barrel tiene su copia namespaceada (`TrendCore.TestUtil`).
 ### 3.2 El reparto con el barrel: qué es de quién
 
 `barrels/trend-core/` aporta el **clasificador** (`TrendCore.TrendArrow`, puro y genérico) y el
-**motor de render entero** (`TrendCore.TrendRenderer`, ~710 líneas: escalera de fuentes, unidad
+**motor de render entero** (`TrendCore.TrendRenderer`, ~840 líneas: escalera de fuentes, unidad
 apilada estilo nativo, flecha glifo-o-primitiva con el hueco reservado, modo inline para celdas
 anchas, caché por celda). Lo aporta **compartido con J y con la futura L**.
 
@@ -176,10 +176,17 @@ Vale más que este ícono, porque manda sobre los que vengan (la Opción L y las
 **Por qué la métrica va en la silueta y NUNCA en un detalle interior:** a 35 px el detalle no existe,
 la silueta sí. Está verificado mirando los launchers de 35 px de J y K lado a lado.
 
-**Y por qué el interior se conserva idéntico entre hermanas:** la prueba a ciegas del ícono de J (7
+**Y por qué el interior se conserva entre hermanas:** la prueba a ciegas del ícono de J (7
 observadores sin contexto) dio que **el objeto no se lee nunca** —0 de 7 vieron un neumático— pero que
 **la raya cruzada por la flecha sí**: 7 de 7 llegaron a «línea de referencia que la flecha cruza». O sea
 que el interior es lo único que comunica algo, así que no se toca.
+
+⚠️ **Lo que se conserva es el MOTIVO y los colores, no las fracciones.** La cara de la biela es bastante
+más chica que la de la rueda de J, así que la geometría se re-escaló: `R_IN` 0,230 acá contra 0,35 en J,
+`ARROW_HW = R_IN*0,92` contra `R_IN` entero, y en K la punta de la flecha queda **siempre dentro de la
+cara**, mientras el master de J la saca por fuera del aro. Al dibujar el ícono de L hay que copiar la
+**lectura** (cara oscura, raya ámbar horizontal, flecha blanca gorda cruzándola de abajo hacia arriba),
+no los números de `gen_icon.py`.
 
 ⚠️ **NO usar un plato para cadencia**, que es el motivo obvio: en esa misma prueba, **7 de 7 leyeron los
 tacos del neumático de J como «engranaje / tuerca / ajustes»** — el peor falso amigo en una lista de
@@ -194,10 +201,18 @@ bien»).
 
 ### 3.4.2 Geometría, y por qué los pedales van inclinados 18°
 
-**Los dos pedales están inclinados 18°, bajando hacia la izquierda y paralelos entre sí.** No es
-capricho: es la inclinación **medida en el glifo de la biela que el campo NATIVO dibuja** junto al rótulo
-`CADENCIA` (12-18°, §6.3). Con eso el ícono y el glifo de la pantalla pasan a ser **el mismo objeto**.
-Sin inclinar, los pedales leen como pestañas — se probaron las dos y el autor eligió mirando.
+**Los dos pedales están inclinados 18° (`PED_TILT = tan 18° = 0,3249`), bajando hacia la izquierda y
+paralelos entre sí.** No es capricho: la inclinación y su dirección salen del **glifo de la biela que el
+campo NATIVO dibuja** junto al rótulo `CADENCIA`, o sea que el ícono y el glifo de la pantalla leen como
+**el mismo objeto**. Sin inclinar, los pedales leen como pestañas — se probaron las dos y el autor
+eligió mirando.
+
+⚠️ **El ángulo del ícono NO es el mismo número que el del glifo de la pantalla, y está bien así.** Los
+dos trazos de pedal de `drawCadenceIcon` caen en ~15° y ~9° sobre la horizontal (se ven en sus fracciones:
+`0,09/0,345` y `0,07/0,435`) y **no son exactamente paralelos**, porque esa geometría se ajustó píxel a
+píxel contra las capturas del nativo (§6.3) y ahí manda la coincidencia, no la prolijidad. El ícono usa
+un 18° limpio porque a 35 px una inclinación de 9° no se distingue de cero. **Lo que se copia es la
+lectura, no el ángulo.**
 
 Variante elegida sobre tres mockups: **brazo largo** (`A2`), que es la que da la silueta más distintiva.
 Costo aceptado y medido: con los brazos largos el aro es más chico que el de J, así que **a 35 px el
@@ -306,11 +321,12 @@ sección. Anotado también en §9.
 
 ### 5.1 `CadenceFormat` — módulo puro
 
-Sin `Dc`, sin `Activity.Info`, sin estado de device → enteramente testeable (§8). Cuatro funciones:
+Sin `Dc`, sin `Activity.Info`, sin estado de device → enteramente testeable (§8). Cinco funciones:
 
 ```
 displayString(rpm)  -> "84" | "0" | NO_DATA        // lo que el usuario ve
 trendValue(rpm)     -> 84 | null                    // el entero que la flecha compara
+targetRpm(raw)      -> 85 | null                    // el objetivo de los settings (§7)
 unitTop()           -> "rpm"
 unitBottom()        -> ""                           // una sola línea: nada que apilar
 ```
@@ -388,13 +404,23 @@ comparar.
 (`getBackgroundColor()` es un método de `DataField`, así que el barrel no puede llamarlo solo) y
 dibujar. No hay una sola medición ni un solo `drawText` en esta app.
 
-Lo que se configura **una vez** en `initialize()`:
+Lo que se configura en `initialize()` **y no se vuelve a tocar**:
+
+- `setTemplates("888", "888" + TrendCore.INLINE_SEP + "888")`, o sea `"888/888"` — ver §6.1. ⚠️ **Sin
+  espacios, y no es cosmético:** la fuente numérica de la familia bitmap no tiene el glifo de ESPACIO y
+  los pintaba como cajas *notdef* (§6.3). El separador con espacios vive solo en el **label**, que va en
+  fuente de texto.
+- `setUnit("rpm", "")` — una sola línea. **Se puede llamar una vez y olvidarse**, a diferencia de J,
+  que la revisa por tick porque las unidades del device pueden cambiar (§2).
+- `setLabelIcon(method(:drawCadenceIcon), ICON_ASPECT)` — el glifo de la biela (§6.3).
+
+Y uno que **NO es de una sola vez**, aunque esté al lado de los otros:
 
 - `setLabels(CADENCIA, CAD, PROM)` — nombre largo, corto y prefijo de la línea secundaria, ya
   uppercased. El barrel elige el largo si entra en la celda y el corto si no, como el campo nativo.
-- `setTemplates("888", "888 / 888")` — ver §6.1.
-- `setUnit("rpm", "")` — una sola línea. **Se puede llamar una vez y olvidarse**, a diferencia de J,
-  que la revisa por tick porque las unidades del device pueden cambiar (§2).
+  **Vive en `reloadSettings()`, no en `initialize()`**, y por eso corre también en cada
+  `onSettingsChanged`: es exactamente así como el prefijo pasa de `PROM` a `META` **en caliente** (§7).
+  `setLabels` invalida el caché de layout del barrel por su cuenta, así que no hay que acordarse de nada.
 
 ### 6.1 La plantilla de ancho estable `"888"`
 
@@ -438,7 +464,7 @@ y las tres apps lo heredan de una vez — que es el motivo de que el barrel exis
 >    diámetro entero y la biela sola se veían mal. Más los **dos pedales inclinados y paralelos**.
 >
 > Ajustado contra **dos capturas ampliadas del 840 real** a la vez: coincide en el **87 %** de los
-> píxeles del mapa chico y el **96 %** del grande. Validado a ojo por el autor en el simulador.
+> píxeles del mapa chico y el **94 %** del grande. Validado a ojo por el autor en el simulador.
 >
 
 > 🔑 **LECCIÓN DE MEDICIÓN, y es la más reutilizable de todo esto: hacen falta DOS tamaños.** Con una
@@ -451,16 +477,13 @@ y las tres apps lo heredan de una vez — que es el motivo de que el barrel exis
 > **la fuente numérica de la familia bitmap no tiene el glifo de ESPACIO** y el separador `" / "` salía
 > como dos cajas *notdef*. Estaba también en la **Opción J, publicada**. Arreglado en el barrel
 > (`INLINE_SEP` sin espacios; el label conserva los suyos porque va en fuente de texto). Hecho y regla
-> en `GARMIN_MTB_SPEC.md` §3.4.1. Ojo con la
-> pista que ya tenemos: con seis campos las celdas son chicas, y ahí conviven tres cosas nuevas — el glifo (que **es más alto que el
-> renglón y puede asomar en la banda del valor**), su umbral `ICON_MIN_H`, y la reserva de ancho que
-> puede empujar el label al nombre corto. Es el primer lugar donde mirar. **Y el 830 es la otra familia
-> de fuentes**, donde el label usa `FONT_SMALL` (ascent 17) en vez de `FONT_GLANCE`, así que el glifo
-> sale más grande que en el 840: 23×19 contra 19×16.
+> en `GARMIN_MTB_SPEC.md` §3.4.1.
 >
-> **Lo ya probado, para no repetirlo en la próxima vuelta:** (a) versión 1, un aro con una diagonal
-> cruzándolo entero → leía como un signo de prohibido; (b) versión 2, la actual, con el interior abierto
-> y el glifo atravesando el renglón. Las constantes a mover están al final de la sección.
+> ⚠️ **Y la razón por la que ese síntoma apuntaba al sospechoso equivocado:** «cosas raras en el 830 con
+> seis campos» describe celdas chicas, que es justo donde conviven el glifo asomando en la banda del
+> valor, el umbral `ICON_MIN_H` y la reserva de ancho que empuja el label al nombre corto — tres cosas
+> nuestras y recién agregadas. El defecto no era ninguna: era el layout **ancho** de la misma pantalla.
+> **Lección: un reporte visual nombra dónde el autor lo vio, no qué lo causó.**
 
 El campo nativo del Edge **antepone un pictograma al nombre** de algunas métricas y no de otras: un
 cronómetro en `TIEMPO`, un corazón en `ZONA`, **una biela en `CADENCIA`**; `VELOCIDAD`, `DISTANCIA` y
@@ -543,11 +566,15 @@ Detalles del comportamiento, todos verificados con el probe headless de §9.1:
   con gracia que la rampa de la Opción B. Tirarlo deja exactamente el comportamiento anterior.
 - **Debajo de `ICON_MIN_H = 15` px no se dibuja:** a 13 px la geometría se convierte en una mancha
   (verificado renderizándola). En una celda que fuerza `FONT_XTINY` no hay glifo.
-- **El tamaño sale del ascent del label**, así que difiere por familia de fuentes: **23×19 en el 830**
-  (que usa `FONT_SMALL`; idéntico al nativo) y **19×16 en el 840** (que usa `FONT_GLANCE`, más chica).
-  ⚠️ El 840 es el caso a mirar primero: es el más chico de los dos.
-- **El glifo puede asomar 1-2 px dentro de la banda del valor**, porque es más alto que el renglón. El
-  valor va centrado en su banda con holgura, y **el nativo hace lo mismo**.
+- **El tamaño sale del ascent del label**, así que difiere por familia de fuentes: con el factor final
+  (`ICON_H_NUM = 134`) el probe mide **28×22 en el 830** (label en `FONT_SMALL`, ascent 17) y **25×20 en
+  el 840** (`FONT_GLANCE`, ascent 15) — la tabla completa está más arriba en esta misma sección, y es la
+  que manda. ⚠️ El 840 es el caso a mirar primero: es el más chico de los dos. Las cifras de la muestra
+  **nativa** son otra cosa y no hay que confundirlas: 23×18 px en celda chica y 30×26 en celda ancha.
+- **El glifo asoma 5 px dentro de la banda del valor en el 840 y 6 px en el 830**, porque es más alto que
+  el renglón — igual que el nativo. Queda ~3 px de aire hasta la tinta de los dígitos en una celda de
+  62 px: ajustado, pero medido y sin tocarse. ⚠️ Subir `ICON_H_NUM` come ese aire, y **afecta a las dos
+  apps de la familia**.
 
 ## 7. Settings — la referencia configurable (2026-07-27)
 
@@ -678,7 +705,7 @@ la ronda de review previa no compraba información nueva. El id de beta de K que
 |---|---|---|
 | 1 | ~~Íconos propios~~ — **CERRADO el 2026-07-28** (§3.4): **biela** con los pedales a 18°, los 13 launchers + master + ícono de ficha, todo generado por código. El primer diseño (pedal cuadrado) se descartó por no decir cadencia. | ✅ |
 | 1b | ~~Assets de la ficha~~ — **hero** a la par del de J (nitidez medida) y **tres capturas bajo los 150 KB** del portal (§3.4.4, §3.4.5). | ✅ |
-| 2 | ~~El glifo de la biela no coincidía con el nativo~~ — **CERRADO el 2026-07-28** (§6.3), en cuatro vueltas y con capturas ampliadas del 840 real: coincide en el **87 %** de los píxeles del tamaño chico y el **96 %** del grande, y el autor lo validó a ojo en el simulador. Las perillas quedan documentadas por si hace falta: `ICON_H_NUM`/`ICON_DY_NUM` en el barrel y las fracciones de `drawCadenceIcon`. | ✅ |
+| 2 | ~~El glifo de la biela no coincidía con el nativo~~ — **CERRADO el 2026-07-28** (§6.3), en cuatro vueltas y con capturas ampliadas del 840 real: coincide en el **87 %** de los píxeles del tamaño chico y el **94 %** del grande, y el autor lo validó a ojo en el simulador. Las perillas quedan documentadas por si hace falta: `ICON_H_NUM`/`ICON_DY_NUM` en el barrel y las fracciones de `drawCadenceIcon`. | ✅ |
 | 3 | ~~«En el 830 con seis campos se ven cosas raras»~~ — **DIAGNOSTICADO Y ARREGLADO el 2026-07-28**: era el glifo de ESPACIO ausente en la fuente numérica de la familia bitmap, no el glifo de la biela (§6.3 y `GARMIN_MTB_SPEC.md` §3.4.1). | ✅ |
 | 4 | **Resto de la validación visual en el simulador** (F5, `TEST_MODE = true`): que la flecha siga al promedio, que los dos tramos de 0 no muestren flecha, el layout en celdas de varios tamaños, y el paseo *promedio → objetivo → promedio* cambiando el setting en caliente, que en el simulador sí se puede (§7). | autor |
 | 5 | **Validación en device real** con sensor de cadencia: que nuestro promedio coincida con el nativo, y de paso cerrar §4.1 (¿incluye los ceros?). | autor |
