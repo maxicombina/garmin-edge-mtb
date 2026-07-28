@@ -340,19 +340,98 @@ y las tres apps lo heredan de una vez — que es el motivo de que el barrel exis
 
 ### 6.3 El glifo de la biela junto al label (2026-07-27) — y el hook nuevo del barrel
 
+> ⏳ **ESTADO: TERCERA ITERACIÓN, hecha con capturas del device y pendiente de la mirada del autor
+> (2026-07-28).** Rechazó la segunda (*«no se ve igual, aún no te queda bien bien»*) y mandó **dos
+> capturas del 840 real con el glifo a DOS TAMAÑOS**: 23×18 px en una celda chica y 30×26 px en una
+> celda ancha. Se extrajeron los dos mapas de píxeles y la geometría se ajustó contra **los dos a la
+> vez**: coincide en el **87 %** de los píxeles del chico y el **96 %** del grande (91,9 % de promedio).
+>
+> 🔑 **LECCIÓN DE MEDICIÓN, y es la más reutilizable de todo esto: hacen falta DOS tamaños.** Con una
+> sola captura no se puede distinguir **una fracción de una constante** — cualquier medida encaja como
+> «tantos píxeles» y como «tanto por ciento del alto», y las dos dan resultados distintos al escalar.
+> Los dos tamaños fijan las proporciones de verdad. Vale para el próximo glifo que haya que copiar.
+>
+> ✅ **EL SEGUNDO PENDIENTE («en el 830 con seis campos se ven cosas raras») YA ESTÁ DIAGNOSTICADO Y
+> ARREGLADO (2026-07-28).** No era del glifo: en el layout **ancho** el 830 mostraba `95 ⃞/⃞ 81` porque
+> **la fuente numérica de la familia bitmap no tiene el glifo de ESPACIO** y el separador `" / "` salía
+> como dos cajas *notdef*. Estaba también en la **Opción J, publicada**. Arreglado en el barrel
+> (`INLINE_SEP` sin espacios; el label conserva los suyos porque va en fuente de texto). Hecho y regla
+> en `GARMIN_MTB_SPEC.md` §3.4.1. Ojo con la
+> pista que ya tenemos: con seis campos las celdas son chicas, y ahí conviven tres cosas nuevas — el glifo (que **es más alto que el
+> renglón y puede asomar en la banda del valor**), su umbral `ICON_MIN_H`, y la reserva de ancho que
+> puede empujar el label al nombre corto. Es el primer lugar donde mirar. **Y el 830 es la otra familia
+> de fuentes**, donde el label usa `FONT_SMALL` (ascent 17) en vez de `FONT_GLANCE`, así que el glifo
+> sale más grande que en el 840: 23×19 contra 19×16.
+>
+> **Lo ya probado, para no repetirlo en la próxima vuelta:** (a) versión 1, un aro con una diagonal
+> cruzándolo entero → leía como un signo de prohibido; (b) versión 2, la actual, con el interior abierto
+> y el glifo atravesando el renglón. Las constantes a mover están al final de la sección.
+
 El campo nativo del Edge **antepone un pictograma al nombre** de algunas métricas y no de otras: un
 cronómetro en `TIEMPO`, un corazón en `ZONA`, **una biela en `CADENCIA`**; `VELOCIDAD`, `DISTANCIA` y
 `TEMPERATURA` van sin nada. Por eso K lleva glifo y J no.
 
-**Medido, no inventado** (captura del autor, 246×322): el glifo nativo es **23×19 px** al lado de una
-mayúscula de **12 px**, y deja **3 px** antes del texto. De ahí salen el aspecto 23/19, el `ICON_GAP = 3`
-y las fracciones de la geometría. Se validó dibujando la misma geometría fuera del device a 13/15/17/19
-y 25 px y comparando los píxeles contra los del nativo.
+**Medido, no inventado** (dos capturas ampliadas del **840 real**). En la celda chica el glifo mide
+**23×18 px** al lado de una mayúscula de **12**, deja **3 px** antes del texto, arranca **3 px por
+encima del techo de la mayúscula** y **termina 3 px POR DEBAJO de la línea base**. En la celda ancha
+mide **30×26** con mayúscula de **19**, hueco de 4, y arranca 5 arriba / termina 2 abajo. De ahí salen
+todas las constantes.
 
-**Forma:** un aro, la **biela cruzándolo en diagonal** y un **pedal en cada punta**. Se dibuja con
-primitivas (`drawCircle` + `drawLine` + dos `fillRectangle`), **no con un glifo de fuente** — misma
-razón que la flecha: la cobertura de un símbolo no está garantizada en los 13 devices y **un glifo
-ausente es invisible**, no una caja.
+⚠️ **DOS COSAS QUE EL PRIMER INTENTO HIZO MAL, las dos encontradas por el autor comparando capturas
+ampliadas — y las dos son lecciones, no descuidos:**
+
+1. **La forma:** ver la lista de arriba. **Tres** lecturas equivocadas antes de la buena, todas por
+   intentar deducir la forma de un mapa de 18-19 px de alto: diámetro completo → brazo horizontal
+   tangente → una sola biela. La buena son **dos bielas con el hueco en el centro**.
+2. **El glifo NO cabe dentro del renglón: lo ATRAVIESA.** Yo lo había encajado en la banda del ascent,
+   así que quedaba chico y apretado dentro de la altura de las mayúsculas. El nativo lo dibuja **más
+   alto que el texto**, empezando arriba de las mayúsculas y **bajando por debajo de la línea base** —
+   que es exactamente lo que el autor señaló («la biela baja por debajo del texto»). Es lo que lo hace
+   leer como un objeto al lado de la palabra en vez de una letra más.
+
+**La altura se expresa contra el `ascent`**, que es lo que la API da (la altura de mayúscula no la da
+nadie): alto = **`ascent × 1,34`** y el techo del glifo = techo del label `+ ascent × 0,18`.
+
+⚠️ **Ese factor NO es la proporción del nativo (que sería 1,12): está subido a propósito, y el motivo es
+CUANTIZACIÓN — dos veces.**
+
+1. Con **1,12** el **edge840 daba un glifo de 16 px**, más chico que la muestra nativa más chica que
+   tenemos (18), y **por debajo de ~18 px la biela y los pedales se disuelven contra el aro**. El autor
+   lo describió exactamente así: *«la biela superior izquierda no está, falta la línea»*.
+2. Con **1,20** el 840 caía en 18 y el 830 en 20, y el autor notó que **el pedal inclinado «se ve mucho
+   mejor en el 830»** — el mismo dibujo, dos píxeles de tamaño de diferencia.
+
+**Factor actual: `ascent × 1,34`**, que lleva al 840 también a 20. **Medido con el probe headless:**
+
+| Device | ascent del label | glifo | dy | banda del label | **asoma en la banda del valor** |
+|---|---|---|---|---|---|
+| edge840 | 15 | **25×20** | 2 | 21 px | **5 px** |
+| edge830 | 17 | **28×22** | 3 | 23 px | **6 px** |
+
+**Lección general: copiar una proporción no alcanza si el resultado cae por debajo del tamaño donde la
+forma se puede resolver en píxeles enteros. Hay que comprobar el tamaño FINAL en cada device.**
+
+⚠️ **El costo, y es lo que hay que vigilar:** cuanto más alto el glifo, más asoma dentro de la banda del
+valor. En una celda de 62 px quedan ~3 px de aire hasta la tinta de los dígitos — no se toca, pero está
+ajustado. Si alguna vez hay que recuperar espacio, la perilla es `ICON_H_NUM` en el barrel, y **el efecto
+se ve en las dos apps de la familia**.
+
+**Forma — leerla bien costó tres intentos, y los dos errores previos valen como aviso:**
+
+- **DOS bielas sobre la misma diagonal, y el detalle que cuesta ver: LA DIAGONAL ESTÁ INTERRUMPIDA EN
+  EL CENTRO DEL ARO.** Son dos trazos cortos —uno que baja desde arriba-izquierda, otro que sale hacia
+  abajo-derecha— con un **hueco** entre ellos donde iría el eje. Eso explica los dos errores previos: un
+  **diámetro completo** llena el aro y **lee como un signo de prohibido**, y **quitar el brazo de
+  arriba** deja el glifo manco (el autor lo cazó al toque: *«la biela superior izquierda no está, falta
+  la línea»*).
+- **LOS DOS PEDALES ESTÁN INCLINADOS**, y paralelos entre sí: son dos plataformas en la misma
+  perspectiva. Ese ángulo es la mitad de lo que los hace leer como pedales y no como guiones — y es
+  el motivo de que se dibujen como **líneas gruesas** (`drawLine` + `setPenWidth`) y no como
+  rectángulos.
+
+Todo con primitivas (`drawCircle` + cuatro `drawLine`), **no con un glifo de fuente** — misma razón que
+la flecha: la cobertura de un símbolo no está garantizada en los 13 devices y **un glifo ausente es
+invisible**, no una caja.
 
 **Dónde vive el layout, que es la parte interesante.** El label lo dibuja el barrel, así que hubo que
 darle soporte **sin que el barrel sepa qué está dibujando** (la regla de §3.2). La solución es un
@@ -369,10 +448,11 @@ Detalles del comportamiento, todos verificados con el probe headless de §9.1:
   con gracia que la rampa de la Opción B. Tirarlo deja exactamente el comportamiento anterior.
 - **Debajo de `ICON_MIN_H = 15` px no se dibuja:** a 13 px la geometría se convierte en una mancha
   (verificado renderizándola). En una celda que fuerza `FONT_XTINY` no hay glifo.
-- **El tamaño sale del ascent del label**, así que difiere por familia de fuentes: **21×17 en el 830**
-  (que usa `FONT_SMALL`, casi el tamaño nativo) y **18×15 en el 840** (que usa `FONT_GLANCE`).
-  ⚠️ **El 840 cae EXACTAMENTE en el umbral de 15**, y a ese tamaño el interior del aro queda apretado.
-  Se lee, pero es el caso a mirar primero en el simulador.
+- **El tamaño sale del ascent del label**, así que difiere por familia de fuentes: **23×19 en el 830**
+  (que usa `FONT_SMALL`; idéntico al nativo) y **19×16 en el 840** (que usa `FONT_GLANCE`, más chica).
+  ⚠️ El 840 es el caso a mirar primero: es el más chico de los dos.
+- **El glifo puede asomar 1-2 px dentro de la banda del valor**, porque es más alto que el renglón. El
+  valor va centrado en su banda con holgura, y **el nativo hace lo mismo**.
 
 ## 7. Settings — la referencia configurable (2026-07-27)
 
@@ -497,10 +577,12 @@ proyecto y queda fuera del `.iq` — esperado, pasa en las cuatro apps). **Sin p
 | # | Pendiente | De quién |
 |---|---|---|
 | 1 | ~~Íconos propios~~ — **HECHO el 2026-07-27** (§3.4): pedal cuadrado, los 13 launchers + los assets de tienda, todo generado por código. Ya no bloquea la subida. | ✅ |
-| 2 | **Validación visual en el simulador** (F5, `TEST_MODE = true`): que la flecha siga al promedio, que los dos tramos de 0 no muestren flecha, el layout en celdas de varios tamaños, **el glifo de la biela en el 840** (cae justo en el umbral de 15 px, §6.3) y el paseo *promedio → objetivo → promedio* cambiando el setting en caliente, que en el simulador sí se puede (§7). | autor |
-| 3 | **Validación en device real** con sensor de cadencia: que nuestro promedio coincida con el nativo, y de paso cerrar §4.1 (¿incluye los ceros?). | autor |
-| 4 | **Assets de la ficha** del store (capturas, hero, textos) cuando se decida subirla. | ambos |
-| 5 | **Prueba a ciegas del ícono** (opcional, §3.4): el de J la pasó y cambió el diseño; el de K no. | asistente, si se pide |
+| 2 | ⛔ **EL GLIFO DE LA BIELA TODAVÍA NO COINCIDE con el nativo** (§6.3). El autor lo miró en el simulador el 2026-07-27 y lo rechazó; **espera una captura ampliada suya** para medir. Constantes a mover: `ICON_H_NUM`/`ICON_DY_NUM` en el barrel (alto y cuánto baja) y las fracciones de `drawCadenceIcon` (forma). | asistente, con captura |
+| 3 | ~~«En el 830 con seis campos se ven cosas raras»~~ — **DIAGNOSTICADO Y ARREGLADO el 2026-07-28**: era el glifo de ESPACIO ausente en la fuente numérica de la familia bitmap, no el glifo de la biela (§6.3 y `GARMIN_MTB_SPEC.md` §3.4.1). | ✅ |
+| 4 | **Resto de la validación visual en el simulador** (F5, `TEST_MODE = true`): que la flecha siga al promedio, que los dos tramos de 0 no muestren flecha, el layout en celdas de varios tamaños, y el paseo *promedio → objetivo → promedio* cambiando el setting en caliente, que en el simulador sí se puede (§7). | autor |
+| 5 | **Validación en device real** con sensor de cadencia: que nuestro promedio coincida con el nativo, y de paso cerrar §4.1 (¿incluye los ceros?). | autor |
+| 6 | **Assets de la ficha** del store (capturas, hero, textos) cuando se decida subirla. | ambos |
+| 7 | **Prueba a ciegas del ícono** (opcional, §3.4): el de J la pasó y cambió el diseño; el de K no. | asistente, si se pide |
 
 **No es un pendiente de esta app:** la **Opción L** (frecuencia cardíaca) está **en pausa** esperando
 una decisión de producto del autor — si la flecha va sobre **bpm** o sobre la **zona de FC**, que es lo

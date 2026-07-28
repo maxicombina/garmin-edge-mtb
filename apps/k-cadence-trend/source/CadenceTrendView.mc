@@ -26,9 +26,10 @@ class CadenceTrendView extends WatchUi.DataField {
     // near 200 rpm), so "888" is a real upper bound on every value displayString can produce.
     private const VALUE_TPL = "888";
 
-    // Label glyph: the crank symbol, 23x19 px on the native field -> aspect 23/19. See
-    // drawCadenceIcon for the geometry and where it was measured.
-    private const ICON_ASPECT = 23.0 / 19.0;
+    // Label glyph box, width/height. The native measures 23x18 in a small cell and 30x26 in a wide one
+    // (1.28 and 1.15); 1.25 sits between them and, importantly, leaves room for the lower pedal, whose
+    // far end reaches 1.205 of the height. See drawCadenceIcon for the geometry and its source.
+    private const ICON_ASPECT = 1.25;
 
     private var mRenderer as TrendCore.TrendRenderer;
 
@@ -160,27 +161,50 @@ class CadenceTrendView extends WatchUi.DataField {
     // Public and un-annotated on purpose: the barrel invokes it, and a barrel cannot depend on this
     // app's (:debug)/(:release) exclusions.
     function drawCadenceIcon(dc as Graphics.Dc, x as Number, y as Number, w as Number, h as Number) as Void {
-        // Everything scales off h, so the shape is identical at every size.
-        var ring = (0.105 * h + 0.5).toNumber();       // ring thickness
-        if (ring < 2) { ring = 2; }
-        var arm = (0.10 * h + 0.5).toNumber();         // crank arm thickness
-        if (arm < 2) { arm = 2; }
-        var cx = x + 0.60 * h;
-        var cy = y + 0.55 * h;
-        var r = 0.335 * h;
-        // The crank arm, upper-left to lower-right, crossing the ring.
-        dc.setPenWidth(arm);
-        dc.drawLine(x + 0.24 * h, y + 0.15 * h, x + 0.97 * h, y + 0.90 * h);
-        // The ring. Drawn with drawCircle at half the thickness inset, so the stroke lands inside r.
-        dc.setPenWidth(ring);
-        dc.drawCircle(cx, cy, r - ring / 2.0);
+        // FITTED AGAINST THE NATIVE'S PIXELS, AT TWO SIZES. The author sent enlarged captures of the
+        // real 840 showing this glyph in a small cell (23x18 px) and in a full-width one (30x26 px);
+        // both maps were extracted and this geometry was fitted against BOTH at once. Match: 87 % of
+        // the pixels on the small one, 94 % on the large one. Having two sizes is what pinned the
+        // proportions down -- one size alone cannot tell a fraction from a constant. Do not "tidy" a
+        // number here without redoing that comparison.
+        //
+        // THE SHAPE. It is a crank seen at an angle: a ring, TWO arms on the same diagonal, and a
+        // tilted pedal at the end of each. What took several readings to see is that
+        //
+        //     THE DIAGONAL IS INTERRUPTED AT THE CENTRE OF THE RING.
+        //
+        // The two arms are short stubs -- one from the upper left, one to the lower right -- with a
+        // GAP between them where the hub would be. That is why drawing a full diameter looked wrong
+        // (it reads as a "forbidden" sign, the ring gets filled) and why dropping the upper arm
+        // altogether looked wrong too (the author spotted that one immediately: "the upper left crank
+        // is not there, the line is missing"). Both errors were made here before this version.
+        //
+        // BOTH PEDALS ARE TILTED, and parallel to each other -- two platforms in the same perspective.
+        // That tilt is most of what makes them read as pedals instead of dashes, and it is why they
+        // are drawn as thick LINES rather than as rectangles.
+        var ringT = (0.101 * h + 0.5).toNumber();
+        if (ringT < 2) { ringT = 2; }
+        var armT = (0.078 * h + 0.5).toNumber();
+        if (armT < 2) { armT = 2; }
+        var pedT = (0.10 * h + 0.5).toNumber();
+        if (pedT < 2) { pedT = 2; }
+        var cx = x + 0.59 * h;
+        var cy = y + 0.46 * h;
+        // Ring. Inset by half the stroke so the pen lands inside the radius.
+        dc.setPenWidth(ringT);
+        dc.drawCircle(cx, cy, 0.343 * h - ringT / 2.0);
+        dc.setPenWidth(armT);
+        // Upper-left arm: a stub that stops SHORT of the centre (see the gap note above). It reaches
+        // a little further in than the native's ink does, and starts a little further back, because
+        // below ~18 px a shorter stub disappears into the ring's edge and the crank reads as missing.
+        dc.drawLine(x + 0.215 * h, y + 0.105 * h, x + 0.465 * h, y + 0.335 * h);
+        // Lower-right arm: from the centre out, crossing the ring's lower right edge.
+        dc.drawLine(cx, cy, x + 0.96 * h, y + 0.895 * h);
+        // The two pedals.
+        dc.setPenWidth(pedT);
+        dc.drawLine(x + 0.345 * h, y + 0.03 * h, x, y + 0.12 * h);
+        dc.drawLine(x + 1.205 * h, y + 0.87 * h, x + 0.77 * h, y + 0.94 * h);
         dc.setPenWidth(1);                             // restore: the renderer draws text next
-        // The two pedals: short horizontal bars at the ends of the arm.
-        var pl = (0.30 * h + 0.5).toNumber();          // pedal length
-        var pt = (0.155 * h + 0.5).toNumber();         // pedal thickness
-        if (pt < 2) { pt = 2; }
-        dc.fillRectangle(x + 0.24 * h - pl / 2, y + 0.13 * h - pt / 2, pl, pt);
-        dc.fillRectangle(x + 0.97 * h - pl / 2, y + 0.92 * h - pt / 2, pl, pt);
     }
 
     // --- Simulator-only synthetic generator. One call = one second. Walks a cadence profile and

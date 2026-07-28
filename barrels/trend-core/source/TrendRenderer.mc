@@ -63,6 +63,22 @@ module TrendCore {
         private const ICON_GAP = 3;          // px between the label glyph and the label text
         private const ICON_MIN_H = 15;       // below this the glyph turns to mush -- drop it instead
                                              // (checked by rendering the geometry at 13 px)
+        // The glyph is TALLER THAN THE TEXT and straddles it: on the native field it starts above the
+        // capitals and ends BELOW the baseline. Measured on the 840 capture: glyph 19 px tall against a
+        // 12 px cap height, starting 3 px below the font box top and ending 4 px under the baseline.
+        // Expressed against the label's ASCENT (which the API gives; cap height it does not):
+        // 134, NOT the 112 the native's own ratio suggests, and the reason is quantisation, twice over:
+        //   * at 112 the edge840 came out at 16 px, SMALLER than the smallest native sample (18), and
+        //     below ~18 px the crank arm and the pedals dissolve into the ring. The author saw exactly
+        //     that: "the upper left crank is not there".
+        //   * at 120 the 840 landed on 18 and the 830 on 20, and the author noticed the tilted pedal
+        //     "looks much better on the 830" -- the same drawing, two pixels of size apart.
+        // 134 puts the 840 on 20 as well. COST, and it is the thing to watch: the taller the glyph, the
+        // further it pokes into the value band below (measured in Option K's SPEC 6.3).
+        private const ICON_H_NUM = 134;      // glyph height = ascent * 134/100
+        private const ICON_H_DEN = 100;
+        private const ICON_DY_NUM = 18;      // glyph top = label top + ascent * 18/100
+        private const ICON_DY_DEN = 100;
         // Native-style unit: a small "km/h" drawn to the right of the number as "km" over "h", the two
         // lines CENTRED on each other and the bottom line's baseline on the digits' baseline -- measured
         // off the native VELOCIDAD field (2026-07-25, edge840 sim @246x322: digits ink 27px tall, unit
@@ -142,6 +158,7 @@ module TrendCore {
         private var mLabelFont as Graphics.FontType = Graphics.FONT_GLANCE;
         private var mIconW as Number = 0;             // 0 = no label glyph this cell (absent or dropped)
         private var mIconH as Number = 0;
+        private var mIconDy as Number = 0;            // px from the label's top to the glyph's top
         private var mShowRef as Boolean = false;
         private var mPrimaryBandH as Number = 0;      // height of the current-value band (below the label)
         private var mRefBandH as Number = 0;          // height of the reference band (below the primary band)
@@ -269,7 +286,7 @@ module TrendCore {
                  + " unitBlockW=" + unitBlockWidth(dc, mUnitFont)
                  + " refF h=" + dc.getFontHeight(mRefFont)
                  + " label=\"" + mLabelText + "\" labelF a=" + Graphics.getFontAscent(mLabelFont)
-                 + " icon=" + mIconW + "x" + mIconH
+                 + " icon=" + mIconW + "x" + mIconH + "+dy" + mIconDy
                  + " labelH=" + mLabelH + " showRef=" + mShowRef + " wide=" + mIsWide
                  + " arrowFits=" + mArrowFits
                  // Which arrow route this cell resolved to, so the console answers "glyph or primitive?"
@@ -321,10 +338,13 @@ module TrendCore {
                     // Group [glyph + gap + text] centred as a unit, like Option B centres [ramp + label].
                     var tw = dc.getTextWidthInPixels(mLabelText, mLabelFont);
                     var gx = w / 2 - (mIconW + ICON_GAP + tw) / 2;
-                    // The glyph's box is aligned with the text's ASCENT band, so it sits on the same
-                    // optical line as the letters rather than on the font box (which reserves a descent
-                    // the capitals never use -- the repo's centring rule, one level down).
-                    mIconCb.invoke(dc, gx, LABEL_MARGIN, mIconW, mIconH);
+                    // The glyph STRADDLES the text: it starts a little below the font box top and its
+                    // box is taller than the ascent, so it ends BELOW the baseline -- which is what the
+                    // native field does and what makes it read as an object next to the word instead of
+                    // a letter squeezed into the line. It can therefore poke a pixel or two into the
+                    // value band below; the value is centred in its band with slack, so that is fine
+                    // (and the native does the same).
+                    mIconCb.invoke(dc, gx, LABEL_MARGIN + mIconDy, mIconW, mIconH);
                     dc.setColor(fg, Graphics.COLOR_TRANSPARENT);   // the callback may have changed it
                     dc.drawText(gx + mIconW + ICON_GAP, LABEL_MARGIN, mLabelFont, mLabelText,
                                 Graphics.TEXT_JUSTIFY_LEFT);
@@ -664,25 +684,28 @@ module TrendCore {
             if (mIconCb == null) {
                 return 0;
             }
-            var h = Graphics.getFontAscent(f);
-            if (h < ICON_MIN_H) {
+            var a = Graphics.getFontAscent(f);
+            if (a < ICON_MIN_H) {
                 return 0;
             }
+            var h = (a * ICON_H_NUM) / ICON_H_DEN;
             return ((h * mIconAspect) + 0.5).toNumber() + ICON_GAP;
         }
 
         private function sizeIcon(f as Graphics.FontType) as Void {
             mIconW = 0;
             mIconH = 0;
+            mIconDy = 0;
             if (mIconCb == null) {
                 return;
             }
-            var h = Graphics.getFontAscent(f);
-            if (h < ICON_MIN_H) {
+            var a = Graphics.getFontAscent(f);
+            if (a < ICON_MIN_H) {
                 return;      // mush at this size; the label alone is better than a smudge
             }
-            mIconH = h;
-            mIconW = ((h * mIconAspect) + 0.5).toNumber();
+            mIconH = (a * ICON_H_NUM) / ICON_H_DEN;
+            mIconW = ((mIconH * mIconAspect) + 0.5).toNumber();
+            mIconDy = (a * ICON_DY_NUM) / ICON_DY_DEN;
         }
 
         // The BIGGEST font a label may use, decided by MEASURING, not by naming devices.

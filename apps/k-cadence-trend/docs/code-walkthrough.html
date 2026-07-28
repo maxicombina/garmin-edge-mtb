@@ -421,14 +421,61 @@
         <code>DISTANCIA</code> o <code>TEMPERATURA</code>. Por eso K lleva glifo y la J no.
       </p>
       <p>
-        La forma es un aro con la <strong>biela cruzándolo en diagonal y un pedal en cada punta</strong>, y
-        está <strong>medida de una captura del autor</strong>, no inventada: 23×19 px al lado de una
-        mayúscula de 12, con 3 px de hueco antes del texto. De ahí salen el aspecto y todas las
-        fracciones, que se validaron dibujando la misma geometría fuera del device a 13, 15, 17, 19 y 25
-        px y comparando los píxeles con los del nativo. Se dibuja con primitivas
-        (<code>drawCircle</code> + <code>drawLine</code> + dos <code>fillRectangle</code>), por la misma
-        razón que la flecha: un glifo de fuente que falte es <em>invisible</em>, no una caja.
+        Está <strong>medida de una captura ampliada del 840 real</strong>, no inventada: 23×19 px al lado
+        de una mayúscula de 12, con 3 px de hueco antes del texto. Se dibuja con primitivas
+        (<code>drawCircle</code> + dos <code>drawLine</code> + dos <code>fillRectangle</code>), por la
+        misma razón que la flecha: un glifo de fuente que falte es <em>invisible</em>, no una caja.
       </p>
+      <p>
+        <strong>Y salió mal dos veces antes de salir bien</strong>, las dos encontradas por el autor
+        poniendo su captura al lado de la nuestra. Vale contarlas porque ninguna era un descuido:
+      </p>
+      <div class="cards">
+        <div class="card">
+          <h3>La diagonal está cortada al medio</h3>
+          <p>Son <strong>dos bielas sobre la misma diagonal, con un hueco en el centro</strong> donde iría
+             el eje. Eso explica los tres intentos fallidos: un <strong>diámetro completo</strong> llena el
+             aro y lee como un <em>signo de prohibido</em>; un brazo largo horizontal no existe; y con una
+             sola biela el glifo queda manco — el autor lo vio al instante.</p>
+        </div>
+        <div class="card">
+          <h3>Los pedales van inclinados</h3>
+          <p>Y paralelos entre sí: son <strong>dos plataformas en la misma perspectiva</strong>. Ese
+             ángulo es la mitad de lo que los hace leer como pedales y no como guiones — y es la razón
+             de que se dibujen como líneas gruesas y no como rectángulos.</p>
+        </div>
+        <div class="card">
+          <h3>No cabe en el renglón: lo atraviesa</h3>
+          <p>Yo lo había encajado dentro de la altura de las mayúsculas, y quedaba chico y apretado. El
+             nativo lo dibuja <strong>más alto que el texto</strong>: empieza por encima de las
+             mayúsculas y <strong>termina por debajo de la línea base</strong>. Es lo que lo hace leer
+             como un objeto al lado de la palabra y no como una letra más.</p>
+        </div>
+      </div>
+      <p style="margin-top:16px">
+        La altura se expresa contra el <strong>ascent</strong> del label, que es lo que la API da — la
+        altura de mayúscula no la da nadie: alto = <code>ascent × 1,20</code>, techo del glifo = techo del
+        label <code>+ ascent × 0,18</code>.
+      </p>
+      <div class="note">
+        <p><strong>Ese 1,20 no es la proporción del nativo, que sería 1,12 — está subido a propósito, y
+        la razón es cuantización.</strong> Con la proporción fiel, en el 840 el glifo salía de
+        <strong>16 px</strong>: más chico que la muestra nativa más chica que teníamos (18), y por debajo
+        de ~18 px <strong>la biela y los pedales se disuelven contra el aro</strong>. El autor lo describió
+        tal cual — «la biela superior izquierda no está». Con 1,20 el 840 cae en 18, el tamaño chico del
+        propio nativo. <strong>Regla: copiar la proporción no alcanza si el resultado cae por debajo del
+        tamaño donde la forma se puede resolver en píxeles enteros. Hay que mirar el tamaño final en cada
+        device.</strong></p>
+      </div>
+      <div class="note">
+        <p><strong>La lección de medición, que es la más reutilizable de todo esto: hacen falta DOS
+        tamaños.</strong> El autor mandó el glifo nativo en una celda chica (23×18 px) y en una ancha
+        (30×26), y la geometría se ajustó contra los dos mapas de píxeles <em>a la vez</em> —
+        <strong>87 %</strong> de coincidencia en el chico, <strong>96 %</strong> en el grande. Con una
+        sola captura no se puede distinguir <strong>una fracción de una constante</strong>: la misma
+        medida encaja como «N píxeles» y como «N % del alto», y al escalar dan cosas distintas. Ese fue
+        el error de fondo de los primeros intentos.</p>
+      </div>
       <p>
         Lo interesante está en <strong>dónde vive el layout</strong>. El label lo dibuja el barrel, así
         que había que darle soporte <strong>sin que el barrel se enterara de qué dibuja</strong> — la regla
@@ -450,15 +497,16 @@
         </div>
         <div class="card">
           <h3>Difiere por familia de fuentes</h3>
-          <p>El tamaño sale del ascent del label: <strong>21×17 en el 830</strong> (casi el nativo) y
-             <strong>18×15 en el 840</strong>. Debajo de 15 px no se dibuja, porque a 13 la geometría se
-             vuelve una mancha — comprobado renderizándola.</p>
+          <p>El tamaño sale del ascent del label: <strong>25×20 en el 830</strong> y
+             <strong>20×18 en el 840</strong>, cuya fuente de label es más chica. Debajo de 15 px no se
+             dibuja: a 13 la geometría se vuelve una mancha, comprobado renderizándola.</p>
         </div>
       </div>
       <div class="note">
-        <p>⚠️ <strong>El 840 cae exactamente en ese umbral de 15 px</strong>, y ahí el interior del aro
-        queda apretado. Se lee, pero es el primer caso a mirar en el simulador. Lo verifiqué con un probe
-        sin pantalla que imprime lo que el motor eligió celda por celda, en los dos devices.</p>
+        <p>Los dos números de arriba están <strong>medidos, no derivados</strong>: un probe sin pantalla
+        instancia la vista real y imprime lo que el motor eligió, en los dos devices. En el 830 devuelve
+        exactamente las medidas del nativo. El 840, que es el más chico de los dos, es el primer caso a
+        mirar en el simulador.</p>
       </div>
     </div>
   </section>
