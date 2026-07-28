@@ -132,10 +132,28 @@ d=np.sqrt(((xx-W*icon_cx)/(W*0.78))**2+((yy-H*0.5)/(H*0.95))**2)
 t=np.clip(d,0,1)[:,:,None]**0.9
 canvas=BG_IN*(1-t)+BG_OUT*t
 
+# --- Mezcla en LUZ LINEAL (esto es MEJOR que el hero de la J, y a proposito) -------------------
+# El de J mezcla directamente los valores de 8 bits, que estan codificados en gamma sRGB. Mezclar en
+# gamma un blanco de 255 contra un navy de ~20 da un resultado MAS OSCURO que la mezcla fisicamente
+# correcta, y eso ensucia justo el filo donde la tarjeta blanca se encuentra con el fondo azul -- que
+# es donde el autor dijo "el cambio de color no esta bien". Se paga solo en los pixeles con alpha
+# fraccionario, o sea los arcos de las esquinas; el interior (alpha 1) sale identico.
+def to_lin(c):
+    c=np.clip(c,0,255)/255.0
+    return np.where(c<=0.04045, c/12.92, ((c+0.055)/1.055)**2.4)
+def to_srgb(l):
+    l=np.clip(l,0.0,1.0)
+    return np.where(l<=0.0031308, l*12.92, 1.055*l**(1/2.4)-0.055)*255.0
+
 def paste(img, alpha, x, y):
     h,w=alpha.shape
     reg=canvas[y:y+h, x:x+w]
-    canvas[y:y+h, x:x+w]=reg*(1-alpha[:,:,None])+img*alpha[:,:,None]
+    a=alpha[:,:,None]
+    hard=(a>=1.0)
+    mixed=to_srgb(to_lin(reg)*(1-a)+to_lin(img)*a)
+    # Donde alpha es exactamente 1 se copia el original tal cual: ida y vuelta por la curva sRGB
+    # redondea y moveria algun valor un nivel sin motivo.
+    canvas[y:y+h, x:x+w]=np.where(hard, img, mixed)
 
 def shadow(x, y, w, h, spread=18, strength=0.55):
     """Sombra suave DEBAJO de la tarjeta: una caja difuminada por sumas acumuladas, desplazada hacia
