@@ -44,9 +44,10 @@ la pusiste (se ve en el sandbox del simulador: hay un archivo de settings por ap
 métrica mostraría **la misma métrica en todas las instancias del campo**, así que no podrías ver
 velocidad y cadencia a la vez — que es exactamente para lo que uno querría el campo.
 
-Costo aceptado: **tres apps** (J velocidad, K cadencia, L frecuencia cardíaca) ocupando tres de los
-~10 slots de campo del device, tres fichas en la store y tres ids. A cambio, cada una se puede poner
-en la pantalla junto a las otras.
+Costo aceptado: **una app por métrica** ocupando un slot de campo cada una, con su ficha y su id.
+A cambio, cada una se puede poner en la pantalla junto a las otras. La cuenta final fue **dos** —
+J velocidad y K cadencia—: la FC se evaluó como Opción L y **se descartó** el 2026-07-30 por motivos
+de producto, no de arquitectura (`GARMIN_MTB_SPEC.md` §4, «las tres preguntas»).
 
 ### 1.2 Vehículo de aprendizaje
 
@@ -114,7 +115,7 @@ hace falta, el barrel tiene su copia namespaceada (`TrendCore.TestUtil`).
 `barrels/trend-core/` aporta el **clasificador** (`TrendCore.TrendArrow`, puro y genérico) y el
 **motor de render entero** (`TrendCore.TrendRenderer`, ~840 líneas: escalera de fuentes, unidad
 apilada estilo nativo, flecha glifo-o-primitiva con el hueco reservado, modo inline para celdas
-anchas, caché por celda). Lo aporta **compartido con J y con la futura L**.
+anchas, caché por celda). Lo aporta **compartido con J** — y con cualquier consumidor futuro, aunque la familia se cerró en dos (la FC se descartó el 2026-07-30, `GARMIN_MTB_SPEC.md` §4).
 
 | Lo aporta el BARREL (compartido) | Lo aporta ESTA app (propio de la cadencia) |
 |---|---|
@@ -166,12 +167,12 @@ cambió: la silueta tiene que ganarse su lugar diciendo cuál es la métrica.
 
 ### 3.4.1 EL SISTEMA DE LA FAMILIA (lo importante de esta sección)
 
-Vale más que este ícono, porque manda sobre los que vengan (la Opción L y las que sigan):
+Vale más que este ícono, porque manda sobre los que vengan:
 
 | | |
 |---|---|
 | **CONSTANTE** — dice «esto es tendencia contra tu promedio» | cara oscura + **raya ámbar** (= tu promedio) + **flecha blanca** cruzándola |
-| **VARIABLE** — dice **qué métrica es** | la **SILUETA EXTERIOR**, en cobalto: aro de rueda = velocidad, **biela = cadencia**, corazón = frecuencia cardíaca |
+| **VARIABLE** — dice **qué métrica es** | la **SILUETA EXTERIOR**, en cobalto: aro de rueda = velocidad, **biela = cadencia**. (La familia se cerró en dos: la FC quedó descartada el 2026-07-30, ver `GARMIN_MTB_SPEC.md` §4.) |
 
 **Por qué la métrica va en la silueta y NUNCA en un detalle interior:** a 35 px el detalle no existe,
 la silueta sí. Está verificado mirando los launchers de 35 px de J y K lado a lado.
@@ -712,12 +713,20 @@ la ronda de review previa no compraba información nueva. El id de beta de K que
 | 6 | **Los TEXTOS de la ficha** (título y descripción EN+ES) — lo único que falta para completar la subida de la `v0.1.0`. Van directo al portal: por decisión del 2026-07-27 los textos de ficha **no se versionan en el repo** (ver `CLAUDE.md` §«Flujo de release»). El formulario **no acepta markdown**. ⚠️ Tienen que **mencionar los dos settings**: están en esta misma versión, y a J le pasó publicar una ficha que decía que no había nada que configurar. | autor |
 | 7 | **Prueba a ciegas del ícono** (opcional, §3.4): el de J la pasó y cambió el diseño; el de K no. | asistente, si se pide |
 
-**No es un pendiente de esta app:** la **Opción L** (frecuencia cardíaca) está **en pausa** esperando
-una decisión de producto del autor — si la flecha va sobre **bpm** o sobre la **zona de FC**, que es lo
-que él usa. Ojo con la segunda: las zonas se leen con
-`UserProfile.getHeartRateZones(UserProfile.getCurrentSport())` y eso **exige declarar el permiso
-`UserProfile`** en el manifest; hoy **ninguna app del repo declara permisos**, y los permisos se le
-muestran al usuario al instalar.
+**K es la ÚLTIMA de la familia: la Opción L (frecuencia cardíaca) se DESCARTÓ el 2026-07-30.** Estaba en
+pausa esperando decidir *bpm o zona*, y la respuesta fue **ninguna de las dos**: la flecha de tendencia
+solo se gana el lugar si la métrica es **inmediata**, **controlable directamente** y **sin una referencia
+propia mejor**. La cadencia da sí a las tres —de ahí esta app—; la FC da **no a las tres** (llega con
+30-60 s de retraso, se gobierna solo vía el esfuerzo, y su referencia natural **ya existe y se llama
+zona**), más el defecto fatal de que el promedio de FC arrastra el calentamiento y deja la flecha clavada
+en ▲ el resto de la salida. El criterio completo, con la tabla por métrica, está en
+[`GARMIN_MTB_SPEC.md`](../../GARMIN_MTB_SPEC.md) §4 («las tres preguntas»); **córrelo antes de agregar
+cualquier métrica nueva a la familia**.
+
+Consecuencia práctica para esta app: **el barrel no va a tener un tercer consumidor por ahora**, así que
+cualquier cosa que se le agregue se justifica por J + K solas. Y **este repo sigue sin declarar ningún
+permiso**: el `UserProfile` que L habría necesitado —para los límites de zona, no para el pulso— se fue
+con ella.
 
 ## 11. Referencias
 

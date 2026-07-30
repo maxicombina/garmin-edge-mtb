@@ -4,7 +4,7 @@
 
   WHY THIS EXISTS. Option J's view is ~840 lines of render engine that took days to tune against
   the native field (ascent-not-height gate, native stacked unit, arrow glyph with a measured
-  fallback, the reserved arrow slot). Options K (cadence) and L (heart rate) are the SAME field with
+  fallback, the reserved arrow slot). Option K (cadence) is the SAME field with
   a different metric, so copying that engine would mean fixing every future render bug three times.
   The repo rule is "nothing shared between apps without an explicit decision" (CLAUDE.md); this
   barrel IS that explicit decision, taken 2026-07-27, and it stays extractable to its own repo

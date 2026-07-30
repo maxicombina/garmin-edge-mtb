@@ -58,7 +58,7 @@ j-trend-arrow/
 │
 │   # MIGRADO 2026-07-27 (§3.4): `TrendArrow.mc` y `TrendArrowTest.mc` ya NO viven acá — los da
 │   # `barrels/trend-core/` como `TrendCore.TrendArrow`, junto con el motor de render entero
-│   # (`TrendCore.TrendRenderer`), compartido con las Opciones K y L.
+│   # (`TrendCore.TrendRenderer`), compartido con la Opción K.
 ├── resources/
 │   ├── strings/strings.xml     # AppName, SpeedLabel (+ SpeedLabelShort, §6.10), AvgLabel — settings/ desde §9 (v1 no tenía)
 ├── resources-spa/strings/      # español

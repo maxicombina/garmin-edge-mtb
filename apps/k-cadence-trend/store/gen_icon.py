@@ -20,7 +20,7 @@ EL SISTEMA DE LA FAMILIA, que es lo que hay que respetar al agregar la Opcion L 
               entiende: 0 de 7 observadores identificaron el objeto, 7 de 7 llegaron a "linea de
               referencia que la flecha cruza".
     VARIABLE (dice QUE metrica es): la SILUETA EXTERIOR, en cobalto. Aro de rueda = velocidad,
-              biela con pedales = cadencia, corazon = frecuencia cardiaca.
+              biela con pedales = cadencia. La familia se cerro en dos (2026-07-30).
     POR QUE ahi: a 35 px no hay detalle, solo silueta. La metrica va en la silueta y NUNCA en un
               detalle interior, que a ese tamano no existe.
 
