@@ -23,7 +23,7 @@ La spec define el contexto (hardware, plataforma, restricciones), **10 opciones 
 | I | Test de subida (VO2max de campo + tracker de forma) | data field / device app | idea |
 | J | Flecha de tendencia estilo Cateye (actual vs. referencia) | data field | **✅ publicada · prod `v0.2.3`** |
 | K | La misma flecha, sobre la **cadencia** | data field | **✅ publicada · prod `v0.1.0`** |
-| L | La misma flecha, sobre la **frecuencia cardíaca** | data field | en diseño |
+| L | La misma flecha, sobre la **frecuencia cardíaca** | data field | **❌ descartada** — la FC falla las tres preguntas ([por qué](GARMIN_MTB_SPEC.md#la-familia-de-la-flecha-de-tendencia--qué-métrica-la-merece-y-qué-métrica-no-decidido-2026-07-30)) |
 
 ## Las apps
 
@@ -65,7 +65,7 @@ apps/<app>/
 ├── docs/          # walkthrough del código en HTML
 └── store/         # RELEASES.md, íconos y assets de la ficha (no son recursos de build)
 
-barrels/trend-core/   # clasificador + motor de render, compartido por J, K y L
+barrels/trend-core/   # clasificador + motor de render, compartido por J y K
 ```
 
 ## Stack

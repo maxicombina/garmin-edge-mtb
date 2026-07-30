@@ -241,7 +241,39 @@ Al terminar la salida, con el usuario **parado**, preguntar una valoración simp
 - **Render:** reusar la flecha up de la Opción B con primitivas `dc` (`drawUpArrow`: cabeza `fillPolygon` + tallo `fillRectangle`, dimensionada al ascent de la fuente como `drawAscentAux`, en `apps/b-grade-vam/source/GradeVamView.mc`) + su **flecha down ESPEJADA**. **NO** usar glifo de flecha de fuente (cobertura no garantizada en los 13 devices — misma precaución que el `%` ausente en las fuentes numéricas). Layout al lado del número; "sin flecha" = no se dibuja nada; color = foreground del tema, atenuado en pausa.
 - **Settings sugeridos:** métrica objetivo (MVP velocidad; extensible a FC/cadencia); ancho de la banda muerta (multiplicador del medio-paso); promedio global (default) vs. ventana móvil (+ largo si móvil); (opcional) suavizado del actual on/off para GPS-only.
 - **Dificultad:** 🟢🟡 baja-media (MVP velocidad es Tier 1, promedio gratis). **Valor MTB:** ⭐⭐⭐⭐.
-- **Rol:** **prioritaria — decidida 2026-07-22.** Indicador genérico, MVP = velocidad. Reusa el primitivo `drawUpArrow` de la Opción B. Arranca standalone sobre velocidad y luego puede **superponerse** a la pendiente/VAM de B o a FC/cadencia sin tocar la lógica del módulo puro.
+- **Rol:** **prioritaria — decidida 2026-07-22.** Indicador genérico, MVP = velocidad. Reusa el primitivo `drawUpArrow` de la Opción B. Arranca standalone sobre velocidad y luego puede **superponerse** a la pendiente/VAM de B o a otra métrica sin tocar la lógica del módulo puro. ⚠️ **Que la lógica sea genérica NO significa que toda métrica merezca la flecha** — ver el criterio de abajo, que descartó la FC.
+
+### La familia de la flecha de tendencia — qué métrica la merece y qué métrica no (DECIDIDO 2026-07-30)
+
+Nació de una pregunta del autor sobre la Opción L (la misma flecha sobre frecuencia cardíaca): *«no me convence este data field, ¿de qué sirve?»*. La respuesta fue que **no sirve**, y al buscar el motivo salió un criterio general, que es lo que vale para las que vengan.
+
+**Las tres preguntas. Una métrica merece la flecha de tendencia solo si las tres dan SÍ:**
+
+1. **¿Es inmediata?** El valor tiene que responder ahora al esfuerzo de ahora. Si la métrica llega con retraso, la flecha informa de algo que ya cambiaste.
+2. **¿La controla el ciclista directamente?** Tiene que haber una acción obvia al ver la flecha (cambiar de piño, apretar). Si solo se controla de forma indirecta, la flecha no es accionable: es un comentario.
+3. **¿Le falta una referencia propia?** La flecha *aporta* una referencia (tu promedio, tu objetivo). Si la métrica ya trae una referencia mejor de fábrica, la flecha compite con ella y pierde.
+
+| Métrica | ¿Inmediata? | ¿Controlable? | ¿Sin referencia propia? | Veredicto |
+|---|---|---|---|---|
+| **Velocidad** (Opción J) | sí | sí | sí | ✅ **en producción** |
+| **Cadencia** (Opción K) | sí | sí | sí | ✅ **en producción** |
+| **Frecuencia cardíaca** (Opción L) | **no** | **no** | **no** | ❌ **DESCARTADA** |
+| Temperatura | no | no | sí | ❌ (y no está en `Activity.Info`, vive en `Sensor.Info`) |
+| Potencia | sí | sí | sí | ✅ en teoría — **imposible acá: el autor no tiene potenciómetro** |
+
+**Por qué la FC falla las tres, y por qué no es un problema de diseño que se pueda arreglar con otro layout:**
+
+- **No es inmediata:** la FC responde con **30-60 s de retraso**. Cuando la flecha se mueve, el esfuerzo que la causó ya pasó.
+- **No es controlable directamente:** se gobierna a través del esfuerzo, no con un gesto. Ver la flecha no habilita ninguna acción que no estuvieras tomando ya.
+- **Ya tiene su referencia, y se llama ZONA.** Una zona *es* una comparación contra tu capacidad — una referencia estructuralmente mejor que «el promedio de la salida de hoy». La flecha estaría compitiendo contra un patrón superior y ya nativo.
+- **Y un cuarto defecto, fatal y medible:** el promedio de FC de la actividad **arrastra el calentamiento**. Los primeros ~20 minutos lo tiran hacia abajo, así que en cuanto la salida se pone dura la flecha apunta arriba y **se queda clavada en ▲ el resto del día**. Un indicador que no cambia no informa.
+- Contra un **objetivo fijo** funciona mejor, pero ahí el Edge ya tiene **alertas de zona**: un pitido le gana a una flecha justamente cuando la gracia es no tener que mirar.
+
+⚠️ **No confundir DISPONIBILIDAD con VALOR.** La tabla de Tiers de la Opción J dice que la FC es Tier 1, y eso sigue siendo cierto: `currentHeartRate` y `averageHeartRate` existen y son gratis. Tier 1 responde *«¿se puede?»*, las tres preguntas responden *«¿sirve?»*. La FC se puede y no sirve.
+
+**Consecuencia: la familia de la flecha es J y K, y se cierra ahí.** Dos no es un fracaso; lo que empujaba a L era **completar el alfabeto**, que es un impulso de coleccionista y no un beneficio para quien instala la app. La letra L queda **libre para otro producto** (la letra es una etiqueta, no un orden — ver `CLAUDE.md`).
+
+**Lo que sí podría hacerse con la FC alguna vez, y pasaría las tres preguntas: la VELOCIDAD DE RECUPERACIÓN.** Cuánto te baja el pulso en la bajada. En XC se sube al límite y se recupera bajando, y la tasa de recuperación de la FC es una señal de forma real que el Edge **no muestra en vivo**. Es inmediata (la caída se ve mientras pasa), es información nueva (ninguna zona la cubre) y no compite con nada nativo. **Sería una opción NUEVA, no la L**, y no está especificada: queda como idea anotada, sin compromiso.
 
 ---
 
